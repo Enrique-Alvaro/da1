@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Auction House API
+  title: Crown Bid API
   description: |
-    REST API for the Auction House mobile application (UADE DA1 - 1C2026).
+    REST API for the Crown Bid mobile application (UADE DA1 - 1C2026).
 
     ## Overview
     This API powers a mobile auction management system where users can:
@@ -31,12 +31,12 @@ info:
     Live auction bidding uses WebSocket connections. See the `/ws/auctions/{id}` section for message formats.
   version: 1.0.0
   contact:
-    name: Auction House Dev Team
+    name: Crown Bid Dev Team
 
 servers:
   - url: http://localhost:3000/api/v1
     description: Local development
-  - url: https://api.auction-house.com/api/v1
+  - url: https://api.crownbid.com/api/v1
     description: Production
 
 tags:
@@ -1065,7 +1065,7 @@ paths:
                   wsUrl:
                     type: string
                     format: uri
-                    example: wss://api.auction-house.com/ws/auctions/1
+                    example: wss://api.crownbid.com/ws/auctions/1
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
