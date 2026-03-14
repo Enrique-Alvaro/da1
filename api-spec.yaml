@@ -560,7 +560,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /users/me/auctions/{auctionId}/bids:
+  /users/me/auctions/{id}/bids:
     get:
       tags: [Users]
       summary: Get own bids in a specific auction
@@ -1149,7 +1149,7 @@ paths:
 
   # ─── BIDDING ────────────────────────────────
 
-  /auctions/{auctionId}/items/{itemId}/bids:
+  /auctions/{id}/items/{itemId}/bids:
     post:
       tags: [Bidding]
       summary: Place a bid
@@ -1171,16 +1171,8 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: auctionId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: itemId
-          in: path
-          required: true
-          schema:
-            type: integer
+        - $ref: "#/components/parameters/AuctionIdParam"
+        - $ref: "#/components/parameters/ItemIdParam"
       requestBody:
         required: true
         content:
@@ -1244,16 +1236,8 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: auctionId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: itemId
-          in: path
-          required: true
-          schema:
-            type: integer
+        - $ref: "#/components/parameters/AuctionIdParam"
+        - $ref: "#/components/parameters/ItemIdParam"
         - $ref: "#/components/parameters/PageParam"
         - $ref: "#/components/parameters/LimitParam"
       responses:
@@ -1275,7 +1259,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /auctions/{auctionId}/items/{itemId}/bids/current:
+  /auctions/{id}/items/{itemId}/bids/current:
     get:
       tags: [Bidding]
       summary: Get current highest bid
@@ -1283,16 +1267,8 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: auctionId
-          in: path
-          required: true
-          schema:
-            type: integer
-        - name: itemId
-          in: path
-          required: true
-          schema:
-            type: integer
+        - $ref: "#/components/parameters/AuctionIdParam"
+        - $ref: "#/components/parameters/ItemIdParam"
       responses:
         "200":
           description: Current highest bid (null if no bids yet)
