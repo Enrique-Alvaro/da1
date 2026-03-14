@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1400, initial-scale=1.0">
+<title>Crown Bid — Plano de Navegación</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1400px; height: 900px;
+    background: #F5F5F5;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    padding: 40px;
+    overflow: hidden;
+  }
+  .title {
+    text-align: center; margin-bottom: 32px;
+  }
+  .title h1 {
+    font-size: 28px; font-weight: 800;
+    color: #1B2838; letter-spacing: 1px;
+  }
+  .title p {
+    font-size: 14px; color: #8E8E93; margin-top: 4px;
+  }
+  .map {
+    position: relative;
+    width: 100%; height: 760px;
+  }
+  .screen {
+    position: absolute;
+    width: 160px;
+    border-radius: 16px;
+    background: #FFFFFF;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    overflow: hidden;
+    border: 2px solid #E0E0E0;
+  }
+  .screen.highlight {
+    border-color: #C5A55A;
+    box-shadow: 0 4px 20px rgba(197,165,90,0.2);
+  }
+  .screen-preview {
+    height: 220px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px;
+    position: relative;
+  }
+  .screen-label {
+    padding: 10px 12px;
+    background: #1B2838;
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+  .screen-sublabel {
+    padding: 6px 12px;
+    font-size: 10px;
+    color: #8E8E93;
+    text-align: center;
+    background: #FFFFFF;
+  }
+
+  /* Positions */
+  .s-splash { left: 20px; top: 240px; }
+  .s-login { left: 240px; top: 240px; }
+  .s-registro { left: 240px; top: 0px; }
+  .s-home { left: 520px; top: 240px; }
+  .s-subasta { left: 800px; top: 240px; }
+  .s-perfil { left: 520px; top: 500px; }
+
+  /* SVG arrows */
+  .arrows {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .arrow-line {
+    stroke: #C5A55A;
+    stroke-width: 2.5;
+    fill: none;
+    marker-end: url(#arrowhead);
+  }
+  .arrow-line-secondary {
+    stroke: #8E8E93;
+    stroke-width: 1.5;
+    stroke-dasharray: 6,4;
+    fill: none;
+    marker-end: url(#arrowhead-gray);
+  }
+  .flow-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    color: #C5A55A;
+    background: #F5F5F5;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .flow-label-gray {
+    color: #8E8E93;
+  }
+
+  /* Legend */
+  .legend {
+    position: absolute;
+    bottom: 0; right: 0;
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .legend-title {
+    font-size: 12px; font-weight: 700;
+    color: #1B2838; margin-bottom: 4px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: #1B2838;
+  }
+  .legend-line {
+    width: 32px; height: 2px;
+    border-radius: 1px;
+  }
+  .legend-line.gold { background: #C5A55A; }
+  .legend-line.gray {
+    background: #8E8E93;
+    background-image: repeating-linear-gradient(
+      90deg, #8E8E93 0, #8E8E93 6px, transparent 6px, transparent 10px
+    );
+    background-color: transparent;
+  }
+
+  /* Color palette section */
+  .palette {
+    position: absolute;
+    bottom: 0; left: 0;
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .palette-title {
+    font-size: 12px; font-weight: 700;
+    color: #1B2838; margin-bottom: 10px;
+  }
+  .palette-colors {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .color-swatch {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+  }
+  .swatch {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: 1px solid #E0E0E0;
+  }
+  .swatch-label {
+    font-size: 9px; font-weight: 600;
+    color: #8E8E93;
+  }
+  .swatch-hex {
+    font-size: 8px; color: #8E8E93;
+  }
+</style>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+</head>
+<body>
+  <div class="title">
+    <h1>Crown Bid — Plano de Navegación</h1>
+    <p>Flujo de pantallas de la aplicación móvil de subastas</p>
+  </div>
+
+  <div class="map">
+    <svg class="arrows" viewBox="0 0 1320 760">
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#C5A55A"/>
+        </marker>
+        <marker id="arrowhead-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#8E8E93"/>
+        </marker>
+      </defs>
+      <!-- Splash → Login -->
+      <line class="arrow-line" x1="180" y1="350" x2="238" y2="350"/>
+      <!-- Login → Home -->
+      <line class="arrow-line" x1="400" y1="350" x2="518" y2="350"/>
+      <!-- Login → Registro -->
+      <line class="arrow-line" x1="320" y1="240" x2="320" y2="180"/>
+      <!-- Registro → Login (back) -->
+      <line class="arrow-line-secondary" x1="340" y1="180" x2="340" y2="240"/>
+      <!-- Home → Subasta -->
+      <line class="arrow-line" x1="680" y1="350" x2="798" y2="350"/>
+      <!-- Home → Perfil -->
+      <line class="arrow-line" x1="600" y1="490" x2="600" y2="500"/>
+      <!-- Perfil → Home (back via tab) -->
+      <line class="arrow-line-secondary" x1="620" y1="500" x2="620" y2="490"/>
+      <!-- Subasta → Home (back) -->
+      <line class="arrow-line-secondary" x1="798" y1="370" x2="680" y2="370"/>
+    </svg>
+
+    <!-- Screens -->
+    <div class="screen highlight s-splash">
+      <div class="screen-preview" style="background: #1B2838;">
+        <span style="font-size: 32px;">👑</span>
+      </div>
+      <div class="screen-label">SPLASH SCREEN</div>
+      <div class="screen-sublabel">Pantalla de carga</div>
+    </div>
+
+    <div class="screen s-login">
+      <div class="screen-preview" style="background: #F5F5F5;">
+        <span>🔐</span>
+      </div>
+      <div class="screen-label">LOGIN</div>
+      <div class="screen-sublabel">Email + Contraseña</div>
+    </div>
+
+    <div class="screen s-registro">
+      <div class="screen-preview" style="background: #F5F5F5;">
+        <span>📝</span>
+      </div>
+      <div class="screen-label">REGISTRO</div>
+      <div class="screen-sublabel">Paso 1 — Datos personales</div>
+    </div>
+
+    <div class="screen highlight s-home">
+      <div class="screen-preview" style="background: linear-gradient(180deg, #1B2838 30%, #F5F5F5 30%);">
+        <span>🏠</span>
+      </div>
+      <div class="screen-label">HOME</div>
+      <div class="screen-sublabel">Subastas próximas</div>
+    </div>
+
+    <div class="screen s-subasta">
+      <div class="screen-preview" style="background: linear-gradient(180deg, #1B2838 20%, #F5F5F5 20%);">
+        <span>🔨</span>
+      </div>
+      <div class="screen-label">SUBASTA EN VIVO</div>
+      <div class="screen-sublabel">Pantalla de puja</div>
+    </div>
+
+    <div class="screen s-perfil">
+      <div class="screen-preview" style="background: linear-gradient(180deg, #1B2838 40%, #F5F5F5 40%);">
+        <span>👤</span>
+      </div>
+      <div class="screen-label">PERFIL</div>
+      <div class="screen-sublabel">Historial + Medios de pago</div>
+    </div>
+
+    <!-- Flow labels -->
+    <div class="flow-label" style="left: 185px; top: 330px;">Auto</div>
+    <div class="flow-label" style="left: 430px; top: 330px;">Login OK</div>
+    <div class="flow-label" style="left: 260px; top: 200px;">Registrarse</div>
+    <div class="flow-label" style="left: 700px; top: 330px;">Tap subasta</div>
+    <div class="flow-label" style="left: 610px; top: 486px;">Tab Perfil</div>
+    <div class="flow-label flow-label-gray" style="left: 700px; top: 376px;">← Volver</div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-title">Leyenda</div>
+      <div class="legend-item">
+        <div class="legend-line gold"></div>
+        Flujo principal
+      </div>
+      <div class="legend-item">
+        <div class="legend-line gray"></div>
+        Navegación secundaria
+      </div>
+    </div>
+
+    <!-- Color Palette -->
+    <div class="palette">
+      <div class="palette-title">Paleta de Colores — Crown Bid</div>
+      <div class="palette-colors">
+        <div class="color-swatch">
+          <div class="swatch" style="background: #1B2838;"></div>
+          <span class="swatch-label">Primary</span>
+          <span class="swatch-hex">#1B2838</span>
+        </div>
+        <div class="color-swatch">
+          <div class="swatch" style="background: #C5A55A;"></div>
+          <span class="swatch-label">Accent</span>
+          <span class="swatch-hex">#C5A55A</span>
+        </div>
+        <div class="color-swatch">
+          <div class="swatch" style="background: #F5F5F5;"></div>
+          <span class="swatch-label">Background</span>
+          <span class="swatch-hex">#F5F5F5</span>
+        </div>
+        <div class="color-swatch">
+          <div class="swatch" style="background: #FFFFFF;"></div>
+          <span class="swatch-label">Surface</span>
+          <span class="swatch-hex">#FFFFFF</span>
+        </div>
+        <div class="color-swatch">
+          <div class="swatch" style="background: #8E8E93;"></div>
+          <span class="swatch-label">Secondary</span>
+          <span class="swatch-hex">#8E8E93</span>
+        </div>
+        <div class="color-swatch">
+          <div class="swatch" style="background: #34C759;"></div>
+          <span class="swatch-label">Success</span>
+          <span class="swatch-hex">#34C759</span>
+        </div>
+        <div class="color-swatch">
+          <div class="swatch" style="background: #FF3B30;"></div>
+          <span class="swatch-label">Error</span>
+          <span class="swatch-hex">#FF3B30</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390, initial-scale=1.0">
+<title>Crown Bid — Login</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 390px; height: 844px;
+    background: #F5F5F5;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .status-bar {
+    height: 54px; padding: 0 24px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    font-size: 15px; font-weight: 600; color: #1B2838;
+    padding-bottom: 8px;
+  }
+  .header {
+    display: flex; flex-direction: column;
+    align-items: center; padding: 40px 24px 32px;
+  }
+  .header-logo {
+    width: 64px; height: 64px;
+    background: #1B2838; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
+  .header-logo svg { width: 40px; height: 40px; }
+  .header h1 {
+    font-size: 28px; font-weight: 700; color: #1B2838;
+    letter-spacing: 1px;
+  }
+  .header p {
+    font-size: 15px; color: #8E8E93; margin-top: 8px;
+  }
+  .form {
+    padding: 0 24px; display: flex;
+    flex-direction: column; gap: 16px;
+    margin-top: 16px;
+  }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-group label {
+    font-size: 13px; font-weight: 600;
+    color: #1B2838; text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .input-group input {
+    height: 52px; border-radius: 12px;
+    border: 1.5px solid #E0E0E0;
+    background: #FFFFFF; padding: 0 16px;
+    font-size: 16px; color: #1B2838;
+    outline: none;
+  }
+  .input-group input::placeholder { color: #8E8E93; }
+  .forgot {
+    text-align: right; font-size: 13px;
+    color: #C5A55A; font-weight: 600;
+    text-decoration: none; margin-top: -4px;
+  }
+  .btn-primary {
+    height: 56px; border-radius: 14px;
+    background: #C5A55A; border: none;
+    color: #FFFFFF; font-size: 17px;
+    font-weight: 700; letter-spacing: 0.5px;
+    cursor: pointer; margin-top: 12px;
+    box-shadow: 0 4px 16px rgba(197,165,90,0.3);
+  }
+  .divider {
+    display: flex; align-items: center;
+    gap: 16px; margin-top: 24px; padding: 0 24px;
+  }
+  .divider span {
+    font-size: 13px; color: #8E8E93; white-space: nowrap;
+  }
+  .divider hr {
+    flex: 1; border: none;
+    border-top: 1px solid #E0E0E0;
+  }
+  .register-link {
+    text-align: center; margin-top: 24px;
+    font-size: 15px; color: #8E8E93;
+  }
+  .register-link a {
+    color: #C5A55A; font-weight: 700;
+    text-decoration: none;
+  }
+  .bottom-spacer { flex: 1; }
+  .home-indicator {
+    width: 134px; height: 5px;
+    background: #1B2838; border-radius: 3px;
+    margin: 0 auto 8px; opacity: 0.2;
+  }
+</style>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+</head>
+<body>
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>⦿ ⦿ ⦿</span>
+  </div>
+
+  <div class="header">
+    <div class="header-logo">
+      <svg viewBox="0 0 40 40" fill="none">
+        <path d="M6 26L10 14L16 20L20 10L24 20L30 14L34 26Z" fill="#C5A55A" stroke="#C5A55A" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="6" y="26" width="28" height="5" rx="1.5" fill="#C5A55A"/>
+      </svg>
+    </div>
+    <h1>CROWN BID</h1>
+    <p>Ingresá a tu cuenta</p>
+  </div>
+
+  <form class="form" onsubmit="return false;">
+    <div class="input-group">
+      <label>Email</label>
+      <input type="email" placeholder="tu@email.com">
+    </div>
+    <div class="input-group">
+      <label>Contraseña</label>
+      <input type="password" placeholder="••••••••">
+    </div>
+    <a href="#" class="forgot">¿Olvidaste tu contraseña?</a>
+    <button class="btn-primary">Ingresar</button>
+  </form>
+
+  <div class="divider">
+    <hr><span>o continuar con</span><hr>
+  </div>
+
+  <div class="register-link">
+    ¿No tenés cuenta? <a href="#">Registrate</a>
+  </div>
+
+  <div class="bottom-spacer"></div>
+  <div class="home-indicator"></div>
+</body>
+</html>
