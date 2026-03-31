@@ -1,0 +1,863 @@
+openapi: 3.0.3
+info:
+  title: CrownBid API - MVP
+  version: 1.0.0
+  description: |-
+    Documentación de la API para la aplicación móvil de subastas **CrownBid**.
+    Diseñada para cumplir con los requerimientos de la primera entrega (MVP).
+    
+    Contempla flujos de autenticación, exploración de catálogos de subasta, control de actividad (pujas y victorias), validación de medios de pago y el proceso de enviar de artículos propios para futuras subastas.
+servers:
+  - url: https://api.crownbid.com/v1
+    description: Entorno de Producción
+  - url: http://localhost:8080/v1
+    description: Entorno de Desarrollo Local
+tags:
+  - name: Auth
+    description: Registro y autenticación
+  - name: Users
+    description: Información del perfil
+  - name: Auctions
+    description: Exploración y listado de subastas
+  - name: Items
+    description: Catálogo y detalle de bienes/artículos
+  - name: Live Bids
+    description: Actividad conectada a la subasta en vivo y pujas
+  - name: User Activity
+    description: Historial de subastas, pujas y victorias del usuario
+  - name: Payment Methods
+    description: Gestión de modalidades de pago del usuario
+  - name: Item Submissions
+    description: Solicitudes de subasta de artículos propios
+
+paths:
+  # ============================
+  # AUTHENTICATION
+  # ============================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar nuevo usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registro exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '409':
+          description: El email ya se encuentra en uso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================
+  # USERS
+  # ============================
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Obtener perfil autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================
+  # AUCTIONS
+  # ============================
+  /auctions:
+    get:
+      tags: [Auctions]
+      summary: Listar subastas
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [scheduled, live, closed]
+          description: Filtrar subastas por estado
+      responses:
+        '200':
+          description: Lista de subastas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Auction'
+
+  /auctions/{auctionId}:
+    get:
+      tags: [Auctions]
+      summary: Detalle de una subasta
+      parameters:
+        - in: path
+          name: auctionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Información detallada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuctionDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auctions/{auctionId}/items:
+    get:
+      tags: [Auctions]
+      summary: Listar ítems de una subasta
+      parameters:
+        - in: path
+          name: auctionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ítems correspondientes a la subasta
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuctionItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================
+  # ITEMS
+  # ============================
+  /items/{itemId}:
+    get:
+      tags: [Items]
+      summary: Ver detalle exhaustivo de un ítem
+      parameters:
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle del ítem
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================
+  # LIVE BIDS
+  # ============================
+  /auctions/{auctionId}/live:
+    get:
+      tags: [Live Bids]
+      summary: Obtener el estado en vivo de la subasta
+      parameters:
+        - in: path
+          name: auctionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Estado en vivo (bid actual, tiempo restante)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveAuctionStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auctions/{auctionId}/bids:
+    post:
+      tags: [Live Bids]
+      summary: Realizar una puja
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: auctionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBidRequest'
+      responses:
+        '201':
+          description: Puja aceptada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+        '400':
+          description: La subasta no se encuentra en estado 'live'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |-
+            Prohibido. Posibles razones:
+            - Usuario sin categoría suficiente.
+            - Usuario no posee medios de pago verificados cargados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: La puja debe ser mayor a la oferta actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auctions/{auctionId}/bids/history:
+    get:
+      tags: [Live Bids]
+      summary: Ver historial de pujas de la subasta
+      parameters:
+        - in: path
+          name: auctionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Historial de la subasta ordenado por fecha descendente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidHistoryResponse'
+
+  # ============================
+  # USER ACTIVITY
+  # ============================
+  /users/me/auctions:
+    get:
+      tags: [User Activity]
+      summary: Ver subastas en las que el usuario participa/participó
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de subastas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Auction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/bids:
+    get:
+      tags: [User Activity]
+      summary: Ver historial consolidado de pujas del usuario
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de pujas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bid'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/wins:
+    get:
+      tags: [User Activity]
+      summary: Ver subastas que el usuario ha ganado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Subastas y montos finales adjudicados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Auction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================
+  # PAYMENT METHODS
+  # ============================
+  /users/me/payment-methods:
+    get:
+      tags: [Payment Methods]
+      summary: Listar medios de pago del usuario
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Arreglo de métodos de pago
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentMethod'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Payment Methods]
+      summary: Agregar medio de pago
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentMethodRequest'
+      responses:
+        '201':
+          description: Medio de pago agregado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Formato de pago inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/me/payment-methods/{paymentMethodId}:
+    put:
+      tags: [Payment Methods]
+      summary: Editar un medio de pago
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: paymentMethodId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePaymentMethodRequest'
+      responses:
+        '200':
+          description: Medio de pago actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Payment Methods]
+      summary: Eliminar un medio de pago
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: paymentMethodId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Medio de pago eliminado correctamente
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================
+  # ITEM SUBMISSIONS
+  # ============================
+  /item-submissions:
+    post:
+      tags: [Item Submissions]
+      summary: Crear postulación de artículo (tasación)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateItemSubmissionRequest'
+      responses:
+        '201':
+          description: Postulación enviada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemSubmission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Faltan declaraciones requeridas (lawful origin, etc)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/me/item-submissions:
+    get:
+      tags: [Item Submissions]
+      summary: Listar todas las postulaciones del usuario autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Arreglo de iteraciones de postulación
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemSubmission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /item-submissions/{submissionId}:
+    get:
+      tags: [Item Submissions]
+      summary: Ver detalle y estado de una postulación
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: submissionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemSubmission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El usuario intenta ver una postulación que no le pertenece
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ============================
+# COMPONENTS & SCHEMAS
+# ============================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: No autenticado (Token inválido o expirado)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # --- ERROR HANDLING ---
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "InvalidBidException"
+        message:
+          type: string
+          example: "La puja ingresada debe ser estrictamente mayor a la oferta actual."
+        statusCode:
+          type: integer
+          example: 409
+
+    # --- SHARED ENUMS ---
+    UserCategory:
+      type: string
+      enum: [common, special, silver, gold, platinum]
+    
+    UserStatus:
+      type: string
+      enum: [pending_verification, approved, rejected, suspended]
+      
+    AuctionStatus:
+      type: string
+      enum: [scheduled, live, closed]
+      
+    CurrencyEnum:
+      type: string
+      enum: [ARS, USD]
+
+    ItemSubmissionStatus:
+      type: string
+      enum: [pending, under_review, accepted, rejected]
+
+    # --- USER MODELS ---
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        category:
+          $ref: '#/components/schemas/UserCategory'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+
+    RegisterRequest:
+      type: object
+      required: [firstName, lastName, email, password]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5c... (jwt token)"
+        user:
+          $ref: '#/components/schemas/User'
+
+    # --- AUCTION MODELS ---
+    Auction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        coverImageUrl:
+          type: string
+          format: uri
+        categoryRequired:
+          $ref: '#/components/schemas/UserCategory'
+        currency:
+          $ref: '#/components/schemas/CurrencyEnum'
+        basePrice:
+          type: number
+          format: float
+        currentBid:
+          type: number
+          format: float
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/AuctionStatus'
+
+    AuctionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Auction'
+        - type: object
+          properties:
+            itemsCount:
+              type: integer
+            rules:
+              type: array
+              items:
+                type: string
+
+    # --- ITEM MODELS ---
+    AuctionItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        auctionId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+          enum: [unsold, sold]
+        basePrice:
+          type: number
+        currentBid:
+          type: number
+        imageUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+
+    ItemDetail:
+      allOf:
+        - $ref: '#/components/schemas/AuctionItem'
+        - type: object
+          properties:
+            description:
+              type: string
+            artistOrDesigner:
+              type: string
+            historicalContext:
+              type: string
+
+    # --- LIVE ACTION MODELS ---
+    LiveAuctionStatus:
+      type: object
+      properties:
+        auctionId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AuctionStatus'
+        currentBid:
+          type: number
+        highestBidderId:
+          type: string
+          format: uuid
+          nullable: true
+        secondsRemaining:
+          type: integer
+          example: 120
+
+    CreateBidRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+          description: El monto debe ser superior al currentBid activo.
+
+    Bid:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        auctionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        isWinning:
+          type: boolean
+
+    BidHistoryResponse:
+      type: object
+      properties:
+        totalBids:
+          type: integer
+        bids:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bid'
+
+    # --- PAYMENT METHOD MODELS ---
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [credit_card, bank_account, certified_check]
+        displayName:
+          type: string
+          example: "Visa terminada en 4432"
+        lastFour:
+          type: string
+          example: "4432"
+        bankName:
+          type: string
+        holderName:
+          type: string
+        verified:
+          type: boolean
+          description: Solo métodos verificados permiten participar en pujas de alto perfil.
+        status:
+          type: string
+          enum: [active, expired, inactive]
+
+    CreatePaymentMethodRequest:
+      type: object
+      required: [type, holderName, details]
+      properties:
+        type:
+          type: string
+          enum: [credit_card, bank_account, certified_check]
+        holderName:
+          type: string
+        bankName:
+          type: string
+        details:
+          type: object
+          description: Datos crudos para la integración con pasarelas (e.g. token de tarjeta, CBU, etc).
+
+    UpdatePaymentMethodRequest:
+      type: object
+      properties:
+        holderName:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+
+    # --- ITEM SUBMISSIONS MODELS ---
+    ItemSubmission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+        declaredOwnershipAccepted:
+          type: boolean
+        lawfulOriginDeclarationAccepted:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/ItemSubmissionStatus'
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateItemSubmissionRequest:
+      type: object
+      required: [title, description, imageUrls, declaredOwnershipAccepted, lawfulOriginDeclarationAccepted]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        imageUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+        declaredOwnershipAccepted:
+          type: boolean
+          description: Firma digital/checkbox aceptando propiedad.
+        lawfulOriginDeclarationAccepted:
+          type: boolean
+          description: Declaración firmada de procedencia lícita.
