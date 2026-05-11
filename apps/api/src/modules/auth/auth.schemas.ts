@@ -49,6 +49,28 @@ export const changeInitialPasswordBodySchema = z
 
 export type ChangeInitialPasswordBodyInput = z.infer<typeof changeInitialPasswordBodySchema>;
 
+export const forgotPasswordBodySchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("Email inválido")
+    .transform((s) => s.toLowerCase()),
+});
+
+export type ForgotPasswordBodyInput = z.infer<typeof forgotPasswordBodySchema>;
+
+export const resetPasswordBodySchema = z.object({
+  token: z.string().min(10, "El token de restablecimiento es inválido"),
+  password: z
+    .string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .regex(/[a-z]/, "La contraseña debe contener al menos una minúscula")
+    .regex(/[A-Z]/, "La contraseña debe contener al menos una mayúscula")
+    .regex(/[0-9]/, "La contraseña debe contener al menos un número"),
+});
+
+export type ResetPasswordBodyInput = z.infer<typeof resetPasswordBodySchema>;
+
 export function formatZodError(error: z.ZodError): string {
   return error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ");
 }

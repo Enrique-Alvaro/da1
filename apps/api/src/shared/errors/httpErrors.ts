@@ -35,6 +35,13 @@ export class ConflictError extends AppError {
   }
 }
 
+export class GoneError extends AppError {
+  constructor(message: string) {
+    super("GoneError", message, 410);
+    this.name = "GoneError";
+  }
+}
+
 export class ValidationError extends AppError {
   constructor(message: string) {
     super("ValidationError", message, 422);

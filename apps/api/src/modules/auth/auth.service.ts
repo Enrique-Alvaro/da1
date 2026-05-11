@@ -1,14 +1,30 @@
 import { randomUUID } from "crypto";
 import * as authRepository from "./auth.repository";
 import type { DbUserRow } from "./auth.types";
-import type { LoginBodyInput, RegisterBodyInput } from "./auth.schemas";
+import type {
+  ForgotPasswordBodyInput,
+  LoginBodyInput,
+  RegisterBodyInput,
+  ResetPasswordBodyInput,
+} from "./auth.schemas";
 import { generateTemporaryPassword, hashPassword, verifyPassword } from "../../shared/security/passwords";
 import { buildLoginTokenPayload, signAccessToken, verifyAccessToken } from "../../shared/security/jwt";
-import { sendTemporaryPasswordEmail } from "../../shared/email/email.service";
+import { sendPasswordResetEmail, sendTemporaryPasswordEmail } from "../../shared/email/email.service";
+import { getEnv, getPasswordResetTtlMinutes } from "../../config/env";
+import {
+  generatePasswordResetToken,
+  hashPasswordResetToken,
+} from "../../shared/security/resetTokens";
+import * as passwordResetRepository from "./password-reset.repository";
 import { mapUserRowToApi } from "../users/user.mapper";
 import type { AuthUserContext } from "../../shared/types/auth";
 import * as revokedTokenRepository from "./revoked-token.repository";
-import { ConflictError, InternalServerError, UnauthorizedError } from "../../shared/errors/httpErrors";
+import {
+  ConflictError,
+  GoneError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../../shared/errors/httpErrors";
 
 export type RegisterResult = {
   message: string;
@@ -28,6 +44,23 @@ function bit(v: boolean | Buffer | undefined): boolean {
     return v[0] === 1;
   }
   return Boolean(v);
+}
+
+const FORGOT_PASSWORD_GENERIC_MESSAGE =
+  "Si existe una cuenta para este correo, las instrucciones de restablecimiento fueron enviadas.";
+
+function resolvePasswordResetLinkBase(): string {
+  const env = getEnv();
+  const trimmed = env.FRONTEND_URL?.trim();
+  if (trimmed) {
+    return trimmed.replace(/\/$/, "");
+  }
+  if (env.NODE_ENV === "production") {
+    throw new InternalServerError(
+      "FRONTEND_URL es obligatorio en producción para generar el enlace de restablecimiento de contraseña."
+    );
+  }
+  return "http://localhost:3000";
 }
 
 /**
@@ -133,6 +166,88 @@ export async function logout(ctx: AuthUserContext): Promise<void> {
     userId: ctx.id,
     expiresAt: ctx.expiresAt,
   });
+}
+
+/** Generic message always — no account enumeration. */
+export async function forgotPassword(input: ForgotPasswordBodyInput): Promise<{ message: string }> {
+  const email = input.email;
+  const row = await authRepository.findUserByEmailWithPassword(email);
+
+  if (!row) {
+    return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
+  }
+
+  const base = resolvePasswordResetLinkBase();
+
+  const rawToken = generatePasswordResetToken();
+  const tokenHash = hashPasswordResetToken(rawToken);
+  const ttlMs = getPasswordResetTtlMinutes() * 60 * 1000;
+  const expiresAt = new Date(Date.now() + ttlMs);
+
+  await passwordResetRepository.createPasswordResetToken({
+    userId: row.id,
+    tokenHash,
+    expiresAt,
+  });
+
+  const resetUrl = `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+  try {
+    await sendPasswordResetEmail({
+      to: row.email,
+      firstName: row.first_name.trim(),
+      resetUrl,
+    });
+  } catch (error) {
+    console.error("[auth/forgot-password] Email delivery failed", error);
+    throw new InternalServerError(
+      "No se pudo enviar el correo de restablecimiento. Intentá nuevamente más tarde."
+    );
+  }
+
+  return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
+}
+
+export async function resetPassword(input: ResetPasswordBodyInput): Promise<LoginResult> {
+  const tokenHash = hashPasswordResetToken(input.token);
+  const rec = await passwordResetRepository.findResetTokenByHash(tokenHash);
+
+  if (!rec) {
+    throw new UnauthorizedError(
+      "El token de restablecimiento es inválido o ya fue utilizado."
+    );
+  }
+
+  if (rec.used_at_utc != null) {
+    throw new UnauthorizedError(
+      "El token de restablecimiento es inválido o ya fue utilizado."
+    );
+  }
+
+  const now = new Date();
+  if (rec.expires_at_utc <= now) {
+    throw new GoneError("El token de restablecimiento expiró.");
+  }
+
+  const newHash = await hashPassword(input.password);
+  const updated = await passwordResetRepository.completePasswordReset({
+    userId: rec.user_id,
+    passwordHash: newHash,
+  });
+
+  const accessPayload = buildLoginTokenPayload({
+    userId: updated.id,
+    email: updated.email,
+    tokenType: "access",
+  });
+  const accessToken = signAccessToken(accessPayload);
+
+  return {
+    accessToken,
+    user: mapUserRowToApi(updated),
+    mustChangePassword: false,
+    isFirstLogin: false,
+  };
 }
 
 /**

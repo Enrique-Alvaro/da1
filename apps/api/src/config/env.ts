@@ -28,6 +28,8 @@ const rawSchema = z.object({
   SMTP_FROM: z.string().optional(),
 
   FRONTEND_URL: z.string().optional(),
+  /** Password reset link TTL; default 30 in code when unset. */
+  PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().optional(),
 });
 
 export type Env = z.infer<typeof rawSchema> & {
@@ -78,4 +80,9 @@ export function getEnv(): Env {
     return loadEnv();
   }
   return cached;
+}
+
+/** Minutes until password reset token expires (env override or 30). */
+export function getPasswordResetTtlMinutes(): number {
+  return getEnv().PASSWORD_RESET_TOKEN_TTL_MINUTES ?? 30;
 }
