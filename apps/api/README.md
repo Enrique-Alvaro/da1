@@ -22,10 +22,10 @@ Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE
 - `GET /api/health/db` — `SELECT 1` contra SQL Server (`503` si no hay conexión)
 - `POST /api/auth/register` — registro (Phase 2; ver `docs/auth-phase-2-register.md`)
 - `POST /api/auth/login` — login + JWT (Phase 3; ver `docs/auth-phase-3-login.md`)
+- `POST /api/auth/change-initial-password` — primera contraseña definitiva + JWT `access` (Phase 4; ver `docs/auth-phase-4-change-initial-password.md`)
 
-Aún **501** (próximas fases):
+Aún **501**:
 
-- `POST /api/auth/change-initial-password`
 - `POST /api/auth/logout`
 - `GET /api/users/me`
 

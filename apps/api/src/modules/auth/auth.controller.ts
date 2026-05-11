@@ -1,11 +1,17 @@
 import type { RequestHandler } from "express";
 import { NotImplementedError, ValidationError } from "../../shared/errors/httpErrors";
+import { extractBearerToken } from "../../shared/security/bearerToken";
 import { asyncHandler } from "../../shared/utils/asyncHandler";
-import { formatZodError, loginBodySchema, registerBodySchema } from "./auth.schemas";
+import {
+  changeInitialPasswordBodySchema,
+  formatZodError,
+  loginBodySchema,
+  registerBodySchema,
+} from "./auth.schemas";
 import * as authService from "./auth.service";
 
-/** Next milestone for endpoints still not implemented (change-password, logout). */
-const nextPhase = "Phase 4";
+/** Next milestone for endpoints still not implemented (logout). */
+const nextPhase = "Phase 5";
 
 function notImplemented(message: string): RequestHandler {
   return (_req, _res, next) => {
@@ -36,9 +42,21 @@ export const login: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 /** POST /api/auth/change-initial-password */
-export const placeholderChangeInitialPassword = notImplemented(
-  `POST /api/auth/change-initial-password will be implemented in ${nextPhase}.`
-);
+export const changeInitialPassword: RequestHandler = asyncHandler(async (req, res) => {
+  const token = extractBearerToken(req.headers.authorization);
+
+  const parsed = changeInitialPasswordBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+
+  const result = await authService.changeInitialPassword({
+    token,
+    ...parsed.data,
+  });
+
+  res.status(200).json(result);
+});
 
 /** POST /api/auth/logout */
 export const placeholderLogout = notImplemented(

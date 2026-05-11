@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { getEnv } from "../../config/env";
-import { InternalServerError } from "../errors/httpErrors";
+import { InternalServerError, UnauthorizedError } from "../errors/httpErrors";
 
 export type LoginTokenType = "initial_password_change" | "access";
 
@@ -12,6 +12,9 @@ export type LoginAccessPayload = {
   type: LoginTokenType;
   jti: string;
 };
+
+/** Alias for verified login / session tokens (Phase 4+). */
+export type JwtAuthPayload = LoginAccessPayload;
 
 function requireJwtSecret(): string {
   const secret = getEnv().JWT_SECRET?.trim();
@@ -47,19 +50,28 @@ export function signAccessToken(payload: LoginAccessPayload): string {
   return jwt.sign({ sub: payload.sub, email: payload.email, type: payload.type }, secret, options);
 }
 
-export function verifyAccessToken(token: string): LoginAccessPayload {
+export function verifyAccessToken(token: string): JwtAuthPayload {
   const secret = requireJwtSecret();
-  const decoded = jwt.verify(token, secret, {
-    issuer: "crownbid-api",
-  }) as jwt.JwtPayload;
+  let decoded: jwt.JwtPayload;
+  try {
+    decoded = jwt.verify(token, secret, {
+      issuer: "crownbid-api",
+    }) as jwt.JwtPayload;
+  } catch {
+    throw new UnauthorizedError("No autorizado.");
+  }
 
-  const sub = decoded.sub;
+  const sub = typeof decoded.sub === "string" ? decoded.sub : undefined;
   const email = decoded.email;
   const type = decoded.type as LoginTokenType | undefined;
   const jti = decoded.jti;
 
-  if (!sub || typeof email !== "string" || (type !== "access" && type !== "initial_password_change")) {
-    throw new jwt.JsonWebTokenError("Invalid token payload");
+  if (
+    !sub ||
+    typeof email !== "string" ||
+    (type !== "access" && type !== "initial_password_change")
+  ) {
+    throw new UnauthorizedError("No autorizado.");
   }
 
   return {

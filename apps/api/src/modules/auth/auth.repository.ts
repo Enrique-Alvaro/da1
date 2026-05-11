@@ -26,6 +26,39 @@ function sqlErrorInfo(err: unknown): { number?: number } {
   return { number: n };
 }
 
+export async function findUserByIdWithPassword(
+  userId: string
+): Promise<DbUserWithPasswordRow | null> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, userId)
+    .query<DbUserWithPasswordRow>(`
+      SELECT TOP (1)
+        id,
+        first_name,
+        last_name,
+        email,
+        password_hash,
+        document_id,
+        address,
+        country_code,
+        photo_url,
+        document_front_image_url,
+        document_back_image_url,
+        category,
+        status,
+        requires_password_change,
+        bidding_blocked_until_resolved,
+        delinquent_win_id,
+        account_service_suspended
+      FROM dbo.users
+      WHERE id = @id
+    `);
+  const row = result.recordset[0];
+  return row ?? null;
+}
+
 export async function findUserByEmailWithPassword(
   email: string
 ): Promise<DbUserWithPasswordRow | null> {
@@ -54,6 +87,48 @@ export async function findUserByEmailWithPassword(
         account_service_suspended
       FROM dbo.users
       WHERE email = @email
+    `);
+  const row = result.recordset[0];
+  return row ?? null;
+}
+
+/**
+ * Sets definitive password and clears first-login flag. Returns row without password_hash.
+ * No rows if user missing or already completed initial change.
+ */
+export async function updateInitialPassword(params: {
+  userId: string;
+  newPasswordHash: string;
+}): Promise<DbUserRow | null> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, params.userId)
+    .input("password_hash", sql.NVarChar(500), params.newPasswordHash)
+    .query<DbUserRow>(`
+      UPDATE dbo.users
+      SET
+        password_hash = @password_hash,
+        requires_password_change = 0,
+        updated_at = SYSUTCDATETIME()
+      OUTPUT
+        INSERTED.id,
+        INSERTED.first_name,
+        INSERTED.last_name,
+        INSERTED.email,
+        INSERTED.document_id,
+        INSERTED.address,
+        INSERTED.country_code,
+        INSERTED.photo_url,
+        INSERTED.document_front_image_url,
+        INSERTED.document_back_image_url,
+        INSERTED.category,
+        INSERTED.status,
+        INSERTED.requires_password_change,
+        INSERTED.bidding_blocked_until_resolved,
+        INSERTED.delinquent_win_id,
+        INSERTED.account_service_suspended
+      WHERE id = @id AND requires_password_change = 1
     `);
   const row = result.recordset[0];
   return row ?? null;

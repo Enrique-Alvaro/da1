@@ -3,7 +3,7 @@ import * as authRepository from "./auth.repository";
 import type { DbUserRow } from "./auth.types";
 import type { LoginBodyInput, RegisterBodyInput } from "./auth.schemas";
 import { generateTemporaryPassword, hashPassword, verifyPassword } from "../../shared/security/passwords";
-import { buildLoginTokenPayload, signAccessToken } from "../../shared/security/jwt";
+import { buildLoginTokenPayload, signAccessToken, verifyAccessToken } from "../../shared/security/jwt";
 import { sendTemporaryPasswordEmail } from "../../shared/email/email.service";
 import { mapUserRowToApi } from "../users/user.mapper";
 import { ConflictError, InternalServerError, UnauthorizedError } from "../../shared/errors/httpErrors";
@@ -61,6 +61,63 @@ export async function loginUser(body: LoginBodyInput): Promise<LoginResult> {
     user: mapUserRowToApi(withoutPassword as DbUserRow),
     mustChangePassword,
     isFirstLogin,
+  };
+}
+
+/**
+ * First login flow: validate Bearer JWT (initial_password_change), set definitive password, issue access JWT.
+ */
+export async function changeInitialPassword(input: {
+  token: string;
+  currentPassword: string;
+  newPassword: string;
+}): Promise<LoginResult> {
+  const payload = verifyAccessToken(input.token);
+
+  if (payload.type === "access") {
+    throw new ConflictError("El usuario ya completó el cambio inicial de contraseña.");
+  }
+
+  const row = await authRepository.findUserByIdWithPassword(payload.sub);
+  if (!row) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+
+  if (row.email.toLowerCase() !== payload.email.toLowerCase()) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+
+  if (!bit(row.requires_password_change)) {
+    throw new ConflictError("El usuario ya completó el cambio inicial de contraseña.");
+  }
+
+  const currentOk = await verifyPassword(input.currentPassword, row.password_hash);
+  if (!currentOk) {
+    throw new UnauthorizedError("La contraseña actual es incorrecta.");
+  }
+
+  const newHash = await hashPassword(input.newPassword);
+  const updated = await authRepository.updateInitialPassword({
+    userId: row.id,
+    newPasswordHash: newHash,
+  });
+
+  if (!updated) {
+    throw new ConflictError("El usuario ya completó el cambio inicial de contraseña.");
+  }
+
+  const accessPayload = buildLoginTokenPayload({
+    userId: updated.id,
+    email: updated.email,
+    tokenType: "access",
+  });
+  const accessToken = signAccessToken(accessPayload);
+
+  return {
+    accessToken,
+    user: mapUserRowToApi(updated),
+    mustChangePassword: false,
+    isFirstLogin: false,
   };
 }
 
