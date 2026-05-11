@@ -21,6 +21,17 @@ export const registerBodySchema = z.object({
 
 export type RegisterBodyInput = z.infer<typeof registerBodySchema>;
 
+export const loginBodySchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("Email inválido")
+    .transform((s) => s.toLowerCase()),
+  password: z.string().min(1, "La contraseña es obligatoria"),
+});
+
+export type LoginBodyInput = z.infer<typeof loginBodySchema>;
+
 export function formatZodError(error: z.ZodError): string {
   return error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ");
 }

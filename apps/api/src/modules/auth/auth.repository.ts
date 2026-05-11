@@ -1,11 +1,12 @@
 import sql from "mssql";
 import { getSqlPool } from "../../db/sqlServer";
-import type { DbUserRow } from "./auth.types";
+import type { DbUserRow, DbUserWithPasswordRow } from "./auth.types";
 import { ConflictError, ValidationError } from "../../shared/errors/httpErrors";
 
 export type CreateUserInput = {
   id: string;
   email: string;
+  /** Bcrypt hash only — never plaintext. */
   passwordHash: string;
   firstName: string;
   lastName: string;
@@ -25,6 +26,39 @@ function sqlErrorInfo(err: unknown): { number?: number } {
   return { number: n };
 }
 
+export async function findUserByEmailWithPassword(
+  email: string
+): Promise<DbUserWithPasswordRow | null> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("email", sql.NVarChar(320), email.toLowerCase())
+    .query<DbUserWithPasswordRow>(`
+      SELECT TOP (1)
+        id,
+        first_name,
+        last_name,
+        email,
+        password_hash,
+        document_id,
+        address,
+        country_code,
+        photo_url,
+        document_front_image_url,
+        document_back_image_url,
+        category,
+        status,
+        requires_password_change,
+        bidding_blocked_until_resolved,
+        delinquent_win_id,
+        account_service_suspended
+      FROM dbo.users
+      WHERE email = @email
+    `);
+  const row = result.recordset[0];
+  return row ?? null;
+}
+
 export async function findUserByEmail(email: string): Promise<Pick<DbUserRow, "id"> | null> {
   const pool = await getSqlPool();
   const result = await pool
@@ -42,6 +76,8 @@ export async function createUser(input: CreateUserInput): Promise<DbUserRow> {
   req.input("first_name", sql.NVarChar(100), input.firstName);
   req.input("last_name", sql.NVarChar(100), input.lastName);
   req.input("email", sql.NVarChar(320), input.email);
+  // While requires_password_change = 1, password_hash stores the temporary password hash.
+  // After the initial password change (Phase 3+), this same column will store the definitive password hash.
   req.input("password_hash", sql.NVarChar(500), input.passwordHash);
   req.input("document_id", sql.NVarChar(80), input.documentId);
   req.input("address", sql.NVarChar(500), input.address);

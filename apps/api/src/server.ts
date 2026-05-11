@@ -21,6 +21,12 @@ async function bootstrap(): Promise<void> {
   }
   console.info(`[startup] DB warmup: ${dbWarmup}`);
 
+  if (env.NODE_ENV !== "production" && !env.JWT_SECRET?.trim()) {
+    console.warn(
+      "[startup] JWT_SECRET not set — POST /api/auth/login will fail until you configure it."
+    );
+  }
+
   const app = createApp();
   const server = app.listen(env.PORT, () => {
     console.info(`crownbid-api listening on http://localhost:${env.PORT} (${env.NODE_ENV})`);

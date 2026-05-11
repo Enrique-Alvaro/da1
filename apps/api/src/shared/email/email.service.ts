@@ -14,7 +14,7 @@ function isSmtpConfigured(): boolean {
     env.SMTP_HOST?.trim() &&
     env.SMTP_PORT &&
     env.SMTP_USER?.trim() &&
-    env.SMTP_PASSWORD !== undefined &&
+    env.SMTP_PASSWORD?.trim() &&
     env.SMTP_FROM?.trim()
   );
 }

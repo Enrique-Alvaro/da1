@@ -17,3 +17,8 @@ export type DbUserRow = {
   delinquent_win_id: string | null;
   account_service_suspended: boolean | Buffer;
 };
+
+/** Login query — includes hash for verification only; never expose to API. */
+export type DbUserWithPasswordRow = DbUserRow & {
+  password_hash: string;
+};

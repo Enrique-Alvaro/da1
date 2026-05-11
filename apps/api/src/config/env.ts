@@ -64,6 +64,11 @@ export function loadEnv(): Env {
   }
   const data = parsed.data;
   const sqlServerConnectionString = resolveConnectionString(data);
+
+  if (data.NODE_ENV === "production" && !data.JWT_SECRET?.trim()) {
+    throw new Error("JWT_SECRET is required in production");
+  }
+
   cached = { ...data, sqlServerConnectionString };
   return cached;
 }

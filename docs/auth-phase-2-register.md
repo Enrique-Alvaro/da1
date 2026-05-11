@@ -2,7 +2,7 @@
 
 ## 1. Executive summary
 
-**Status:** **PHASE_2_READY_WITH_OBSERVATIONS**
+**Status:** **PHASE_2_CLOSED_READY_FOR_PHASE_3**
 
 `POST /api/auth/register` está implementado con validación Zod, persistencia en `dbo.users`, hash bcrypt de contraseña temporal, envío SMTP o mock en desarrollo, y respuesta alineada al contrato (sin exponer contraseña ni hashes). La validación integral contra una BD real depende de tener **filas en `dbo.countries`** para el código ISO del usuario (FK).
 
@@ -51,6 +51,7 @@ Cuerpo estándar: `{ "error", "message", "statusCode" }`.
 | Hash | **bcryptjs** con costo `BCRYPT_SALT_ROUNDS` (env) o **12** por defecto |
 | Contraseña temporal | `crypto.randomInt` — longitud 12, incluye mayúsculas, minúsculas y dígitos |
 | Persistencia | Solo **hash** en `password_hash`; nunca texto plano |
+| `password_hash` (MVP) | Mientras `requires_password_change = 1`, la columna guarda el **hash de la contraseña temporal**. Tras el cambio de contraseña inicial (fase siguiente), la **misma columna** almacenará el hash de la contraseña definitiva (no existe columna separada en el esquema actual). |
 | Respuesta API | Sin contraseña temporal ni hashes |
 | Logs | Contraseña solo en mock de desarrollo (`NODE_ENV !== production`); no en producción |
 
@@ -61,8 +62,8 @@ Cuerpo estándar: `{ "error", "message", "statusCode" }`.
 | Concepto | Tabla / columna |
 |----------|-----------------|
 | Email | `dbo.users.email` (único) |
-| Hash (temporal o definitiva futura) | `dbo.users.password_hash` |
-| Contraseña temporal separada | **No** hay columna aparte; solo hash vigente |
+| Hash (temporal luego definitiva) | `dbo.users.password_hash` — ver fila anterior en §4 |
+| Contraseña temporal separada | **No** hay columna aparte en el esquema; una sola columna para el hash vigente |
 | requiresPasswordChange | `dbo.users.requires_password_change` = 1 |
 | category | `dbo.users.category` = `'common'` |
 | status | `dbo.users.status` = `'pending_verification'` |
@@ -77,7 +78,7 @@ Cuerpo estándar: `{ "error", "message", "statusCode" }`.
 |---------|----------------|
 | **Development / test** sin SMTP completo | Mock: aviso en consola; en no-producción puede loguearse la contraseña temporal marcada como solo dev |
 | **Production** sin SMTP | Error claro al enviar (tras crear usuario); usuario eliminado por compensación |
-| **SMTP configurado** | **nodemailer** — asunto *CrownBid - Contraseña temporal*, cuerpo con instrucciones |
+| **SMTP configurado** | **nodemailer** — asunto *CrownBid - Contraseña temporal*, cuerpo con instrucciones. Variables SMTP deben ser **no vacías** (incl. contraseña); cadenas en blanco no cuentan como configuradas. |
 
 **Transaccionalidad:** el correo no puede ir dentro de una transacción SQL. Flujo elegido: **INSERT** → **envío email** → si el envío falla (SMTP real), **DELETE** del usuario recién creado y **500** al cliente.
 
@@ -120,7 +121,7 @@ curl -s -X POST http://localhost:3000/api/auth/register \
 
 | Command | Result |
 |---------|--------|
-| `npm run typecheck` | Pass |
+| `npm run typecheck` | Pass (tras pasada correctiva + `@types/express@4`) |
 | `npm run build` | Pass |
 | `npm test` | Placeholder (sin suite) |
 
@@ -133,6 +134,19 @@ curl -s -X POST http://localhost:3000/api/auth/register \
 - Forgot / reset password
 - Auditoría de datos live (Phase 0) si aún pendiente
 - Tests automatizados (no añadidos en esta fase)
+
+---
+
+## 10. Corrective pass (pre-cierre Phase 2)
+
+| Item | Cambio |
+|------|--------|
+| `auth.controller.ts` | Constante única renombrada a `nextPhase` para placeholders 501; imports unificados. |
+| `auth.repository.ts` | Sin código corrupto; comentario explícito sobre `password_hash` temporal vs definitivo. |
+| SMTP | `isSmtpConfigured()` exige `SMTP_PASSWORD` (y demás campos) **trim** no vacío. |
+| `auth.service.ts` | Fallo de email: log del error original (sin contraseña); `deleteUserById` en try/catch aparte si falla la compensación. |
+| Tipos Express | `@types/express` alineado a **v4** con `express@4`. |
+| Documentación | Estado final **PHASE_2_CLOSED_READY_FOR_PHASE_3**. |
 
 ---
 

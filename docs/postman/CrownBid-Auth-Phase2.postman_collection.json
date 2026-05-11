@@ -1,0 +1,284 @@
+{
+  "info": {
+    "_postman_id": "9d484e9d-95be-4ca3-ae0f-95f8aa22d7a0",
+    "name": "CrownBid Auth Phase 2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Coleccion para validar la base de API y el registro de usuario (Phase 2)."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "registerEmail",
+      "value": "nasser.phase2.postman@example.com"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health - API",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health - DB",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health/db",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health",
+            "db"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200 o 503\", function () {",
+              "  pm.expect([200, 503]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register - success (201)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Nasser\",\n  \"lastName\": \"El Bacha\",\n  \"email\": \"{{registerEmail}}\",\n  \"documentId\": \"12345678\",\n  \"address\": \"Av. Siempre Viva 123\",\n  \"country\": \"AR\",\n  \"documentFrontImageUrl\": \"https://example.com/dni-front.jpg\",\n  \"documentBackImageUrl\": \"https://example.com/dni-back.jpg\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"No expone password ni hash\", function () {",
+              "  pm.expect(body).to.not.have.property(\"temporaryPassword\");",
+              "  pm.expect(body).to.not.have.property(\"passwordHash\");",
+              "  pm.expect(body.user).to.not.have.property(\"passwordHash\");",
+              "  pm.expect(body.user).to.not.have.property(\"password_hash\");",
+              "});",
+              "",
+              "pm.test(\"requiresPasswordChange true\", function () {",
+              "  pm.expect(body.user.requiresPasswordChange).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register - duplicate email (409)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Nasser\",\n  \"lastName\": \"El Bacha\",\n  \"email\": \"{{registerEmail}}\",\n  \"documentId\": \"12345678\",\n  \"address\": \"Av. Siempre Viva 123\",\n  \"country\": \"AR\",\n  \"documentFrontImageUrl\": \"https://example.com/dni-front.jpg\",\n  \"documentBackImageUrl\": \"https://example.com/dni-back.jpg\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 409\", function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register - invalid email (422)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Nasser\",\n  \"lastName\": \"El Bacha\",\n  \"email\": \"not-an-email\",\n  \"documentId\": \"12345678\",\n  \"address\": \"Av. Siempre Viva 123\",\n  \"country\": \"AR\",\n  \"documentFrontImageUrl\": \"https://example.com/dni-front.jpg\",\n  \"documentBackImageUrl\": \"https://example.com/dni-back.jpg\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 422\", function () {",
+              "  pm.response.to.have.status(422);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth login placeholder (501)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"secret\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 501\", function () {",
+              "  pm.response.to.have.status(501);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users me placeholder (501)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "me"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 501\", function () {",
+              "  pm.response.to.have.status(501);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
