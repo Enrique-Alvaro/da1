@@ -10,6 +10,7 @@ Backend REST CrownBid (Node.js + Express + TypeScript).
 | `npm run build` | Compila a `dist/` |
 | `npm start` | Ejecuta `dist/server.js` |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Vitest — tests esenciales Auth (`tests/auth.essential.test.ts`) |
 | `npm run db:test` | Prueba de conexión SQL Server (CLI) |
 
 ## Variables de entorno
@@ -28,7 +29,21 @@ Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE
 - `POST /api/auth/forgot-password` — solicitud de restablecimiento (**202** genérico; Phase 7; ver `docs/auth-phase-7-password-recovery.md`)
 - `POST /api/auth/reset-password` — nueva contraseña con token de un solo uso (**200** + JWT; Phase 7; mismo doc)
 
+**Cierre Auth (Phase 8):** QA manual y checklist — `docs/auth-phase-8-manual-qa.md`. Resumen para frontend/mobile — `docs/auth-final-summary.md`.
+
 **Endpoints previstos fuera de esta fase:** otros módulos de negocio (pujas, pagos, etc.) según roadmap.
+
+## Auth flow quick check (local)
+
+1. `POST /api/auth/register` → obtener contraseña temporal (mock o email).
+2. `POST /api/auth/login` con temporal → `mustChangePassword: true`.
+3. `POST /api/auth/change-initial-password` con Bearer (token primer login) → nuevo `accessToken`.
+4. `GET /api/users/me` con Bearer (`access`).
+5. `POST /api/auth/logout` → **204**; mismo token → **401** revocado.
+6. `POST /api/auth/forgot-password` → **202** mensaje genérico.
+7. `POST /api/auth/reset-password` con token del correo/mock → sesión **200**.
+
+Validación detallada: `docs/auth-phase-8-manual-qa.md`.
 
 ## Contrato API
 

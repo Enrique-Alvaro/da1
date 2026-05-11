@@ -50,12 +50,12 @@ export function signAccessToken(payload: LoginAccessPayload): string {
     jwtid: payload.jti,
     issuer: "crownbid-api",
   };
+  /* `jwtid` option sets standard `jti` claim — do not duplicate `jti` in payload (jsonwebtoken rejects). */
   return jwt.sign(
     {
       sub: payload.sub,
       email: payload.email,
       type: payload.type,
-      jti: payload.jti,
     },
     secret,
     options
