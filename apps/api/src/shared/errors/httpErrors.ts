@@ -42,6 +42,13 @@ export class ValidationError extends AppError {
   }
 }
 
+export class InternalServerError extends AppError {
+  constructor(message: string) {
+    super("InternalServerError", message, 500);
+    this.name = "InternalServerError";
+  }
+}
+
 export class NotImplementedError extends AppError {
   constructor(message: string) {
     super("NotImplementedError", message, 501);

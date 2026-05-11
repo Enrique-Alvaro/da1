@@ -16,12 +16,13 @@ Backend REST CrownBid (Node.js + Express + TypeScript).
 
 Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE_URL` como alias). Opcional: JWT, SMTP, `FRONTEND_URL` para fases siguientes.
 
-## Endpoints públicos (Phase 1)
+## Endpoints públicos
 
 - `GET /health`, `GET /api/health` — estado del proceso
 - `GET /api/health/db` — `SELECT 1` contra SQL Server (`503` si no hay conexión)
+- `POST /api/auth/register` — registro (Phase 2; ver `docs/auth-phase-2-register.md`)
 
-Rutas Auth/Users montadas con **501 Not Implemented** hasta Phase 2 — ver `docs/auth-phase-1-foundation.md`.
+Otros Auth (`/login`, `/change-initial-password`, `/logout`) y `GET /users/me` siguen en **501** hasta las siguientes fases.
 
 ## Contrato API
 
