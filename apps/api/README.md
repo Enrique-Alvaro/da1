@@ -2,23 +2,27 @@
 
 Backend REST CrownBid (Node.js + Express + TypeScript).
 
-## Estado
+## Scripts
 
-Estructura de carpetas lista (`src/modules/*`, `routes`, `middlewares`, `shared`). **Sin dependencias instaladas** todavía.
+| Script | Descripción |
+|--------|-------------|
+| `npm run dev` | Servidor con recarga (`tsx watch`) |
+| `npm run build` | Compila a `dist/` |
+| `npm start` | Ejecuta `dist/server.js` |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run db:test` | Prueba de conexión SQL Server (CLI) |
 
-## Probar conexión a SQL Server
+## Variables de entorno
 
-1. Completá `DATABASE_URL` en `.env` (cadena **ADO**, no JDBC). Ejemplo en `.env.example`.
-2. Desde esta carpeta:
+Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE_URL` como alias). Opcional: JWT, SMTP, `FRONTEND_URL` para fases siguientes.
 
-```bash
-npm run db:test
-```
+## Endpoints públicos (Phase 1)
 
-Si ves `Conexión OK` con la base y el login, el driver y la red están bien. Errores típicos: `ELOGIN` (usuario/clave), `ETIMEOUT` (host/puerto o firewall), `certificate` (ajustar `Encrypt` / `TrustServerCertificate`).
+- `GET /health`, `GET /api/health` — estado del proceso
+- `GET /api/health/db` — `SELECT 1` contra SQL Server (`503` si no hay conexión)
 
-## Próximo
+Rutas Auth/Users montadas con **501 Not Implemented** hasta Phase 2 — ver `docs/auth-phase-1-foundation.md`.
 
-1. `npm install` (desde la raíz del monorepo o esta carpeta, según el flujo elegido).
-2. Añadir `express`, `ts-node-dev` / build, validación de envíos, etc. (el driver `mssql` ya está para `db:test`).
-3. Cablear `server.ts` con la app Express y módulos alineados al contrato en `../../docs/api/api-docs.md`.
+## Contrato API
+
+Documentación en `../../docs/api/api-docs.md`.
