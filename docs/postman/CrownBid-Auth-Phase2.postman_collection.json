@@ -1,9 +1,9 @@
 {
   "info": {
     "_postman_id": "9d484e9d-95be-4ca3-ae0f-95f8aa22d7a0",
-    "name": "CrownBid Auth Phase 2",
+    "name": "CrownBid Auth API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Coleccion para validar la base de API y el registro de usuario (Phase 2)."
+    "description": "Flujo auth: registro (Phase 2), login + JWT (Phase 3), cambio contraseña inicial (Phase 4), GET /users/me (Phase 5), logout por jti (Phase 6).\n\nVariables sugeridas:\n- `registerEmail` / `loginEmail`: mismo usuario de prueba.\n- `temporaryPassword`: pegá la contraseña temporal (correo o mock dev) después de registrar.\n- `newPassword`: contraseña nueva que cumple reglas (≥8, mayúscula, minúscula, número).\n\nTras \"Login - success (first login)\", el token se guarda en `accessTokenInitial`. Tras \"Change initial password - success\" o login definitivo, el JWT va a `accessToken` — úsalo en GET /users/me."
   },
   "variable": [
     {
@@ -13,6 +13,26 @@
     {
       "key": "registerEmail",
       "value": "nasser.phase2.postman@example.com"
+    },
+    {
+      "key": "loginEmail",
+      "value": "nasser.phase2.postman@example.com"
+    },
+    {
+      "key": "temporaryPassword",
+      "value": ""
+    },
+    {
+      "key": "newPassword",
+      "value": "NuevaPassword123"
+    },
+    {
+      "key": "accessTokenInitial",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
     }
   ],
   "item": [
@@ -23,13 +43,8 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/health",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "health"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
         }
       },
       "event": [
@@ -53,14 +68,8 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/health/db",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "health",
-            "db"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health", "db"]
         }
       },
       "event": [
@@ -93,14 +102,8 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/auth/register",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "auth",
-            "register"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
         }
       },
       "event": [
@@ -145,14 +148,8 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/auth/register",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "auth",
-            "register"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
         }
       },
       "event": [
@@ -185,14 +182,8 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/auth/register",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "auth",
-            "register"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
         }
       },
       "event": [
@@ -210,7 +201,7 @@
       ]
     },
     {
-      "name": "Auth login placeholder (501)",
+      "name": "Login - success first login (200)",
       "request": {
         "method": "POST",
         "header": [
@@ -221,18 +212,59 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"secret\"\n}"
+          "raw": "{\n  \"email\": \"{{loginEmail}}\",\n  \"password\": \"{{temporaryPassword}}\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/auth/login",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "auth",
-            "login"
-          ]
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Antes de ejecutar: definí `temporaryPassword` (correo o logs dev). Esperado: mustChangePassword e isFirstLogin true."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"accessToken y primer login\", function () {",
+              "  pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+              "  pm.expect(body.mustChangePassword).to.eql(true);",
+              "  pm.expect(body.isFirstLogin).to.eql(true);",
+              "  pm.expect(body.user.requiresPasswordChange).to.eql(true);",
+              "});",
+              "",
+              "if (pm.response.code === 200 && body.accessToken) {",
+              "  pm.collectionVariables.set(\"accessTokenInitial\", body.accessToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login - invalid credentials (401)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{loginEmail}}\",\n  \"password\": \"wrong-password-xyz\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
         }
       },
       "event": [
@@ -241,8 +273,13 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"Status 501\", function () {",
-              "  pm.response.to.have.status(501);",
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"mensaje genérico\", function () {",
+              "  pm.expect(body.message).to.include(\"Credenciales\");",
               "});"
             ]
           }
@@ -250,20 +287,23 @@
       ]
     },
     {
-      "name": "Users me placeholder (501)",
+      "name": "Login - invalid email (422)",
       "request": {
-        "method": "GET",
-        "header": [],
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"secret\"\n}"
+        },
         "url": {
-          "raw": "{{baseUrl}}/api/users/me",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "users",
-            "me"
-          ]
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
         }
       },
       "event": [
@@ -272,8 +312,308 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"Status 501\", function () {",
-              "  pm.response.to.have.status(501);",
+              "pm.test(\"Status 422\", function () {",
+              "  pm.response.to.have.status(422);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Change initial password - success (200)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessTokenInitial}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"{{temporaryPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/change-initial-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "change-initial-password"]
+        },
+        "description": "Ejecutá antes Login - success first login para llenar accessTokenInitial."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"JWT access y flags\", function () {",
+              "  pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+              "  pm.expect(body.mustChangePassword).to.eql(false);",
+              "  pm.expect(body.isFirstLogin).to.eql(false);",
+              "  pm.expect(body.user.requiresPasswordChange).to.eql(false);",
+              "});",
+              "",
+              "if (pm.response.code === 200 && body.accessToken) {",
+              "  pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Change initial password - wrong current password (401)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessTokenInitial}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"wrong-temporary-password\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/change-initial-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "change-initial-password"]
+        },
+        "description": "Usá un token initial válido; contraseña actual incorrecta a propósito."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Change initial password - already completed (409)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessTokenInitial}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"{{temporaryPassword}}\",\n  \"newPassword\": \"OtraPassword456\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/change-initial-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "change-initial-password"]
+        },
+        "description": "Ejecutá después de \"Change initial password - success\" con el mismo `accessTokenInitial`: la API debe responder 409 (usuario ya completó el cambio)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 409\", function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login - success after password change (200)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{loginEmail}}\",\n  \"password\": \"{{newPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Tras completar el cambio inicial con newPassword."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"sin primer login\", function () {",
+              "  pm.expect(body.mustChangePassword).to.eql(false);",
+              "  pm.expect(body.isFirstLogin).to.eql(false);",
+              "  pm.expect(body.user.requiresPasswordChange).to.eql(false);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth logout (204)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "logout"]
+        },
+        "description": "Bearer tipo **access**. Revoca el `jti` en servidor. Ejecutá tras tener `accessToken` (login definitivo o change-password)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 204\", function () {",
+              "  pm.response.to.have.status(204);",
+              "});",
+              "",
+              "pm.test(\"sin cuerpo\", function () {",
+              "  pm.expect(pm.response.text()).to.eql(\"\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users me - success (200)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "me"]
+        },
+        "description": "Usá `accessToken` tras login con contraseña definitiva o tras change-initial-password (variable `accessToken`)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"perfil público sin hash\", function () {",
+              "  pm.expect(body).to.not.have.property(\"password_hash\");",
+              "  pm.expect(body).to.not.have.property(\"passwordHash\");",
+              "  pm.expect(body.id).to.be.a(\"string\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users me - missing token (401)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "me"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users me - first-login token rejected (401)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessTokenInitial}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "me"]
+        },
+        "description": "Ejecutá después de Login - success first login; token tipo initial_password_change no válido para /me."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
               "});"
             ]
           }

@@ -6,6 +6,8 @@ import { generateTemporaryPassword, hashPassword, verifyPassword } from "../../s
 import { buildLoginTokenPayload, signAccessToken, verifyAccessToken } from "../../shared/security/jwt";
 import { sendTemporaryPasswordEmail } from "../../shared/email/email.service";
 import { mapUserRowToApi } from "../users/user.mapper";
+import type { AuthUserContext } from "../../shared/types/auth";
+import * as revokedTokenRepository from "./revoked-token.repository";
 import { ConflictError, InternalServerError, UnauthorizedError } from "../../shared/errors/httpErrors";
 
 export type RegisterResult = {
@@ -119,6 +121,18 @@ export async function changeInitialPassword(input: {
     mustChangePassword: false,
     isFirstLogin: false,
   };
+}
+
+/** Records JWT `jti` as revoked until token expiry (server-side logout). */
+export async function logout(ctx: AuthUserContext): Promise<void> {
+  if (!ctx.jti.trim()) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+  await revokedTokenRepository.revokeToken({
+    tokenJti: ctx.jti,
+    userId: ctx.id,
+    expiresAt: ctx.expiresAt,
+  });
 }
 
 /**

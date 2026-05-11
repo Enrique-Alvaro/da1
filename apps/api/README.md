@@ -23,11 +23,13 @@ Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE
 - `POST /api/auth/register` — registro (Phase 2; ver `docs/auth-phase-2-register.md`)
 - `POST /api/auth/login` — login + JWT (Phase 3; ver `docs/auth-phase-3-login.md`)
 - `POST /api/auth/change-initial-password` — primera contraseña definitiva + JWT `access` (Phase 4; ver `docs/auth-phase-4-change-initial-password.md`)
+- `GET /api/users/me` — perfil autenticado (**Bearer** tipo `access`; Phase 5; ver `docs/auth-phase-5-users-me.md`)
+- `POST /api/auth/logout` — revoca el JWT actual por `jti` (**Bearer** tipo `access`; Phase 6; ver `docs/auth-phase-6-logout.md`)
 
-Aún **501**:
+Aún **no implementados**:
 
-- `POST /api/auth/logout`
-- `GET /api/users/me`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
 
 ## Contrato API
 

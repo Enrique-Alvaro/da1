@@ -13,8 +13,11 @@ export type LoginAccessPayload = {
   jti: string;
 };
 
-/** Alias for verified login / session tokens (Phase 4+). */
-export type JwtAuthPayload = LoginAccessPayload;
+/** Verified access token (includes `exp` / expiry from JWT). */
+export type JwtAuthPayload = LoginAccessPayload & {
+  exp: number;
+  expiresAt: Date;
+};
 
 function requireJwtSecret(): string {
   const secret = getEnv().JWT_SECRET?.trim();
@@ -47,7 +50,16 @@ export function signAccessToken(payload: LoginAccessPayload): string {
     jwtid: payload.jti,
     issuer: "crownbid-api",
   };
-  return jwt.sign({ sub: payload.sub, email: payload.email, type: payload.type }, secret, options);
+  return jwt.sign(
+    {
+      sub: payload.sub,
+      email: payload.email,
+      type: payload.type,
+      jti: payload.jti,
+    },
+    secret,
+    options
+  );
 }
 
 export function verifyAccessToken(token: string): JwtAuthPayload {
@@ -61,14 +73,22 @@ export function verifyAccessToken(token: string): JwtAuthPayload {
     throw new UnauthorizedError("No autorizado.");
   }
 
-  const sub = typeof decoded.sub === "string" ? decoded.sub : undefined;
-  const email = decoded.email;
+  const subRaw = typeof decoded.sub === "string" ? decoded.sub : undefined;
+  const sub = subRaw?.trim();
+  const emailRaw = decoded.email;
+  const email = typeof emailRaw === "string" ? emailRaw.trim() : "";
   const type = decoded.type as LoginTokenType | undefined;
-  const jti = decoded.jti;
+  const jtiRaw = decoded.jti;
+  const jti = typeof jtiRaw === "string" ? jtiRaw.trim() : "";
+  const exp =
+    typeof decoded.exp === "number" && Number.isFinite(decoded.exp) ? decoded.exp : undefined;
 
   if (
     !sub ||
-    typeof email !== "string" ||
+    typeof emailRaw !== "string" ||
+    !email ||
+    !jti ||
+    exp === undefined ||
     (type !== "access" && type !== "initial_password_change")
   ) {
     throw new UnauthorizedError("No autorizado.");
@@ -78,6 +98,8 @@ export function verifyAccessToken(token: string): JwtAuthPayload {
     sub,
     email,
     type,
-    jti: typeof jti === "string" ? jti : "",
+    jti,
+    exp,
+    expiresAt: new Date(exp * 1000),
   };
 }

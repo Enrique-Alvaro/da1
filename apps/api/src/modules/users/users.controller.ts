@@ -1,7 +1,14 @@
 import type { RequestHandler } from "express";
-import { NotImplementedError } from "../../shared/errors/httpErrors";
+import { UnauthorizedError } from "../../shared/errors/httpErrors";
+import { asyncHandler } from "../../shared/utils/asyncHandler";
+import * as usersService from "./users.service";
 
-/** GET /api/users/me */
-export const placeholderMe: RequestHandler = (_req, _res, next) => {
-  next(new NotImplementedError("GET /api/users/me will be implemented in Phase 5."));
-};
+/** GET /api/users/me — requires Bearer access token (not first-login token). */
+export const getMe: RequestHandler = asyncHandler(async (req, res) => {
+  if (!req.authUser) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+
+  const user = await usersService.getCurrentUser(req.authUser);
+  res.status(200).json(user);
+});

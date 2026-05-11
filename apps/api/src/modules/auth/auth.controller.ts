@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import { NotImplementedError, ValidationError } from "../../shared/errors/httpErrors";
+import { UnauthorizedError, ValidationError } from "../../shared/errors/httpErrors";
 import { extractBearerToken } from "../../shared/security/bearerToken";
 import { asyncHandler } from "../../shared/utils/asyncHandler";
 import {
@@ -9,15 +9,6 @@ import {
   registerBodySchema,
 } from "./auth.schemas";
 import * as authService from "./auth.service";
-
-/** Next milestone for endpoints still not implemented (logout). */
-const nextPhase = "Phase 5";
-
-function notImplemented(message: string): RequestHandler {
-  return (_req, _res, next) => {
-    next(new NotImplementedError(message));
-  };
-}
 
 /** POST /api/auth/register */
 export const register: RequestHandler = asyncHandler(async (req, res) => {
@@ -58,7 +49,12 @@ export const changeInitialPassword: RequestHandler = asyncHandler(async (req, re
   res.status(200).json(result);
 });
 
-/** POST /api/auth/logout */
-export const placeholderLogout = notImplemented(
-  `POST /api/auth/logout will be implemented in ${nextPhase}.`
-);
+/** POST /api/auth/logout — Bearer access token only (chain: requireAuth + requireAccessToken). */
+export const logout: RequestHandler = asyncHandler(async (req, res) => {
+  if (!req.authUser) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+
+  await authService.logout(req.authUser);
+  res.status(204).send();
+});
