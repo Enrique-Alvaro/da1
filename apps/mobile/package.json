@@ -1,0 +1,12 @@
+{
+  "name": "@crownbid/mobile",
+  "private": true,
+  "version": "0.0.1",
+  "description": "CrownBid React Native app — placeholder",
+  "scripts": {
+    "dev": "echo \"[placeholder] Initialize React Native / Expo then use dev client\"",
+    "start": "echo \"[placeholder] npx react-native start or expo start\"",
+    "android": "echo \"[placeholder] Run Android build/emulator\"",
+    "ios": "echo \"[placeholder] Run iOS build/simulator\""
+  }
+}
