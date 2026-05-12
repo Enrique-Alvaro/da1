@@ -1,3581 +1,515 @@
-# CrownBid API(1.2.2)
+# CrownBid API
 
-Download OpenAPI specification: Download
+**Versión del contrato documentado:** 2.0.0 (alineación con schema académico)
 
-API REST para la aplicación móvil de CrownBid (UADE DA1 MVP).
+Documentación del API REST para la aplicación móvil CrownBid (UADE — Desarrollo de aplicaciones I / entrega tipo TPO). El texto está en **español** y describe el contrato público que el equipo de frontend (React Native) puede consumir.
 
-## Trazabilidad con la consigna (DA1)
+---
 
-Este contrato documenta el mismo dominio funcional del TP: registro con verificación externa y
-categoría asignada por la empresa, catálogos públicos con restricción de precios, participación
-condicionada por categoría y medios de pago verificados, límites de puja salvo subastas oro/platino,
-liquidaciones al vendedor, incumplimiento de pago del comprador (multa 10%, 72 h, bloqueo),
-propuestas comerciales post-inspección, compra de la empresa al valor base ante ausencia de pujas,
-seguro con posibilidad de ampliación de cobertura y mensajería privada (modelada como
-notificaciones y desgloses de facturación).
+## Estado del contrato
 
-## Resumen general
+Este documento fue **actualizado** tras adoptar como única **fuente de verdad de persistencia** el archivo `database/schema.sql` provisto por la cátedra (modelo relacional en español: `personas`, `clientes`, `subastas`, `pujos`, etc.).
 
-Esta API impulsa un sistema móvil de gestión de subastas donde los usuarios pueden:
+**Qué cambió respecto a versiones anteriores del contrato:**
 
-```
-Registrarse con datos personales; recibir una contraseña temporal por email , iniciar sesión y
-luego definir una contraseña definitiva en el primer acceso antes de usar completamente la app.
-Explorar catálogos (esquemas públicos *Catalog* sin precios base; Auction /
-ItemDetail autenticados incluyen precios) y acceder a campos monetarios en vivo al iniciar
-sesión.
-Participar en subastas ascendentes con actualizaciones en tiempo real (WebSocket/SSE
-recomendado; polling soportado como alternativa MVP).
-Ver catálogos de ítems (incluyendo piezas compuestas por múltiples subelementos, números de
-pieza y metadatos opcionales de arte/diseño).
-Enviar sus propios ítems para subasta (incluyendo envío físico para inspección y
-aceptación/rechazo explícito del precio base y comisión tras la inspección).
-Gestionar medios de pago tipados por modalidad (cuenta bancaria, tarjeta de crédito, cheque
-certificado), incluyendo garantías de participación para cheques certificados.
-Declarar una cuenta bancaria de cobro del vendedor y consultar liquidaciones de bienes
-consignados vendidos.
-```
-
-## Business Rules
-
-```
-Autenticación : Registro → correo con clave temporal → POST /auth/login (la respuesta lleva
-mustChangePassword / isFirstLogin mientras aplique) → POST /auth/change-
-initial-password obligatorio antes de considerar el perfil operativo para flujos sensibles
-(medios de pago, pujas, etc.). Recuperación opcional: /auth/forgot-password +
-/auth/reset-password. JWT requerido en el resto de rutas salvo catálogo público y
-referencias.
-Visibilidad de precios (TP) : los catálogos públicos modelan AuctionCatalogItem,
-AuctionDetailCatalog, AuctionItemCatalog e ItemDetailCatalog sin propiedades
-monetarias. Con JWT válido, las mismas rutas devuelven Auction, AuctionDetail,
-AuctionItem e ItemDetail (incluyen AuctionPricingFields / AuctionItemPricing).
-El estado en vivo y el historial de pujas siguen exigiendo token por montos competitivos.
-Categories : Users have varying access levels (common, special, silver, gold,
-platinum) — map to común / especial / plata / oro / platino in domain documentation. Certain
-premium auctions require a minimum category level to place bids.
-Bidding Restrictions :
-Una puja siempre debe ser estrictamente mayor que currentBid.
-Minimum bid: currentBid + 1% * basePrice. Maximum bid: currentBid + 20% *
-basePrice. These limits do NOT apply to gold/platinum auctions.
-Los usuarios DEBEN poseer al menos un medio de pago verificado para participar.
-Con garantía limitada (cheque certificado / fondos reservados), se rechazan ofertas por
-encima del tope garantizado (TP).
-Sesión activa única de subasta (TP) : un usuario NO DEBE mantener una sesión interactiva en vivo
-en más de una subasta al mismo tiempo. Se aplica vía
-/auctions/{auctionId}/live/session (ver respuestas 409).
-Incumplimiento de pago del ganador (TP) : Si el pago falla, aplica una multa del 10% sobre el
-monto ofertado, el usuario tiene 72 horas para regularizar fondos, no puede unirse a otra subasta
-hasta resolver la situación y la persistencia del incumplimiento puede derivar en suspensión del
-servicio (User.accountServiceSuspended).
-Publicación de ítems : Las publicaciones siguen un flujo interno de revisión que incluye términos
-comerciales post-inspección (terms_proposed). El envío físico es obligatorio tras la aceptación
-inicial. Si el usuario rechaza el precio base / comisión propuestos, el bien se devuelve (pueden
-aplicar costos — ver rejectionReason / notificaciones). Los términos comerciales aceptados
-hacen avanzar el ítem hacia la programación.
-Sin pujas (TP) : Cuando un ítem no recibe pujas en la subasta, la empresa puede comprarlo al
-precio base publicado — reflejado bajo AuctionItem.status ==
-company_purchased_at_base.
-Seguro (TP) : Todo ítem consignado cuenta con un seguro corporativo base. Los dueños pueden
-solicitar monto asegurado adicional ; cualquier diferencia de prima se cobra antes de actualizar la
-póliza.
-Pagos al vendedor (TP) : los ingresos de bienes vendidos propiedad de clientes se transfieren a
-una cuenta de cobro previamente declarada (/users/me/seller/payout-account). Los
-registros de liquidación exponen el estado de transferencia para auditoría.
-```
-
-# Auth
-
-Registro, login (incluye primer acceso con clave temporal y flags mustChangePassword /
-isFirstLogin), logout, cambio obligatorio de contraseña inicial, y recuperación opcional de acceso.
-
-## Registrar usuario con datos personales
-
-Registra el legajo (nombre, apellido, documento, domicilio legal, país, imágenes del DNI y correo). Si el
-alta es exitosa, el sistema **envía por email una contraseña temporal** (no devuelve la clave en el cuerpo
-de la API).
-
-El usuario vuelve a la pantalla de **inicio de sesión** e ingresa esa clave temporal en POST
-/auth/login. La **categoría** asignada por la empresa y demás datos de perfil siguen el circuito
-manual de backoffice y aparecen en GET /users/me cuando corresponda.
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-```
-```
-string
-```
-```
-string<email>
-```
-```
-string
-```
-```
-string
-Domicilio legal del usuario.
-```
-```
-string
-Código ISO-3166 alpha-2 del país de origen del usuario.
-```
-```
-string<uri>
-URL de la imagen frontal del documento nacional cargada.
-```
-```
-string<uri>
-URL de la imagen trasera del documento nacional cargada.
-```
-```
-firstName
-required
-```
-```
-lastName
-required
-```
-```
-email
-required
-```
-```
-documentId
-required
-```
-```
-address
-required
-```
-```
-country
-required
-```
-```
-documentFrontImageUrl
-required
-```
-```
-documentBackImageUrl
-required
-```
-
-### Responses
-
-```
-201 Alta aceptada; se disparó el envío de la contraseña temporal al correo indicado.
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-409 Conflicto (p. ej., el email ya existe, la puja es menor al mínimo)
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-201 400 409 422
-```
-```
-POST /auth/register
-```
-```
-application/json
-```
-```
-Copy
-{
-"firstName": "string",
-"lastName": "string",
-"email": "user@example.com",
-"documentId": "string",
-"address": "string",
-"country": "string",
-"documentFrontImageUrl": "http://example.com",
-"documentBackImageUrl": "http://example.com"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"message": "Se envió una contraseña temporal al correo indicado. Revisá t
-```
-```
-Content type
-```
-```
-Content type
-```
-
-- "user": {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "firstName": "string",
-    "lastName": "string",
-    "email": "user@example.com",
-    "documentId": "string",
-    "address": "string",
-    "country": "AR",
-    "photoUrl": "http://example.com",
-    "documentFrontImageUrl": "http://example.com",
-    "documentBackImageUrl": "http://example.com",
-    "category": "common",
-    "status": "pending_verification",
-    "biddingBlockedUntilResolved": true,
-    "delinquentWinId": "9a9b588f-b2b3-4db1-9faa-82754cda1452",
-    "accountServiceSuspended": true,
-    "requiresPasswordChange": true
-},
-"emailSentTo": "user@example.com"
-}
-
-## Iniciar sesión (clave temporal o definitiva)
-
-Autentica con email + password. El campo password admite tanto la **clave temporal** recibida
-por mail como la **clave definitiva** ya definida por el usuario.
-
-Si el backend detecta **primer acceso** aún con clave temporal (proceso inicial de seguridad incompleto),
-la respuesta incluye mustChangePassword: true e isFirstLogin: true, más un
-accessToken **acotado** a ese estado: la app debe mostrar **obligatoriamente** la pantalla de nueva
-contraseña y llamar a POST /auth/change-initial-password antes de tratar al usuario como
-plenamente operativo (pujas, medios de pago, etc.).
-
-Tras el cambio de contraseña inicial, nuevos inicios de sesión devuelven mustChangePassword:
-false e isFirstLogin: false (sesión normal).
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string<email>
-```
-```
-string<password>
-Clave temporal recibida por email o contraseña definitiva ya definida.
-```
-```
-email
-required
-```
-```
-password
-required
-```
-
-### Responses
-
-```
-200 Autenticación exitosa (revisar flags de primer acceso en el cuerpo).
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-200 400 401
-```
-```
-POST /auth/login
-```
-```
-application/json
-```
-```
-Copy
-{
-"email": "user@example.com",
-"password": "pa$$word"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"accessToken": "eyJhbGciOiJIUzI1NiIsInR5c... (token jwt)",
-```
-```
-Content type
-```
-```
-Content type
-```
-
-- "user": {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "firstName": "string",
-    "lastName": "string",
-    "email": "user@example.com",
-    "documentId": "string",
-    "address": "string",
-    "country": "AR",
-    "photoUrl": "http://example.com",
-    "documentFrontImageUrl": "http://example.com",
-    "documentBackImageUrl": "http://example.com",
-    "category": "common",
-    "status": "pending_verification",
-    "biddingBlockedUntilResolved": true,
-    "delinquentWinId": "9a9b588f-b2b3-4db1-9faa-82754cda1452",
-    "accountServiceSuspended": true,
-    "requiresPasswordChange": true
-},
-"mustChangePassword": true,
-"isFirstLogin": true
-}
-
-## Cerrar sesión
-
-Invalida la sesión del **JWT actual** en el servidor (p. ej. lista de revocación o rotación de sesión). La app
-móvil debe **eliminar el token** almacenado localmente aunque la llamada falle con red intermitente
-(comportamiento idempotente recomendado en cliente).
-
-##### AUTHORIZATIONS: BearerAuth
-
-### Responses
-
-```
-— 204 Sesión cerrada correctamente (sin cuerpo).
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-
-#### Response samples
-
-```
-401
-```
-```
-POST /auth/logout
-```
-```
-application/json
-```
-```
-Copy
-{
-"error": "InvalidBidAmountError",
-"message": "El monto de puja debe ser estrictamente mayor a la puja actua
-"statusCode": 409
-}
-```
-## Definir la contraseña definitiva tras el primer login
-
-Pantalla obligatoria del primer acceso: el usuario autenticado (JWT del login con clave temporal) envía
-la **clave temporal actual** y la **nueva contraseña** definitiva.
-
-El backend valida la temporal, persiste la nueva clave, marca el perfil como **sin**
-requiresPasswordChange, y devuelve un AuthResponse **normalizado** (mustChangePassword e
-isFirstLogin en false, token apto para el resto de la app).
-
-Si el usuario ya completó este paso, responder 409.
-
-##### AUTHORIZATIONS: BearerAuth
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string<password>
-Contraseña temporal vigente (la recibida por email en el registro).
-```
-```
-string<password> >= 8 characters
-Nueva contraseña definitiva. Mismas reglas de complejidad que el resto del
-sistema (p. ej. mayúscula + minúscula según política del backend).
-```
-### Responses
-
-```
-currentPassword
-required
-```
-```
-newPassword
-required
-```
-```
-Content type
-```
-
-```
-200 Contraseña definitiva guardada; sesión actualizada.
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-409 El usuario ya no está en flujo de primer cambio de contraseña.
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-200 400 401 409 422
-```
-```
-POST /auth/change-initial-password
-```
-```
-application/json
-```
-```
-Copy
-{
-"currentPassword": "pa$$word",
-"newPassword": "pa$$word"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"accessToken": "eyJhbGciOiJIUzI1NiIsInR5c... (token jwt)",
-```
-```
-Content type
-```
-```
-Content type
-```
-
-- "user": {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "firstName": "string",
-    "lastName": "string",
-    "email": "user@example.com",
-    "documentId": "string",
-    "address": "string",
-    "country": "AR",
-    "photoUrl": "http://example.com",
-    "documentFrontImageUrl": "http://example.com",
-    "documentBackImageUrl": "http://example.com",
-    "category": "common",
-    "status": "pending_verification",
-    "biddingBlockedUntilResolved": true,
-    "delinquentWinId": "9a9b588f-b2b3-4db1-9faa-82754cda1452",
-    "accountServiceSuspended": true,
-    "requiresPasswordChange": true
-},
-"mustChangePassword": true,
-"isFirstLogin": true
-}
-
-## Solicitar un correo de restablecimiento de contraseña
-
-Envía un enlace de restablecimiento de un solo uso (o token) al correo del usuario cuando la cuenta
-existe y está habilitada para autenticarse. La respuesta es intencionalmente genérica para evitar
-revelar si un correo está registrado.
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string<email>
-Correo de la cuenta para recibir instrucciones de restablecimiento.
-```
-### Responses
-
-###### 202
-
-```
-Las instrucciones de restablecimiento se encolaron para envío si el correo coincidió con una cuenta
-activa.
-```
-```
-email
-required
-```
-
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-202 400 422
-```
-```
-POST /auth/forgot-password
-```
-```
-application/json
-```
-```
-Copy
-{
-"email": "user@example.com"
-}
-```
-```
-application/json
-```
-```
-Copy
-{
-"message": "Si existe una cuenta para este correo, las instrucciones de r
-}
-```
-## Definir una nueva contraseña usando un token de
-
-## restablecimiento
-
-Consume el token de un solo uso del correo de restablecimiento y reemplaza la contraseña del
-usuario. Devuelve una sesión nueva para que el cliente continúe sin una llamada extra de login.
-
-```
-Content type
-```
-```
-Content type
-```
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-Token de un solo uso del correo de restablecimiento (o contenido de enlace
-profundo).
-```
-```
-string<password> >= 8 characters
-Debe contener al menos una letra mayúscula y una letra minúscula.
-```
-### Responses
-
-###### 200
-
-```
-Contraseña actualizada; nueva sesión. AuthResponse con mustChangePassword: false e
-isFirstLogin: false (flujo de recuperación, distinto del primer acceso con clave temporal).
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401
-El token de restablecimiento es inválido, ya fue usado o no coincide con ningún restablecimiento
-pendiente.
-```
-```
-410 El token de restablecimiento expiró.
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-```
-token
-required
-```
-```
-password
-required
-```
-```
-POST /auth/reset-password
-```
-```
-application/json
-```
-```
-Copy
-{
-"token": "string",
-"password": "pa$$word"
-}
-```
-```
-Content type
-```
-
-# Users
-
-Perfiles autenticados de usuario y métricas
+- Los **identificadores públicos** en ejemplos y descripciones pasan de UUID a **enteros** (`identificador`, `numero`, etc.), coherentes con columnas `INT` / `IDENTITY` del schema.
+- Las **categorías** y muchos **estados de dominio** se documentan con los **valores almacenados en base de datos** (p. ej. `comun`, `especial`, `abierta`, `carrada` en subastas según el script del profesor).
+- Se deja explícito qué rutas pueden **persistirse** solo con tablas del profesor, qué comportamiento es **derivado** o **solo en memoria/sesión**, y qué funcionalidades quedan **fuera del alcance** del modelo entregado o requieren **tablas auxiliares** no incluidas en ese script.
 
-#### Response samples
+**Qué no cambió a propósito:**
 
-```
-200 400 401 410 422
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"accessToken": "eyJhbGciOiJIUzI1NiIsInR5c... (token jwt)",
-```
-- "user": {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "firstName": "string",
-    "lastName": "string",
-    "email": "user@example.com",
-    "documentId": "string",
-    "address": "string",
-    "country": "AR",
-    "photoUrl": "http://example.com",
-    "documentFrontImageUrl": "http://example.com",
-    "documentBackImageUrl": "http://example.com",
-    "category": "common",
-    "status": "pending_verification",
-    "biddingBlockedUntilResolved": true,
-    "delinquentWinId": "9a9b588f-b2b3-4db1-9faa-82754cda1452",
-    "accountServiceSuspended": true,
-    "requiresPasswordChange": true
-},
-"mustChangePassword": true,
-"isFirstLogin": true
-}
-
-## Obtener perfil autenticado actual
-
-```
-Content type
-```
-
-Incluye requiresPasswordChange: la app puede usarlo junto con los flags de AuthResponse para
-bloquear navegación a flujos sensibles hasta completar el cambio de contraseña inicial.
+- Los **nombres de rutas** (paths y métodos HTTP) se mantienen en la medida de lo posible para **no romper** el diseño de pantallas ni el enrutamiento ya acordado con el frontend.
 
-##### AUTHORIZATIONS: BearerAuth
+---
 
-### Responses
+## Fuente de verdad de persistencia
 
-```
-200 Perfil obtenido correctamente
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
-
-```
-200 401
-```
-```
-GET /users/me
-```
-```
-application/json
-```
-```
-Copy
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"firstName": "string",
-"lastName": "string",
-"email": "user@example.com",
-"documentId": "string",
-"address": "string",
-"country": "AR",
-"photoUrl": "http://example.com",
-"documentFrontImageUrl": "http://example.com",
-"documentBackImageUrl": "http://example.com",
-"category": "common",
-"status": "pending_verification",
-"biddingBlockedUntilResolved": true,
-"delinquentWinId": "9a9b588f-b2b3-4db1-9faa-82754cda1452",
-"accountServiceSuspended": true,
-"requiresPasswordChange": true
-}
-```
-```
-Content type
-```
+Las tablas del `schema.sql` académico que definen el núcleo persistible son:
 
-## Métricas agregadas del usuario
+| Tabla | Rol resumido |
+| --- | --- |
+| `paises` | Catálogo de países (`numero`, `nombre`, `nombreCorto`, `capital`, `nacionalidad`, `idiomas`). |
+| `personas` | Datos generales de persona (`identificador` IDENTITY, `documento`, `nombre`, `direccion`, `estado`, `foto`). |
+| `empleados` | Extensión laboral de una persona (`identificador` → `personas`). |
+| `sectores` | Sectores organizacionales. |
+| `seguros` | Pólizas asociables a productos (`nroPoliza`, `compania`, `polizaCombinada`, `importe`). |
+| `clientes` | Cliente de subasta (`identificador` = misma persona; `numeroPais`, `admitido`, `categoria`, `verificador`). |
+| `duenios` | Dueño de bienes. |
+| `subastadores` | Martillero vinculado a `personas`. |
+| `subastas` | Evento de subasta (`fecha`, `hora`, `estado`, `ubicacion`, `categoria`, etc.). |
+| `productos` | Bienes (`descripcionCatalogo`, `descripcionCompleta`, `duenio`, `revisor`, `seguro`, …). |
+| `fotos` | Imágenes binarias por producto (`foto` VARBINARY). |
+| `catalogos` | Catálogo ligado a subasta y responsable. |
+| `itemsCatalogo` | Ítem de catálogo (`precioBase`, `comision`, `subastado`, FK a `catalogos` y `productos`). |
+| `asistentes` | Postor en una subasta (`cliente`, `subasta`, `numeroPostor`). |
+| `pujos` | Ofertas (`importe`, `ganador`, FK a `asistentes` e `itemsCatalogo`). |
+| `registroDeSubasta` | Registro económico post-subasta (`importe`, `comision`, vínculos a subasta, dueño, producto, cliente). |
 
-Devuelve estadísticas agregadas sobre la actividad del usuario: participaciones, victorias, montos
-pagados/ofertados, desglose por categoría de subasta. Alimenta la sección de métricas de la pantalla
-de Perfil.
+Cualquier campo o tabla **no** listada arriba (email, contraseña, JWT, medios de pago, notificaciones persistidas, sesión live en BD, etc.) **no forma parte** del script del profesor; si el backend las implementa, debe documentarse como **auxiliar** o **fuera de alcance** (ver secciones posteriores).
 
-##### AUTHORIZATIONS: BearerAuth
+---
 
-### Responses
+## Convenciones generales
 
-```
-200 Métricas agregadas del usuario
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
+### Identificadores
 
-```
-200 401
-```
-```
-GET /users/me/metrics
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"totalAuctionsAttended": 0 ,
-"totalWins": 0 ,
-"totalBidsPlaced": 0 ,
-"totalAmountOffered": 0 ,
-"totalAmountPaid": 0 ,
-"winRate": 0 ,
-```
-- "byCategory": [
-    + { ... }
-]
-}
+- En path parameters y cuerpos de ejemplo, use **`type: integer`** (no `format: uuid`).
+- Ejemplos típicos: `1`, `10`, `42`.
 
+```yaml
+type: integer
+example: 1
 ```
-Content type
-```
-
-# Auctions
 
-Exploración global de subastas (GET /auctions incluye filtro opcional featured para la UI de
-**Subastas Destacadas** ). Catálogo público vs. autenticado se diferencia por esquema (sin vs. con
-precios).
+### Mapeo conceptual ID → tabla (referencia rápida)
 
-## Listar subastas disponibles
+| Uso en API | Origen en BD (profesor) |
+| --- | --- |
+| `auctionId` | `subastas.identificador` |
+| `itemId` (ítem de catálogo / puja) | `itemsCatalogo.identificador` |
+| `productId` | `productos.identificador` |
+| `userId` / perfil | `personas.identificador` (cliente: misma clave en `clientes.identificador`) |
+| `bidId` | `pujos.identificador` |
+| `settlementId` / `winId` (registro económico) | `registroDeSubasta.identificador` |
+| `countryId` | `paises.numero` |
 
-**Catálogo (TP):** sin Authorization, cada elemento cumple AuctionCatalogItem (sin
-basePrice ni currentBid). Con JWT válido, el cuerpo es un arreglo de Auction (catálogo +
-AuctionPricingFields).
+### Categorías (valores en BD)
 
-**Subastas destacadas (UI):** featured=true limita el resultado al conjunto promocionado para la
+El modelo académico restringe categorías a:
 
-##### pantalla Subastas Destacadas; featured=false u omitido no aplica este filtro.
+| Valor en BD | Notas |
+| --- | --- |
+| `comun` | |
+| `especial` | |
+| `plata` | |
+| `oro` | Subastas oro: en la consigna del TPO, reglas de puja máxima/mínima pueden no aplicar igual que en `comun`/`especial`/`plata`. |
+| `platino` | Idem oro/platino para límites de puja. |
 
-Si se envía un Authorization mal formado o expirado, el servidor **debe** responder 401 (no
-degradar silenciosamente a vista anónima).
+No use en documentación de persistencia los valores en inglés `common`, `special`, `silver`, `gold`, `platinum` como si fueran los guardados en el schema del profesor. Si la API **normaliza** a inglés en JSON, indíquelo explícitamente como capa de presentación; **este documento** prioriza honestidad con el modelo entregado.
 
-##### AUTHORIZATIONS: None or BearerAuth
+### Valores monetarios
 
-###### QUERY PARAMETERS
+- `decimal` en API (JSON number), coherente con `DECIMAL(18,2)` en tablas.
 
-```
-string (AuctionStatus)
-Enum: "scheduled" "live" "closed"
-Filtro opcional por estado.
-```
-```
-boolean
-true = solo subastas destacadas para la pantalla de Subastas
-Destacadas. Omitido o false = no filtrar por destacado (pueden convivir
-con otros filtros como status).
-```
-## Responses
-
-###### 200
+### Imágenes
 
-```
-Anónimo: AuctionCatalogItem[]. Autenticado: Auction[] (mismas entidades con capa de
-precios).
-```
-```
-status
-```
-```
-featured
-```
+- En BD, fotos de producto están en `fotos.foto` como **VARBINARY(MAX)**.
+- Si la API expone `imageUrl` o arreglo de URLs, documéntelo como **generado por el backend** (p. ej. endpoint que sirve el binario o CDN intermedio), no como columna URL en el schema del profesor.
 
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
+### Autenticación
 
-```
-200 401
-```
-```
-GET /auctions
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
+- El `schema.sql` del profesor **no** define correo, hash de contraseña, tokens de recuperación ni revocación JWT.
+- Cualquier `POST /auth/login`, JWT o sesión debe considerarse **AUXILIARY_REQUIRED** (implementación técnica aparte) hasta que existan tablas auxiliares explícitas fuera del script académico.
+
+### Estado de subasta (`subastas.estado`)
+
+El script académico define valores literales **`abierta`** y **`carrada`** (convención del material entregado).
+
+Para no acoplar el cliente móvil al typo ni al inglés crudo de BD, la API puede **normalizar** en las respuestas JSON:
+
+| Condición | `status` sugerido en API (inglés, derivado) |
+| --- | --- |
+| `subastas.estado = 'carrada'` | `closed` |
+| `subastas.estado = 'abierta'` y fecha/hora de inicio **≤** ahora | `live` |
+| `subastas.estado = 'abierta'` y fecha/hora de inicio **>** ahora | `scheduled` |
+
+Si se prefiere exponer **tal cual** la BD, use solo `abierta` | `carrada` y documente que coincide con el CHECK del profesor.
+
+---
+
+## Matriz de soporte de endpoints
+
+Leyenda de **Estado**:
+
+- **DB_BACKED**: la operación principal puede sustentarse en tablas del `schema.sql` del profesor.
+- **DERIVED**: la respuesta se calcula agregando/consultando tablas del profesor sin fila dedicada de “vista materializada”.
+- **RUNTIME_ONLY**: no hay tabla equivalente; lógica de aplicación / memoria / token.
+- **AUXILIARY_REQUIRED**: mantiene la ruta del contrato pero exige persistencia fuera del script del profesor (auth, JWT, etc.).
+- **OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA**: no hay tabla en el schema académico; no debe presentarse como MVP persistible del modelo entregado.
+
+| Módulo | Endpoint | Estado | Respaldo en BD | Notas |
+| --- | --- | --- | --- | --- |
+| Países | `GET /countries` | DB_BACKED | `paises` | Lista catálogo. |
+| Subastas | `GET /auctions` | DB_BACKED | `subastas`, `subastadores`, `personas` | Filtros y paginación según implementación. |
+| Subastas | `GET /auctions/{auctionId}` | DB_BACKED | `subastas`, … | `auctionId` entero. |
+| Subastas | `GET /auctions/{auctionId}/items` | DB_BACKED | `catalogos`, `itemsCatalogo`, `productos`, `fotos` | Ítems del catálogo de esa subasta. |
+| Subastas | `GET /auctions/{auctionId}/live` | DERIVED | `subastas`, `itemsCatalogo`, `pujos` | “En vivo” inferido de estado + tiempo + pujas recientes. |
+| Subastas | `POST /auctions/{auctionId}/live/session` | RUNTIME_ONLY | — | Sin tabla de sesión en el schema del profesor. |
+| Subastas | `DELETE /auctions/{auctionId}/live/session` | RUNTIME_ONLY | — | Idem. |
+| Pujas | `POST /auctions/{auctionId}/bids` | DB_BACKED | `asistentes`, `pujos`, `itemsCatalogo` | Requiere cliente autenticado mapeado a `clientes`. |
+| Pujas | `GET /auctions/{auctionId}/bids/history` | DB_BACKED | `pujos`, `asistentes`, `itemsCatalogo` | Orden sugerido: `pujos.identificador`. |
+| Ítems | `GET /items/{itemId}` | DB_BACKED | `itemsCatalogo`, `productos`, `fotos`, `duenios`, `personas` | `itemId` = `itemsCatalogo.identificador`. |
+| Ítems | `GET /items/{itemId}/insurance` | DB_BACKED | `seguros`, `productos` | Según `productos.seguro` → `nroPoliza`. |
+| Ítems | `POST /items/{itemId}/insurance/coverage-increase` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | No hay persistencia de “solicitud de aumento” en el schema. |
+| Usuario | `GET /users/me` | DB_BACKED | `personas`, `clientes`, `paises` | Sin email/contraseña en modelo profesor. |
+| Usuario | `GET /users/me/metrics` | DERIVED | `asistentes`, `pujos`, `registroDeSubasta` | Agregados. |
+| Usuario | `GET /users/me/auctions` | DB_BACKED | `asistentes`, `subastas` | Subastas donde participó. |
+| Usuario | `GET /users/me/bids` | DB_BACKED | `pujos`, `asistentes`, `itemsCatalogo` | |
+| Usuario | `GET /users/me/wins` | DB_BACKED | `pujos` (`ganador = 'si'`), `itemsCatalogo`, `subastas` | Ajustar regla de “ganador” con negocio. |
+| Usuario | `GET /users/me/live-session` | RUNTIME_ONLY | — | |
+| Vendedor | `GET /users/me/seller/settlements` | DB_BACKED | `registroDeSubasta`, `duenios`, `productos`, `subastas` | Dueño = `duenios.identificador` = persona del vendedor. |
+| Vendedor | `GET /users/me/seller/settlements/{settlementId}` | DB_BACKED | `registroDeSubasta` | |
+| Vendedor | `GET /users/me/seller/payout-account` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | |
+| Vendedor | `PUT /users/me/seller/payout-account` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | |
+| Notificaciones | `GET /users/me/notifications` | DERIVED o OUT_OF_SCOPE | opcional | Sin tabla `notifications`; solo DERIVED si la API sintetiza eventos. |
+| Notificaciones | `PATCH /users/me/notifications/{notificationId}` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | Sin persistencia de leído. |
+| Pagos | `GET/POST/PUT/DELETE /users/me/payment-methods…` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | Ver sección fuera de alcance. |
+| Consignaciones | `POST /item-submissions` | DB_BACKED (simplificado) | `productos`, `fotos`, `duenios`, `empleados` | Flujo reducido a alta de producto + fotos. |
+| Consignaciones | `GET /users/me/item-submissions` | DB_BACKED / DERIVED | `productos` | Listado según criterio de “mis productos”. |
+| Consignaciones | `GET /item-submissions/{submissionId}` | DB_BACKED | `productos` | Mapear `submissionId` → `productos.identificador` si se unifica. |
+| Consignaciones | `DELETE /item-submissions/{submissionId}` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | No hay máquina de estados de envío en el schema. |
+| Consignaciones | `POST …/terms-decision`, `POST …/shipment` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | |
+| Auth | `POST /auth/register` | DB_BACKED (MVP académico) | `personas`, `clientes`, `paises` | Sin email/clave en BD profesor. |
+| Auth | `POST /auth/login` | AUXILIARY_REQUIRED | — | |
+| Auth | `POST /auth/logout` | AUXILIARY_REQUIRED | — | |
+| Auth | `POST /auth/change-initial-password` | AUXILIARY_REQUIRED o OUT_OF_SCOPE | — | Sin columnas en schema profesor. |
+| Auth | `POST /auth/forgot-password`, `POST /auth/reset-password` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | — | Salvo tablas auxiliares explícitas. |
+
+---
+
+## Endpoints respaldados por el schema del profesor
+
+### `GET /countries`
+
+**Estado:** DB_BACKED  
+
+**Descripción:** Lista países desde `paises`.
+
+**Respuesta 200** — ejemplo:
+
+```json
 [
-```
-- {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "title": "string",
-    "description": "string",
-    "coverImageUrl": "http://example.com",
-    "categoryRequired": "common",
-    "currency": "ARS",
-    "startDate": "2019-08-24T14:15:22Z",
-    "endDate": "2019-08-24T14:15:22Z",
-    "status": "scheduled",
-    "location": "string",
-+ "auctioneer": { ... }
-}
-]
-
-## Obtener detalle de subasta
-
-**Catálogo (TP):** sin JWT la respuesta es AuctionDetailCatalog (sin precios). Con Bearer válido,
-AuctionDetail (incluye AuctionPricingFields). Misma política 401 que /auctions.
-
-##### AUTHORIZATIONS: None or BearerAuth
-
-###### PATH PARAMETERS
-
-```
-Content type
-```
-
-```
-string<uuid>
-Identificador único de la subasta.
-```
-### Responses
-
-```
-200 Anónimo AuctionDetailCatalog; autenticado AuctionDetail.
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-#### Response samples
-
-```
-200 401 404
-```
-```
-auctionId
-required
-```
-```
-GET /auctions/{auctionId}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"title": "string",
-"description": "string",
-"coverImageUrl": "http://example.com",
-"categoryRequired": "common",
-"currency": "ARS",
-"startDate": "2019-08-24T14:15:22Z",
-"endDate": "2019-08-24T14:15:22Z",
-"status": "scheduled",
-"location": "string",
-```
-- "auctioneer": {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "firstName": "string",
-    "lastName": "string",
-    "licenseNumber": "string",
-    "region": "string"
-},
-
-```
-Content type
-```
-
-```
-"itemsCount": 0 ,
-```
-- "rules": [
-    "string"
-]
-}
-
-## Listar ítems pertenecientes a una subasta
-
-**Catálogo (TP):** anónimo → AuctionItemCatalog[]; autenticado → AuctionItem[] (agrega
-AuctionItemPricing).
-
-##### AUTHORIZATIONS: None or BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único de la subasta.
-```
-### Responses
-
-```
-200 Lista de ítems; forma depende de autenticación (ver descripción de operación).
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-#### Response samples
-
-```
-200 401 404
-```
-```
-auctionId
-required
-```
-```
-GET /auctions/{auctionId}/items
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-```
-```
-Content type
-```
-
-# Items
-
-Vista detallada de recursos subastables (incluyendo seguro)
-
-###### [
-
-###### - {
-
-```
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"pieceNumber": "string",
-"title": "string",
-"status": "unsold",
-+ "imageUrls": [ ... ]
-}
+  {
+    "id": 1,
+    "nombre": "Argentina",
+    "nombreCorto": "AR",
+    "capital": "Buenos Aires",
+    "nacionalidad": "argentina",
+    "idiomas": "es"
+  }
 ]
 ```
-## Obtener especificación detallada del ítem
 
-**TP — visibilidad de precios:** sin JWT la respuesta es ItemDetailCatalog (sin capa de precios). Con
-Bearer válido, ItemDetail (AuctionItem + extensiones).
+- `id` ↔ `paises.numero`.
 
-##### AUTHORIZATIONS: None or BearerAuth
+---
 
-###### PATH PARAMETERS
+### `GET /auctions`
 
-```
-string<uuid>
-```
-## Responses
+**Estado:** DB_BACKED  
 
-```
-200 Anónimo ItemDetailCatalog; autenticado ItemDetail.
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-itemId
-required
-```
+**Query:** filtros opcionales (`categoria`, `estado`, paginación) según implementación.
 
-#### Response samples
+**Respuesta:** lista de subastas; cada elemento incluye al menos:
 
-```
-200 401 404
-```
-```
-GET /items/{itemId}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
+- `id` (entero) ↔ `subastas.identificador`
+- `fecha`, `hora`
+- `estadoBd`: `abierta` | `carrada` (opcional, crudo)
+- `status` (opcional, **normalizado**): `scheduled` | `live` | `closed` (ver convenciones)
+- `categoria`: `comun` | `especial` | `plata` | `oro` | `platino`
+- `ubicacion`, `capacidadAsistentes`, `tieneDeposito`, `seguridadPropia`
+- Datos del subastador: join `subastadores` + `personas` (`nombre`, `matricula`, `region`)
+
+**Nota:** El schema del profesor **no** incluye flag `featured`. Si el cliente envía o espera `featured`, documéntelo como **no persistido** en este MVP de BD o elimínelo del contrato visual en frontend.
+
+---
+
+### `GET /auctions/{auctionId}`
+
+**Estado:** DB_BACKED  
+
+**Parámetro:** `auctionId` — `integer`, ejemplo `5`.
+
+**Respuesta 200:** mismo shape que un elemento de la lista, con más detalle si aplica.
+
+---
+
+### `GET /auctions/{auctionId}/items`
+
+**Estado:** DB_BACKED  
+
+**Descripción:** Ítems del catálogo de la subasta: `catalogos` donde `subasta = auctionId`, join `itemsCatalogo` → `productos` → `fotos` (conteo o URLs derivadas).
+
+**Elemento ejemplo:**
+
+```json
 {
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"pieceNumber": "string",
-"title": "string",
-"status": "unsold",
-```
-- "imageUrls": [
-    "http://example.com"
-],
-"description": "string",
-"artistOrDesigner": "string",
-"creationOrEraLabel": "string",
-"historicalContext": "string",
-"currentOwnerId": "2adf8857-cc6e-4581-bb66-004f674d7900",
-- "components": [
-    + { ... }
-]
+  "id": 100,
+  "catalogoId": 12,
+  "productoId": 34,
+  "precioBase": 1500.00,
+  "comision": 150.00,
+  "subastado": "no",
+  "tituloResumen": "Producto 34",
+  "descripcionCatalogo": "No Posee",
+  "imageUrls": ["/api/products/34/photos/1"]
 }
-
-## Obtener póliza de seguro que cubre este ítem
-
-Devuelve la póliza de seguro contratada por la empresa para este ítem. Disponible para el dueño actual
-(beneficiario) y para el comprador una vez cerrada la venta.
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-itemIdrequired string<uuid>
-```
-```
-Content type
 ```
 
-### Responses
+---
 
-```
-200 Detalles de la póliza de seguro
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-#### Response samples
+### `GET /items/{itemId}`
 
-```
-200 401 403 404
-```
-```
-GET /items/{itemId}/insurance
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
+**Estado:** DB_BACKED  
+
+**Parámetro:** `itemId` — entero, `itemsCatalogo.identificador`.
+
+**Cuerpo de detalle** (campos alineados al profesor):
+
+| Campo API | Origen BD |
+| --- | --- |
+| `id` | `itemsCatalogo.identificador` |
+| `catalogoId` | `itemsCatalogo.catalogo` |
+| `productoId` | `itemsCatalogo.producto` |
+| `precioBase` | `itemsCatalogo.precioBase` |
+| `comision` | `itemsCatalogo.comision` |
+| `subastado` | `itemsCatalogo.subastado` (`si`/`no`) |
+| `descripcionCatalogo` | `productos.descripcionCatalogo` |
+| `descripcionCompleta` | `productos.descripcionCompleta` |
+| `duenio` | `productos.duenio` (FK `duenios`) |
+| `fotos` / `imageUrls` | Derivado de `fotos` |
+
+**No documentar como persistidos en el schema del profesor:** `artistOrDesigner`, `creationOrEraLabel`, `historicalContext`, `components[]` — salvo extensión auxiliar no incluida en el script.
+
+---
+
+### `GET /items/{itemId}/insurance`
+
+**Estado:** DB_BACKED  
+
+**Condición:** si `productos.seguro` es NULL, responder 404 o payload vacío según política.
+
+**Ejemplo 200:**
+
+```json
 {
-"policyNumber": "string",
-"insurerName": "string",
-"baselineInsuredAmount": 0 ,
-"upgradedInsuredAmount": 0 ,
-"lastCoverageUpgradePaidAt": "2019-08-24T14:15:22Z",
-```
-- "coveredItemIds": [
-    "497f6eca-6276-4993-bfeb-53cbbbba6f08"
-],
-"insuredAmount": 0 ,
-"currency": "ARS",
-"startDate": "2019-08-24T14:15:22Z",
-"endDate": "2019-08-24T14:15:22Z",
-"beneficiaryUserId": "6a2c1627-563b-4f3b-9b61-aee95dd555f6",
-"depotLocation": "string"
+  "nroPoliza": "POL-2024-001",
+  "compania": "Aseguradora SA",
+  "polizaCombinada": "no",
+  "importe": 50000.00
 }
-
-```
-Content type
 ```
 
-## Solicitar mayor monto asegurado (diferencia a cargo del
+**No incluir** en MVP de BD: `baselineInsuredAmount`, `upgradedInsuredAmount`, `lastCoverageUpgradePaidAt`, `coverageStartAt`, `depotLocation`, etc., **no** están en `seguros` del script académico.
 
-## dueño)
+---
 
-**TP — ampliación de cobertura:** el dueño consignante solicita incrementar el capital asegurado. El
-backend calcula la prima adicional; el cargo se confirma contra un medio de pago verificado.
+### `POST /auctions/{auctionId}/bids`
 
-##### AUTHORIZATIONS: BearerAuth
+**Estado:** DB_BACKED  
 
-###### PATH PARAMETERS
+**Descripción:** Registra una puja en `pujos` vinculada a un `asistente` existente o creado para (`cliente`, `subasta`).
 
-```
-string<uuid>
-```
-REQUEST BODY SCHEMA: application/json
+**Request body ejemplo:**
 
-```
-number<float> >= 0
-Capital asegurado deseado (debe superar la cobertura vigente).
-```
-```
-string<uuid>
-Medio verificado del dueño para debitar la diferencia de prima.
-```
-### Responses
-
-```
-200 Póliza actualizada tras cobro exitoso / validación de suscripción
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-402 Falló el cobro por diferencia de prima.
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-```
-409 El aumento no está permitido para el estado actual del ciclo de vida del ítem.
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-```
-itemId
-required
-```
-```
-targetInsuredAmount
-required
-```
-```
-paymentMethodId
-required
-```
-
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-200 400 401 402 403 404 409 422
-```
-```
-POST /items/{itemId}/insurance/coverage-increase
-```
-```
-application/json
-```
-```
-Copy
+```json
 {
-"targetInsuredAmount": 0 ,
-"paymentMethodId": "b6df8625-cd25-4123-b345-638aa7b5d011"
+  "itemId": 100,
+  "importe": 2000.00
 }
 ```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
+
+**Reglas de negocio (TPO)** — deben implementarse en servicio, no necesariamente con CHECK adicionales:
+
+- La puja debe ser **estrictamente mayor** que la oferta vigente en el ítem (derivada de último `pujos.importe` o precio base si no hay pujas).
+- **Mínimo:** oferta vigente + **1%** del `precioBase` del `itemsCatalogo`.
+- **Máximo:** oferta vigente + **20%** del `precioBase`.
+- **Excepción:** en subastas con categoría `oro` o `platino`, estos límites **no aplican** (según consigna).
+
+**Respuesta:** incluir `bidId` entero (`pujos.identificador`), `ganador` si se actualiza a `'si'`/`'no'`.
+
+---
+
+### `GET /auctions/{auctionId}/bids/history`
+
+**Estado:** DB_BACKED  
+
+**Orden:** por `pujos.identificador` ascendente (cronológico por inserción).
+
+---
+
+### `GET /users/me`
+
+**Estado:** DB_BACKED (perfil sin auth en BD del profesor)
+
+**Descripción:** Perfil del cliente autenticado mapeado a `personas` + `clientes` + `paises`.
+
+**Ejemplo 200:**
+
+```json
 {
-"policyNumber": "string",
-"insurerName": "string",
-"baselineInsuredAmount": 0 ,
-"upgradedInsuredAmount": 0 ,
-"lastCoverageUpgradePaidAt": "2019-08-24T14:15:22Z",
-```
-- "coveredItemIds": [
-    "497f6eca-6276-4993-bfeb-53cbbbba6f08"
-],
-"insuredAmount": 0 ,
-"currency": "ARS",
-"startDate": "2019-08-24T14:15:22Z",
-"endDate": "2019-08-24T14:15:22Z",
-"beneficiaryUserId": "6a2c1627-563b-4f3b-9b61-aee95dd555f6",
-"depotLocation": "string"
+  "id": 7,
+  "documento": "40123456",
+  "nombre": "María García",
+  "direccion": "Calle Falsa 123",
+  "estado": "activo",
+  "pais": {
+    "id": 1,
+    "nombre": "Argentina"
+  },
+  "admitido": "no",
+  "categoria": "plata"
 }
-
-```
-Content type
-```
-```
-Content type
 ```
 
-# Live Bids
+**Marcar como no persistidos en el schema del profesor** (no deben documentarse como columnas del modelo académico): `email`, `firstName`/`lastName` separados, `documentFrontImageUrl`, `documentBackImageUrl`, `biddingBlockedUntilResolved`, `delinquentWinId`, `accountServiceSuspended`, `requiresPasswordChange`.
 
-Seguimiento de subastas en vivo, pujas y **sesión única** por usuario. El TP exige actualizaciones en
-tiempo real: usar WebSocket/SSE cuando esté disponible y GET /auctions/{auctionId}/live
-como snapshot + alternativa de polling (suggestedPollIntervalMs).
+---
 
-## Inspeccionar la vinculación interactiva actual a subasta en
+### `GET /users/me/metrics`
 
-## vivo
+**Estado:** DERIVED  
 
-Permite al cliente móvil saber si ya existe una sesión activa antes de llamar a POST
-/auctions/{auctionId}/live/session (TP: una sola subasta simultánea).
+**Descripción:** Conteos desde `asistentes`, `pujos`, `registroDeSubasta` (definición exacta a cargo del backend).
 
-##### AUTHORIZATIONS: BearerAuth
+---
 
-## Responses
+### `GET /users/me/auctions` · `GET /users/me/bids` · `GET /users/me/wins`
 
-```
-200 Estado actual de sesión (id de subasta activa si existe)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
+**Estado:** DB_BACKED / DERIVED  
 
-```
-200 401
-```
-```
-GET /users/me/live-session
-```
-```
-application/json
-```
-```
-Copy
+- Subastas: vía `asistentes.subasta`.
+- Pujas: vía `pujos` + `asistentes`.
+- Ganadas: `pujos.ganador = 'si'` (validar reglas de cierre con negocio).
+
+---
+
+### `GET /users/me/seller/settlements` · `GET /users/me/seller/settlements/{settlementId}`
+
+**Estado:** DB_BACKED  
+
+**Mapeo:**
+
+| Campo API | Columna |
+| --- | --- |
+| `id` | `registroDeSubasta.identificador` |
+| `auctionId` | `registroDeSubasta.subasta` |
+| `productoId` | `registroDeSubasta.producto` |
+| `duenioId` | `registroDeSubasta.duenio` |
+| `clienteId` | `registroDeSubasta.cliente` |
+| `importe` | `registroDeSubasta.importe` |
+| `comision` | `registroDeSubasta.comision` |
+
+---
+
+### `POST /auth/register` (MVP académico / alcance persistente)
+
+**Estado:** DB_BACKED **solo** para persona + cliente.
+
+**Descripción:** Alta de **persona** y extensión **cliente**; no hay correo ni contraseña en el `schema.sql` del profesor.
+
+**Request body recomendado:**
+
+```json
 {
-"activeAuctionId": "5354e8d3-3578-4411-9bc5-5ae0e9f1af36",
-"connectedSince": "2019-08-24T14:15:22Z"
-```
-```
-Content type
-```
-
-###### }
-
-## Obtener estado de subasta en vivo
-
-Devuelve el estado corriente de la subasta (ítem activo, temporizador, mejor postura y reglas de
-siguiente puja). **Requiere JWT** porque expone montos competitivos (TP: precios sensibles solo para
-registrados).
-
-**Tiempo real (TP):** el producto debe notificar cambios en tiempo real. La implementación recomendada
-es un canal **WebSocket** o **SSE** (LiveAuctionStatus.realtimeChannelHint); este GET sirve
-como sincronización inicial y como **respaldo por polling** (suggestedPollIntervalMs).
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único de la subasta.
-```
-### Responses
-
-```
-200 Progreso actual en vivo
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-#### Response samples
-
-```
-200 401 404
-```
-```
-auctionId
-required
-```
-```
-GET /auctions/{auctionId}/live
-```
-```
-application/json
-```
-```
-Copy
-```
-```
-Content type
-```
-
-###### {
-
-```
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"status": "scheduled",
-"currentItemId": "d50a91bf-9368-4971-949f-5572e7578bba",
-"currentBid": 0 ,
-"highestBidderId": "be95e659-ffa4-4485-87bb-d519c285dfa6",
-"minNextBid": 0 ,
-"maxNextBid": 0 ,
-"secondsRemaining": 0 ,
-"serverTime": "2019-08-24T14:15:22Z",
-"suggestedPollIntervalMs": 2000 ,
-"realtimeChannelHint": "string"
+  "documento": "40123456",
+  "nombre": "María García",
+  "direccion": "Calle Falsa 123",
+  "numeroPais": 1,
+  "foto": null
 }
 ```
-## Vincular al usuario autenticado a la sala en vivo de esta
 
-## subasta
+- `foto`: opcional; si se envía Base64, el backend persiste en `personas.foto` (VARBINARY). Alternativa: subida por otro endpoint si se define.
 
-**TP — exclusividad:** registra la intención explícita de seguir/interactuar en vivo con esta subasta. Si ya
-existe otra sesión activa, responde 409 hasta que se libere con DELETE.
+**Respuesta 201:**
 
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único de la subasta.
-```
-### Responses
-
-```
-201 Sesión en vivo establecida para esta subasta
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-409 El usuario ya está vinculado a una sesión en vivo de otra subasta.
-```
-```
-auctionId
-required
-```
-
-#### Response samples
-
-```
-201 401 404 409
-```
-```
-POST /auctions/{auctionId}/live/session
-```
-```
-application/json
-```
-```
-Copy
+```json
 {
-"activeAuctionId": "5354e8d3-3578-4411-9bc5-5ae0e9f1af36",
-"connectedSince": "2019-08-24T14:15:22Z"
+  "id": 7,
+  "mensaje": "Cliente registrado pendiente de verificación (admitido = no)."
 }
 ```
-## Liberar la sesión en vivo de esta subasta
 
-Cierra la sesión interactiva del usuario sobre **esta** subasta, liberando el cupo para conectarse a otra
-(TP).
+- `id` ↔ `personas.identificador` / `clientes.identificador`.
 
-##### AUTHORIZATIONS: BearerAuth
+**No documentar:** envío de contraseña temporal por email como parte del modelo del profesor.
 
-###### PATH PARAMETERS
+---
 
-```
-string<uuid>
-Identificador único de la subasta.
-```
-### Responses
+## Endpoints de tiempo de ejecución o auxiliares
 
-```
-— 204 Sesión liberada (o no había sesión activa en esta subasta)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-auctionId
-required
-```
-```
-Content type
-```
+### Autenticación JWT / sesión
 
-#### Response samples
+| Endpoint | Estado | Notas |
+| --- | --- | --- |
+| `POST /auth/login` | AUXILIARY_REQUIRED | Credenciales fuera del script académico salvo tablas auxiliares. |
+| `POST /auth/logout` | AUXILIARY_REQUIRED | Invalidación de token en memoria o tabla auxiliar. |
+| `POST /auth/change-initial-password` | AUXILIARY_REQUIRED o OUT_OF_SCOPE | Sin columnas en profesor; solo si hay módulo técnico paralelo. |
+| `POST /auth/forgot-password` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | Salvo diseño auxiliar explícito. |
+| `POST /auth/reset-password` | OUT_OF_SCOPE_FOR_PROFESSOR_SCHEMA | Idem. |
 
-```
-401 404
-```
-```
-DELETE /auctions/{auctionId}/live/session
-```
-```
-application/json
-```
-```
-Copy
-{
-"error": "InvalidBidAmountError",
-"message": "El monto de puja debe ser estrictamente mayor a la puja actua
-"statusCode": 409
-}
-```
-## Crear una puja
+### Sesión en vivo (sin tabla en BD)
 
-Reglas de negocio aplicadas:
+| Endpoint | Estado |
+| --- | --- |
+| `GET /users/me/live-session` | RUNTIME_ONLY |
+| `POST /auctions/{auctionId}/live/session` | RUNTIME_ONLY |
+| `DELETE /auctions/{auctionId}/live/session` | RUNTIME_ONLY |
 
-```
-El usuario debe tener un medio de pago verificado.
-La categoría del usuario debe cumplir la categoría mínima requerida por la subasta.
-El usuario no debe estar bloqueado por morosidad de pago hasta regularizar (TP).
-El monto de puja debe superar estrictamente el monto actual.
-El monto de puja debe estar dentro de [minNextBid, maxNextBid] (salvo que la categoría de
-subasta sea gold/platinum).
-Se rechazan ofertas por encima de una garantía de cheque certificado (o tope de fondos
-reservados) (TP).
-El cliente DEBERÍA mantener una sesión en vivo activa vía POST
-/auctions/{auctionId}/live/session antes de pujar en la UX móvil (el servidor PUEDE
-exigirlo).
-```
-##### AUTHORIZATIONS: BearerAuth
+**Texto para el cliente móvil:** estas rutas modelan **exclusión mutua** de sala en vivo (regla TPO); la persistencia de “sesión activa” **no** está en el `schema.sql` del profesor. El backend puede usar caché, Redis o estado en JWT hasta que exista tabla auxiliar.
 
-###### PATH PARAMETERS
+### `GET /auctions/{auctionId}/live`
 
-```
-string<uuid>
-Identificador único de la subasta.
-```
-REQUEST BODY SCHEMA: application/json
+**Estado:** DERIVED — estado actual construido desde `subastas`, últimas `pujos`, ítems activos.
 
-```
-auctionId
-required
-```
-```
-Content type
-```
+---
 
-```
-number<float>
-Debe ser estrictamente mayor que currentBid y estar dentro de
-[minNextBid, maxNextBid].
-```
-### Responses
+## Endpoints fuera del alcance del MVP persistente (schema del profesor)
 
-```
-201 Puja procesada correctamente
-```
-```
-400 La subasta no está en un estado participable (cerrada o no iniciada)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403
-Prohibido por falta de medios de pago verificados, categoría de usuario insuficiente, suspensión para
-pujar por morosidad, o monto de puja por encima de la garantía de participación.
-```
-```
-404 Recurso no encontrado
-```
-```
-409
-Conflicto de puja (el monto está fuera del rango permitido [minNextBid, maxNextBid] o es menor
-al monto actual).
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
+Los siguientes **mantienen nombre de ruta** si el producto aún los referencia, pero **no** deben documentarse como soportados por las tablas del script académico:
 
-```
-Payload
-```
-#### Response samples
+- **Medios de pago:** `GET/POST/PUT/DELETE /users/me/payment-methods`, `…/verify`, `…/reserve-funds`
+- **Cuenta de cobro vendedor:** `GET/PUT /users/me/seller/payout-account`
+- **Aumento de cobertura:** `POST /items/{itemId}/insurance/coverage-increase`
+- **Workflow envío / términos de consignación:** `DELETE /item-submissions/{id}`, `POST …/terms-decision`, `POST …/shipment`
+- **Notificación leída:** `PATCH /users/me/notifications/{notificationId}` (sin columna `read` en BD profesor)
+- **Pago ganador / liquidación interactiva** si implicaban tablas no presentes (p. ej. `winner_payments` del modelo antiguo): revisar; el académico cubre cierre económico vía **`registroDeSubasta`** para consultas de vendedor.
 
-```
-amount
-required
-```
-```
-POST /auctions/{auctionId}/bids
-```
-```
-application/json
-```
-```
-Copy
-{
-"amount": 0
-}
-```
-```
-Content type
-```
+**Pagos del ganador** (`GET …/wins/{winId}/payment-breakdown`, `POST …/settle`): si el backend antiguo usaba tablas fuera del profesor, marcar como **AUXILIARY_REQUIRED** o simplificar a lectura derivada de `registroDeSubasta` + reglas de negocio.
 
-```
-201 400 401 403 404 409 422
-```
-```
-application/json
-```
-```
-Copy
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"userId": "2c4a230c-5085-4924-a3e1-25fb4fc5965b",
-"amount": 0 ,
-"createdAt": "2019-08-24T14:15:22Z",
-"isWinning": true
-}
-```
-## Obtener historial de pujas de una subasta
+---
 
-Historial de pujas exitosas con montos identificables. **Solo usuarios autenticados (TP)** — el listado no
-es parte del catálogo público anónimo.
+## Reglas de negocio TPO a mantener (honestas con la BD)
 
-##### AUTHORIZATIONS: BearerAuth
+- **Pujas:** mayor que oferta vigente; límites ±1% / ±20% sobre `precioBase` salvo categoría subasta `oro` / `platino`.
+- **Sesión única en vivo:** regla de producto; implementación **RUNTIME_ONLY** respecto al schema del profesor.
+- **Sin pujas:** lógica “compra empresa al valor base” es de negocio; el estado `company_purchased_at_base` **no** existe como columna en el script mostrado — documentar como **campo derivado** o `itemsCatalogo.subastado` + reglas.
+- **Incumplimiento / multa / 72 h:** no hay columnas explícitas en el extracto académico; si se mantiene el requisito, será **AUXILIARY_REQUIRED** o extensión futura.
 
-###### PATH PARAMETERS
+---
 
-```
-string<uuid>
-Identificador único de la subasta.
-```
-### Responses
+## Notas de implementación para backend
 
-```
-200 Historial cronológico de pujas exitosas
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-auctionId
-required
-```
-```
-GET /auctions/{auctionId}/bids/history
-```
-```
-Content type
-```
+Orientación de repositorios contra el `schema.sql` del profesor:
 
-# User Activity
+1. **`subastas` repository:** CRUD lectura de `subastas`, joins a `subastadores` / `personas`, normalización de `status` API vs `estado` + `fecha`/`hora`.
+2. **`catalogos` / `itemsCatalogo` / `productos` repository:** catálogo por subasta, precios, dueño, fotos (binario → DTO con URLs).
+3. **`pujos` repository:** inserción con validación de montos y categoría de subasta; historial ordenado por `identificador`.
+4. **`asistentes` repository:** alta idempotente por par (`cliente`, `subasta`) antes de pujar.
+5. **`clientes` / `personas` repository:** registro académico, perfil `GET /users/me`, joins a `paises`.
+6. **`paises` repository:** `GET /countries`.
+7. **`registroDeSubasta` repository:** listados y detalle de liquidaciones/registros para vendedor (`duenio`) y comprador (`cliente`).
 
-Trazabilidad de acciones históricas del usuario (pujas, victorias, pagos de ganadores)
+Mantener una capa de **mapeo DTO** entre nombres JSON (camelCase o español, según acuerdo de equipo) y columnas SQL tal cual en el script.
 
-#### Response samples
+---
 
-```
-200 401 404
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"totalBids": 0 ,
-```
-- "bids": [
-    + { ... }
-]
-}
+## Riesgos y supuestos (sin modificar `schema.sql`)
 
-## Listar subastas en las que el usuario participa / participó
+- El archivo `database/schema.sql` del profesor puede contener **errores de sintaxis** heredados del material (p. ej. tipos en `seguros`, comas finales en `catalogos`, caracteres corruptos en nombres de columna). La **corrección de DDL** es responsabilidad del equipo / docente; **este contrato API** asume que el modelo lógico descrito (tablas y relaciones) es el objetivo.
+- `personas.estado` incluye el valor `'incativo'` en el CHECK del script recibido (posible typo de `inactivo`); el backend debe normalizar o alinearse al script real desplegado.
+- `subastas.estado` usa el literal **`carrada`** en el CHECK del profesor; la API puede exponer `closed` en JSON para no propagar el typo al cliente, documentando la correspondencia.
 
-Siempre autenticado: incluye datos monetarios completos alineados al TP (no aplica la anonimización
-del catálogo público).
+---
 
-##### AUTHORIZATIONS: BearerAuth
+## Resumen ejecutivo para entrega
 
-## Responses
+- **Rutas:** se conservan los paths principales acordados con diseño.
+- **IDs:** documentación y ejemplos en **enteros**.
+- **Categorías:** valores **`comun` / `especial` / `plata` / `oro` / `platino`** alineados al CHECK del profesor.
+- **Persistencia real:** acotada a las tablas listadas en **Fuente de verdad**; auth rico, medios de pago, notificaciones persistidas y sesión live en BD quedan como **auxiliar**, **runtime** o **fuera de alcance**, según la matriz.
 
-```
-200 Devuelve una lista de subastas
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-Content type
-```
+---
 
-#### Response samples
-
-```
-200 401
-```
-```
-GET /users/me/auctions
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-[
-```
-- {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "title": "string",
-    "description": "string",
-    "coverImageUrl": "http://example.com",
-    "categoryRequired": "common",
-    "currency": "ARS",
-    "startDate": "2019-08-24T14:15:22Z",
-    "endDate": "2019-08-24T14:15:22Z",
-    "status": "scheduled",
-    "location": "string",
-+ "auctioneer": { ... },
-"basePrice": 0 ,
-"currentBid": 0
-}
-]
-
-## Listar pujas históricas del usuario en todas las subastas
-
-##### AUTHORIZATIONS: BearerAuth
-
-### Responses
-
-```
-200 Devuelve un arreglo con las pujas del usuario
-```
-```
-Content type
-```
-
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
-
-```
-200 401
-```
-```
-GET /users/me/bids
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-[
-```
-- {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-    "userId": "2c4a230c-5085-4924-a3e1-25fb4fc5965b",
-    "amount": 0 ,
-    "createdAt": "2019-08-24T14:15:22Z",
-    "isWinning": true
-}
-]
-
-## Listar subastas ganadas por el usuario
-
-##### AUTHORIZATIONS: BearerAuth
-
-### Responses
-
-```
-200 Devuelve un arreglo de subastas concluidas donde el usuario ganó
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-Content type
-```
-
-#### Response samples
-
-```
-200 401
-```
-```
-GET /users/me/wins
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-[
-```
-- {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "title": "string",
-    "description": "string",
-    "coverImageUrl": "http://example.com",
-    "categoryRequired": "common",
-    "currency": "ARS",
-    "startDate": "2019-08-24T14:15:22Z",
-    "endDate": "2019-08-24T14:15:22Z",
-    "status": "scheduled",
-    "location": "string",
-+ "auctioneer": { ... },
-"basePrice": 0 ,
-"currentBid": 0
-}
-]
-
-## Obtener desglose de pago del ganador
-
-Devuelve el desglose tipo factura enviado al ganador por mensaje privado: monto de puja, comisión,
-costo de envío a la dirección declarada y total adeudado.
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único del registro de subasta ganada.
-```
-```
-winId
-required
-```
-```
-Content type
-```
-
-### Responses
-
-```
-200 Desglose de pago de la subasta ganada
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-#### Response samples
-
-```
-200 401 403 404
-```
-```
-GET /users/me/wins/{winId}/payment
-```
-```
-application/json
-```
-```
-Copy
-{
-"winId": "e8abd73a-ae52-4739-9b76-4fc0911d1a0e",
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"itemId": "f11b669d-7201-4c21-88af-d85092f0c005",
-"bidAmount": 0 ,
-"commission": 0 ,
-"shippingCost": 0 ,
-"total": 0 ,
-"currency": "ARS",
-"shippingAddress": "string",
-"deadline": "2019-08-24T14:15:22Z",
-"settled": true,
-"penaltyPercent": 0 ,
-"penaltyAmount": 0 ,
-"regularizationDeadline": "2019-08-24T14:15:22Z",
-"biddingBlockedUntilPayment": true
-}
-```
-```
-Content type
-```
-
-## Liquidar el pago del ganador
-
-Debita el medio de pago elegido por el monto total (puja + comisión + envío). Si el cobro falla, el
-usuario recibe una multa del 10% y dispone de 72 h para presentar fondos.
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único del registro de subasta ganada.
-```
-REQUEST BODY SCHEMA: application/json
-
-```
-string<uuid>
-```
-```
-boolean
-Default: false
-Si es true, el comprador retirará el ítem en persona (se elimina el costo de
-envío pero la cobertura de seguro queda sin efecto al retirarlo).
-```
-### Responses
-
-```
-200 Pago liquidado correctamente
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-402
-Pago fallido — cobro rechazado por el proveedor o fondos insuficientes. Inicia el circuito de multa 10% ,
-regularización en 72 h y bloqueo de participación hasta saneamiento (TP). Si el incumplimiento
-persiste, accountServiceSuspended pasa a true.
-```
-```
-404 Recurso no encontrado
-```
-```
-409 El pago ya fue liquidado para esta victoria.
-```
-```
-winId
-required
-```
-```
-paymentMethodId
-required
-```
-```
-pickupInPerson
-```
-```
-POST /users/me/wins/{winId}/payment
-```
-
-# Payment Methods
-
-CRUD de alternativas de pago tipadas (banco, tarjeta, cheque) + verificación y reserva de fondos
-
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-200 401 402 404 409
-```
-```
-application/json
-```
-```
-Copy
-{
-"paymentMethodId": "b6df8625-cd25-4123-b345-638aa7b5d011",
-"pickupInPerson": false
-}
-```
-```
-application/json
-```
-```
-Copy
-{
-"winId": "e8abd73a-ae52-4739-9b76-4fc0911d1a0e",
-"paidAmount": 0 ,
-"currency": "ARS",
-"paidAt": "2019-08-24T14:15:22Z",
-"paymentMethodId": "b6df8625-cd25-4123-b345-638aa7b5d011"
-}
-```
-## Listar medios de pago del usuario
-
-##### AUTHORIZATIONS: BearerAuth
-
-```
-Content type
-```
-```
-Content type
-```
-
-### Responses
-
-```
-200 Listado de fuentes de pago conectadas
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
-
-```
-200 401
-```
-```
-GET /users/me/payment-methods
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-[
-```
-- {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "type": "credit_card",
-    "displayName": "Visa ending in 4432",
-    "holderName": "string",
-    "currency": "ARS",
-    "reservedAmount": 0 ,
-    "verificationStatus": "pending",
-    "verified": true,
-    "status": "active",
-+ "details": { ... }
-}
-]
-
-## Registrar un nuevo medio de pago
-
-Acepta un cuerpo tipado según el discriminador type: bank_account → BankAccountDetails,
-credit_card → CreditCardDetails, certified_check → CertifiedCheckDetails.
-
-##### AUTHORIZATIONS: BearerAuth
-
-```
-Content type
-```
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string (PaymentMethodType)
-Enum: "credit_card" "bank_account" "certified_check"
-```
-```
-string
-```
-```
-string (CurrencyEnum)
-Enum: "ARS" "USD"
-```
-```
-number<float>
-Reserva inicial opcional para bank_account / credit_card.
-```
-```
-any
-```
-```
-string
-PAN en crudo. Solo se acepta para credit_card; nunca se persiste en
-texto claro.
-```
-```
-string
-Valor de verificación de tarjeta. Solo se acepta para credit_card; nunca
-se persiste.
-```
-### Responses
-
-```
-201 Medio de pago almacenado de forma segura
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-```
-type
-required
-```
-```
-holderName
-required
-```
-```
-currency
-```
-```
-reservedAmount
-```
-```
-details
-required
-```
-```
-cardNumber
-```
-```
-cvv
-```
-```
-POST /users/me/payment-methods
-```
-
-#### Response samples
-
-```
-201 400 401 422
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"type": "credit_card",
-"holderName": "string",
-"currency": "ARS",
-"reservedAmount": 0 ,
-```
-- "details": {
-    "type": "bank_account",
-    "bankName": "string",
-    "country": "string",
-    "accountNumber": "string",
-    "swiftBic": "string",
-    "currency": "ARS"
-},
-"cardNumber": "string",
-"cvv": "string"
-}
-
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"type": "credit_card",
-"displayName": "Visa ending in 4432",
-"holderName": "string",
-"currency": "ARS",
-"reservedAmount": 0 ,
-"verificationStatus": "pending",
-"verified": true,
-"status": "active",
-```
-```
-Content type
-```
-```
-Content type
-```
-
-- "details": {
-    "type": "bank_account",
-    "bankName": "string",
-    "country": "string",
-    "accountNumber": "string",
-    "swiftBic": "string",
-    "currency": "ARS"
-}
-}
-
-## Actualizar detalles del medio de pago
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único del medio de pago.
-```
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-```
-```
-string
-Enum: "active" "inactive"
-```
-### Responses
-
-```
-200 Cuerpo aplicado correctamente
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-paymentMethodId
-required
-```
-```
-holderName
-```
-```
-status
-```
-
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-200 400 401 404
-```
-```
-PUT /users/me/payment-methods/{paymentMethodId}
-```
-```
-application/json
-```
-```
-Copy
-{
-"holderName": "string",
-"status": "active"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"type": "credit_card",
-"displayName": "Visa ending in 4432",
-"holderName": "string",
-"currency": "ARS",
-"reservedAmount": 0 ,
-"verificationStatus": "pending",
-"verified": true,
-"status": "active",
-```
-- "details": {
-    "type": "bank_account",
-    "bankName": "string",
-    "country": "string",
-    "accountNumber": "string",
-    "swiftBic": "string",
-    "currency": "ARS"
-}
-}
-
-```
-Content type
-```
-```
-Content type
-```
-
-## Desvincular un medio de pago
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único del medio de pago.
-```
-### Responses
-
-```
-— 204 Eliminado (lógico o físico) correctamente
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-#### Response samples
-
-```
-401 404
-```
-```
-paymentMethodId
-required
-```
-```
-DELETE /users/me/payment-methods/{paymentMethodId}
-```
-```
-application/json
-```
-```
-Copy
-{
-"error": "InvalidBidAmountError",
-"message": "El monto de puja debe ser estrictamente mayor a la puja actua
-"statusCode": 409
-}
-```
-```
-Content type
-```
-
-## Enviar un código de verificación para este medio de pago
-
-Completa el flujo de verificación (p. ej., código de 6 dígitos para tarjetas, confirmación de
-microdepósito para cuentas bancarias, confirmación de recepción para cheques certificados). Solo los
-medios de pago verificados habilitan pujas.
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único del medio de pago.
-```
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-Código de verificación de 6 dígitos para tarjetas, o referencia provista por el
-emisor bancario/del cheque.
-```
-### Responses
-
-```
-200 Medio de pago verificado
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-422 El código de verificación es inválido o expiró.
-```
-#### Request samples
-
-```
-Payload
-```
-```
-paymentMethodId
-required
-```
-```
-code
-required
-```
-```
-POST /users/me/payment-methods/{paymentMethodId}/verify
-```
-
-#### Response samples
-
-```
-200 400 401 404 422
-```
-```
-application/json
-```
-```
-Copy
-{
-"code": "string"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"type": "credit_card",
-"displayName": "Visa ending in 4432",
-"holderName": "string",
-"currency": "ARS",
-"reservedAmount": 0 ,
-"verificationStatus": "pending",
-"verified": true,
-"status": "active",
-```
-- "details": {
-    "type": "bank_account",
-    "bankName": "string",
-    "country": "string",
-    "accountNumber": "string",
-    "swiftBic": "string",
-    "currency": "ARS"
-}
-}
-
-## Reservar fondos para participar en subastas
-
-Para medios bank_account y credit_card. Define o actualiza el monto reservado como garantía
-de participación. Para certified_check el monto reservado se fija al emitir el cheque y no puede
-modificarse aquí.
-
-```
-Content type
-```
-```
-Content type
-```
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único del medio de pago.
-```
-REQUEST BODY SCHEMA: application/json
-
-```
-number<float> >= 0
-```
-```
-string (CurrencyEnum)
-Enum: "ARS" "USD"
-```
-### Responses
-
-```
-200 Reserva aplicada
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-```
-paymentMethodId
-required
-```
-```
-amount
-required
-```
-```
-currency
-required
-```
-```
-POST /users/me/payment-methods/{paymentMethodId}/reserve-funds
-```
-```
-application/json
-```
-```
-Copy
-```
-```
-Content type
-```
-
-# Item Submissions
-
-Módulo para que clientes ofrezcan sus pertenencias para futuras subastas, incluyendo seguimiento de
-envío físico
-
-#### Response samples
-
-```
-200 400 401 404 422
-```
-###### {
-
-```
-"amount": 0 ,
-"currency": "ARS"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"type": "credit_card",
-"displayName": "Visa ending in 4432",
-"holderName": "string",
-"currency": "ARS",
-"reservedAmount": 0 ,
-"verificationStatus": "pending",
-"verified": true,
-"status": "active",
-```
-- "details": {
-    "type": "bank_account",
-    "bankName": "string",
-    "country": "string",
-    "accountNumber": "string",
-    "swiftBic": "string",
-    "currency": "ARS"
-}
-}
-
-```
-Content type
-```
-
-## Crear solicitud de publicación de ítem
-
-Permite a un usuario enviar detalles de un ítem que desea poner en subasta. Requiere al menos 6
-imágenes, declaración de titularidad y declaración de origen lícito.
-
-##### AUTHORIZATIONS: BearerAuth
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-```
-```
-string
-```
-```
-Array of strings<uri> >= 6 items
-```
-```
-string
-```
-```
-string
-```
-```
-Array of objects (ItemComponent)
-Subelementos de la pieza cuando es compuesta.
-```
-```
-boolean
-Explicit legal acknowledgement.
-```
-```
-boolean
-Proof of non-illicit provenance.
-```
-### Responses
-
-```
-201 Solicitud registrada correctamente
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-```
-title
-required
-```
-```
-description
-required
-```
-```
-imageUrls
-required
-```
-```
-artistOrDesigner
-```
-```
-historicalContext
-```
-```
-components
-```
-```
-declaredOwnershipAccepted
-required
-```
-```
-lawfulOriginDeclarationAccepted
-required
-```
-
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-201 400 401 422
-```
-```
-POST /item-submissions
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"title": "string",
-"description": "string",
-```
-- "imageUrls": [
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com"
-],
-"artistOrDesigner": "string",
-"historicalContext": "string",
-- "components": [
-    + { ... }
-],
-"declaredOwnershipAccepted": true,
-"lawfulOriginDeclarationAccepted": true
-}
-
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"title": "string",
-"description": "string",
-```
-```
-Content type
-```
-```
-Content type
-```
-
-- "imageUrls": [
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com"
-],
-"declaredOwnershipAccepted": true,
-"lawfulOriginDeclarationAccepted": true,
-"status": "pending",
-"rejectionReason": "string",
-"scheduledAuctionId": "0b5a254a-939c-464a-8de2-21d69ca56cef",
-"basePrice": 0 ,
-"commissionPercent": 0 ,
-"termsProposalExpiresAt": "2019-08-24T14:15:22Z",
-"termsProposalVenue": "string",
-"termsProposalEventAt": "2019-08-24T14:15:22Z",
-- "shippingInstructions": {
-    "address": "string",
-    "city": "string",
-    "country": "string",
-    "venueName": "string",
-    "scheduledPreviewAt": "2019-08-24T14:15:22Z",
-    "deadline": "2019-08-24T14:15:22Z",
-    "instructions": "string"
-},
-"physicalShipmentStatus": "not_required",
-"shipmentTrackingNumber": "string",
-"shipmentCarrier": "string",
-"createdAt": "2019-08-24T14:15:22Z"
-}
-
-## Listar todas mis publicaciones de ítems
-
-##### AUTHORIZATIONS: BearerAuth
-
-### Responses
-
-
-```
-200 Listado que sigue los estados de los ítems propuestos por el usuario
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
-
-```
-200 401
-```
-```
-GET /users/me/item-submissions
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-[
-```
-- {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "title": "string",
-    "description": "string",
-+ "imageUrls": [ ... ],
-"declaredOwnershipAccepted": true,
-"lawfulOriginDeclarationAccepted": true,
-"status": "pending",
-"rejectionReason": "string",
-"scheduledAuctionId": "0b5a254a-939c-464a-8de2-21d69ca56cef",
-"basePrice": 0 ,
-"commissionPercent": 0 ,
-"termsProposalExpiresAt": "2019-08-24T14:15:22Z",
-"termsProposalVenue": "string",
-"termsProposalEventAt": "2019-08-24T14:15:22Z",
-+ "shippingInstructions": { ... },
-"physicalShipmentStatus": "not_required",
-"shipmentTrackingNumber": "string",
-"shipmentCarrier": "string",
-"createdAt": "2019-08-24T14:15:22Z"
-}
-]
-
-```
-Content type
-```
-
-## Obtener detalle puntual de una publicación
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador único de la publicación del ítem.
-```
-### Responses
-
-```
-200 Respuesta detallada del elemento publicado
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-#### Response samples
-
-```
-200 401 403 404
-```
-```
-submissionId
-required
-```
-```
-GET /item-submissions/{submissionId}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"title": "string",
-"description": "string",
-```
-```
-Content type
-```
-
-- "imageUrls": [
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com"
-],
-"declaredOwnershipAccepted": true,
-"lawfulOriginDeclarationAccepted": true,
-"status": "pending",
-"rejectionReason": "string",
-"scheduledAuctionId": "0b5a254a-939c-464a-8de2-21d69ca56cef",
-"basePrice": 0 ,
-"commissionPercent": 0 ,
-"termsProposalExpiresAt": "2019-08-24T14:15:22Z",
-"termsProposalVenue": "string",
-"termsProposalEventAt": "2019-08-24T14:15:22Z",
-- "shippingInstructions": {
-    "address": "string",
-    "city": "string",
-    "country": "string",
-    "venueName": "string",
-    "scheduledPreviewAt": "2019-08-24T14:15:22Z",
-    "deadline": "2019-08-24T14:15:22Z",
-    "instructions": "string"
-},
-"physicalShipmentStatus": "not_required",
-"shipmentTrackingNumber": "string",
-"shipmentCarrier": "string",
-"createdAt": "2019-08-24T14:15:22Z"
-}
-
-## Cancelar una publicación antes de que inicie la subasta
-
-Permitido mientras la publicación esté en pending, under_review o accepted (nunca después
-de terms_proposed o scheduled). Corresponde a la acción "Cancelar publicación" en la pantalla
-Mis Productos.
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-
-```
-string<uuid>
-Identificador único de la publicación del ítem.
-```
-### Responses
-
-```
-— 204 Publicación cancelada
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-```
-409 La publicación ya no puede cancelarse (ya está programada o vendida).
-```
-#### Response samples
-
-```
-401 403 404 409
-```
-```
-submissionId
-required
-```
-```
-DELETE /item-submissions/{submissionId}
-```
-```
-application/json
-```
-```
-Copy
-{
-"error": "InvalidBidAmountError",
-"message": "El monto de puja debe ser estrictamente mayor a la puja actua
-"statusCode": 409
-}
-```
-## Aceptar o rechazar la propuesta de precio base y
-
-## comisión de la empresa
-
-```
-Content type
-```
-
-**TP — post-inspección:** cuando la empresa informa fecha, lugar, valor base y comisiones (status ==
-terms_proposed), el usuario **acepta** (avanza hacia programación) o **rechaza** (el bien se devuelve;
-pueden aplicarse costos logísticos — ver notificación / rejectionReason).
-
-##### AUTHORIZATIONS: BearerAuth
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-Enum: "accept" "reject"
-accept confirma base y comisión propuestas y habilita la transición hacia
-scheduled. reject inicia la logística de devolución del bien (posibles
-costos — TP).
-```
-### Responses
-
-```
-200 Decisión aplicada; la publicación refleja el nuevo estado de ciclo de vida
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-```
-409 No hay términos comerciales pendientes o la decisión no está permitida en este estado.
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-```
-decision
-required
-```
-```
-POST /item-submissions/{submissionId}/terms-decision
-```
-```
-application/json
-```
-```
-Copy
-```
-```
-Content type
-```
-
-#### Response samples
-
-```
-200 400 401 403 404 409 422
-```
-###### {
-
-```
-"decision": "accept"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"title": "string",
-"description": "string",
-```
-- "imageUrls": [
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com"
-],
-"declaredOwnershipAccepted": true,
-"lawfulOriginDeclarationAccepted": true,
-"status": "pending",
-"rejectionReason": "string",
-"scheduledAuctionId": "0b5a254a-939c-464a-8de2-21d69ca56cef",
-"basePrice": 0 ,
-"commissionPercent": 0 ,
-"termsProposalExpiresAt": "2019-08-24T14:15:22Z",
-"termsProposalVenue": "string",
-"termsProposalEventAt": "2019-08-24T14:15:22Z",
-- "shippingInstructions": {
-    "address": "string",
-    "city": "string",
-    "country": "string",
-    "venueName": "string",
-    "scheduledPreviewAt": "2019-08-24T14:15:22Z",
-    "deadline": "2019-08-24T14:15:22Z",
-    "instructions": "string"
-},
-"physicalShipmentStatus": "not_required",
-"shipmentTrackingNumber": "string",
-
-```
-Content type
-```
-
-```
-"shipmentCarrier": "string",
-"createdAt": "2019-08-24T14:15:22Z"
-}
-```
-## Registrar el envío físico de una publicación aceptada para
-
-## inspección
-
-Una vez que la publicación se marca como accepted, el usuario debe enviar físicamente el ítem a la
-dirección de inspección devuelta en ItemSubmission.shippingInstructions. Este endpoint
-registra el transportista y número de seguimiento para que la empresa pueda rastrear la recepción.
-
-##### AUTHORIZATIONS: BearerAuth
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-```
-```
-string
-```
-```
-string<date-time>
-```
-### Responses
-
-```
-200 Envío registrado
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-```
-409 El envío no está permitido en el estado actual de la publicación.
-```
-```
-carrier
-required
-```
-```
-trackingNumber
-required
-```
-```
-shippedAt
-```
-
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-200 400 401 403 404 409
-```
-```
-POST /item-submissions/{submissionId}/shipment
-```
-```
-application/json
-```
-```
-Copy
-{
-"carrier": "DHL",
-"trackingNumber": "string",
-"shippedAt": "2019-08-24T14:15:22Z"
-}
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"title": "string",
-"description": "string",
-```
-- "imageUrls": [
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com",
-    "http://example.com"
-],
-"declaredOwnershipAccepted": true,
-"lawfulOriginDeclarationAccepted": true,
-"status": "pending",
-"rejectionReason": "string",
-"scheduledAuctionId": "0b5a254a-939c-464a-8de2-21d69ca56cef",
-"basePrice": 0 ,
-"commissionPercent": 0 ,
-
-```
-Content type
-```
-```
-Content type
-```
-
-# Seller Settlements
-
-Declaración de cuenta de cobro y trazabilidad de liquidaciones para bienes consignados vendidos en
-nombre del usuario (TP)
-
-```
-"termsProposalExpiresAt": "2019-08-24T14:15:22Z",
-"termsProposalVenue": "string",
-"termsProposalEventAt": "2019-08-24T14:15:22Z",
-```
-- "shippingInstructions": {
-    "address": "string",
-    "city": "string",
-    "country": "string",
-    "venueName": "string",
-    "scheduledPreviewAt": "2019-08-24T14:15:22Z",
-    "deadline": "2019-08-24T14:15:22Z",
-    "instructions": "string"
-},
-"physicalShipmentStatus": "not_required",
-"shipmentTrackingNumber": "string",
-"shipmentCarrier": "string",
-"createdAt": "2019-08-24T14:15:22Z"
-}
-
-## Obtener la cuenta bancaria declarada para recibir el
-
-## producido de ventas
-
-**TP — cuenta predeclarada:** los fondos por bienes vendidos del cliente se transfieren a la cuenta
-informada previamente. Este recurso modela esa cuenta (no es un medio de pago para comprar/pagar
-subastas).
-
-##### AUTHORIZATIONS: BearerAuth
-
-## Responses
-
-```
-200 Instrucciones de cobro almacenadas (identificadores enmascarados según corresponda)
-```
-
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 El usuario todavía no configuró una cuenta de cobro.
-```
-#### Response samples
-
-```
-200 401 404
-```
-```
-GET /users/me/seller/payout-account
-```
-```
-application/json
-```
-```
-Copy
-{
-"bankName": "string",
-"country": "string",
-"accountNumberMasked": "string",
-"currency": "ARS",
-"holderName": "string",
-"updatedAt": "2019-08-24T14:15:22Z"
-}
-```
-## Crear o reemplazar la cuenta de cobro para bienes
-
-## consignados
-
-##### AUTHORIZATIONS: BearerAuth
-
-REQUEST BODY SCHEMA: application/json
-
-```
-string
-```
-```
-string
-```
-```
-string
-CBU/CVU/IBAN local según país; se almacena tokenizado.
-```
-```
-bankName
-required
-```
-```
-country
-required
-```
-```
-accountNumber
-required
-```
-```
-Content type
-```
-
-```
-string
-Requerido para cuentas extranjeras.
-```
-```
-string (CurrencyEnum)
-Enum: "ARS" "USD"
-```
-```
-string
-```
-### Responses
-
-```
-200 Cuenta de cobro guardada
-```
-```
-400 Solicitud incorrecta (parámetros o query strings inválidos)
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-422 Entidad no procesable (falló la validación del esquema)
-```
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-swiftBic
-```
-```
-currency
-required
-```
-```
-holderName
-required
-```
-```
-PUT /users/me/seller/payout-account
-```
-```
-application/json
-```
-```
-Copy
-{
-"bankName": "string",
-"country": "string",
-"accountNumber": "string",
-"swiftBic": "string",
-"currency": "ARS",
-"holderName": "string"
-}
-```
-```
-Content type
-```
-
-```
-200 400 401 422
-```
-```
-application/json
-```
-```
-Copy
-{
-"bankName": "string",
-"country": "string",
-"accountNumberMasked": "string",
-"currency": "ARS",
-"holderName": "string",
-"updatedAt": "2019-08-24T14:15:22Z"
-}
-```
-## Listar liquidaciones de ítems consignados vendidos
-
-**TP — liquidaciones:** cada venta de un bien consignado genera un registro de liquidación con importes,
-comisiones descontadas y estado de transferencia a la cuenta declarada.
-
-##### AUTHORIZATIONS: BearerAuth
-
-### Responses
-
-```
-200 Resúmenes de liquidación ordenados de más nuevos a más antiguos
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
-
-```
-200 401
-```
-```
-GET /users/me/seller/settlements
-```
-```
-application/json
-```
-```
-Content type
-```
-```
-Content type
-```
-
-```
-Copy Expand all Collapse all
-[
-```
-- {
-    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-    "submissionId": "23243110-f447-42f4-a433-27cb8d276b19",
-    "auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-    "itemId": "f11b669d-7201-4c21-88af-d85092f0c005",
-    "hammerAmount": 0 ,
-    "commissionAmount": 0 ,
-    "netToSeller": 0 ,
-    "currency": "ARS",
-    "transferStatus": "pending",
-    "createdAt": "2019-08-24T14:15:22Z"
-}
-]
-
-## Obtener detalle de liquidación (trazabilidad de auditoría)
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-Identificador de un registro de liquidación de vendedor.
-```
-### Responses
-
-```
-200 Liquidación detallada incluyendo referencias a subasta/ítem/submission
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-403 Prohibido (token válido provisto, pero privilegios/requisitos insuficientes)
-```
-```
-404 Recurso no encontrado
-```
-```
-settlementId
-required
-```
-```
-GET /users/me/seller/settlements/{settlementId}
-```
-
-# Notifications
-
-Notificaciones de usuario (ganada, superada, comienza pronto, pago fallido, etc.)
-
-#### Response samples
-
-```
-200 401 403 404
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"submissionId": "23243110-f447-42f4-a433-27cb8d276b19",
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"itemId": "f11b669d-7201-4c21-88af-d85092f0c005",
-"hammerAmount": 0 ,
-"commissionAmount": 0 ,
-"netToSeller": 0 ,
-"currency": "ARS",
-"transferStatus": "pending",
-"createdAt": "2019-08-24T14:15:22Z",
-```
-- "deductions": [
-    + { ... }
-],
-- "payoutAccountSnapshot": {
-    "bankName": "string",
-    "country": "string",
-    "accountNumberMasked": "string",
-    "currency": "ARS",
-    "holderName": "string",
-    "updatedAt": "2019-08-24T14:15:22Z"
-},
-"notes": "string"
-}
-
-```
-Content type
-```
-
-## Listar notificaciones del usuario
-
-Devuelve el feed de notificaciones (ganada, liderando, superada, pago fallido, comienza pronto,
-detalles de pago del ganador, etc.).
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### QUERY PARAMETERS
-
-```
-boolean
-Default: false
-```
-### Responses
-
-```
-200 Notificaciones del usuario
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-#### Response samples
-
-```
-200 401
-```
-```
-unreadOnly
-```
-```
-GET /users/me/notifications
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-```
-```
-Content type
-```
-
-###### [
-
-###### - {
-
-```
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"type": "won",
-"title": "string",
-"message": "string",
-"read": true,
-"createdAt": "2019-08-24T14:15:22Z",
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"itemId": "f11b669d-7201-4c21-88af-d85092f0c005",
-"winId": "e8abd73a-ae52-4739-9b76-4fc0911d1a0e"
-}
-]
-```
-## Marcar una notificación como leída
-
-##### AUTHORIZATIONS: BearerAuth
-
-###### PATH PARAMETERS
-
-```
-string<uuid>
-```
-REQUEST BODY SCHEMA: application/json
-
-```
-boolean
-```
-### Responses
-
-```
-200 Notificación actualizada
-```
-```
-401 No autorizado (token ausente, manipulado o expirado)
-```
-```
-404 Recurso no encontrado
-```
-```
-notificationId
-required
-```
-```
-read
-required
-```
-```
-PATCH /users/me/notifications/{notificationId}
-```
-
-# Reference
-
-Static reference data (countries)
-
-#### Request samples
-
-```
-Payload
-```
-#### Response samples
-
-```
-200 401 404
-```
-```
-application/json
-```
-```
-Copy
-{
-"read": true
-}
-```
-```
-application/json
-```
-```
-Copy
-{
-"id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
-"type": "won",
-"title": "string",
-"message": "string",
-"read": true,
-"createdAt": "2019-08-24T14:15:22Z",
-"auctionId": "1b0383e0-fa9f-4f21-bfb0-a5423e98b82d",
-"itemId": "f11b669d-7201-4c21-88af-d85092f0c005",
-"winId": "e8abd73a-ae52-4739-9b76-4fc0911d1a0e"
-}
-```
-## Listar países soportados
-
-```
-Content type
-```
-```
-Content type
-```
-
-Devuelve la lista canónica de países usada para poblar selectores en el formulario de registro y en el
-flujo de creación de cuenta bancaria.
-
-### Responses
-
-```
-200 Arreglo de países
-```
-#### Response samples
-
-```
-200
-```
-```
-GET /countries
-```
-```
-application/json
-```
-```
-Copy Expand all Collapse all
-[
-```
-- {
-    "code": "AR",
-    "name": "Argentina"
-}
-]
-
-```
-Content type
-```
-
+*Fin del documento CrownBid API v2.0.0 (alineación schema académico).*
