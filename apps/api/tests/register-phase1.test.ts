@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as authRepository from "../src/modules/auth/auth.repository";
 import * as emailService from "../src/shared/email/email.service";
+import { ConflictError } from "../src/shared/errors/httpErrors";
 import { registerUser } from "../src/modules/auth/auth.service";
 
 describe("Auth-2 — registerUser", () => {
@@ -8,7 +9,7 @@ describe("Auth-2 — registerUser", () => {
     vi.restoreAllMocks();
   });
 
-  it("crea credencial, envía correo y devuelve contrato con mensaje y usuario", async () => {
+  it("acepta contrato Figma (firstName, lastName, email, documento, país, imágenes)", async () => {
     vi.spyOn(authRepository, "createPersonaClienteCredential").mockResolvedValue({
       id: 7,
       documentNumber: "40123456",
@@ -41,6 +42,7 @@ describe("Auth-2 — registerUser", () => {
       expect.objectContaining({
         to: "juan@example.com",
         firstName: "Juan",
+        temporaryPassword: expect.any(String),
       })
     );
     expect(r.emailSentTo).toBe("juan@example.com");
@@ -69,7 +71,8 @@ describe("Auth-2 — registerUser", () => {
 
     await expect(
       registerUser({
-        fullName: "A B",
+        firstName: "A",
+        lastName: "B",
         email: "a@b.com",
         documentNumber: "1",
         countryId: 1,
@@ -79,11 +82,28 @@ describe("Auth-2 — registerUser", () => {
     expect(delSpy).toHaveBeenCalledWith(99);
   });
 
-  it("acepta nombre completo único sin first/last", async () => {
+  it("propaga conflicto por documento o email duplicado desde el repositorio", async () => {
+    vi.spyOn(authRepository, "createPersonaClienteCredential").mockRejectedValue(
+      new ConflictError("Ya existe un registro con ese correo electrónico o número de documento.")
+    );
+
+    await expect(
+      registerUser({
+        firstName: "María",
+        lastName: "García",
+        email: "m@example.com",
+        documentNumber: "2",
+        countryId: 1,
+        photoBase64: Buffer.from("x", "utf8").toString("base64"),
+      })
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("opcional fullName override y foto desde photoBase64", async () => {
     vi.spyOn(authRepository, "createPersonaClienteCredential").mockResolvedValue({
       id: 2,
       documentNumber: "2",
-      fullName: "María García",
+      fullName: "Nombre Legal Completo",
       status: "activo",
       admitted: "no",
       category: "comun",
@@ -91,7 +111,9 @@ describe("Auth-2 — registerUser", () => {
     vi.spyOn(emailService, "sendTemporaryPasswordEmail").mockResolvedValue(undefined);
 
     await registerUser({
-      fullName: "María García",
+      firstName: "María",
+      lastName: "García",
+      fullName: "Nombre Legal Completo",
       email: "m@example.com",
       documentNumber: "2",
       countryId: 1,
@@ -99,7 +121,7 @@ describe("Auth-2 — registerUser", () => {
     });
 
     const call = vi.mocked(authRepository.createPersonaClienteCredential).mock.calls[0][0];
-    expect(call.fullName).toBe("María García");
+    expect(call.fullName).toBe("Nombre Legal Completo");
     expect(call.fotoBuffer).toEqual(Buffer.from(Buffer.from("x", "utf8").toString("base64"), "base64"));
   });
 });

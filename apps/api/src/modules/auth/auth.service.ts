@@ -49,15 +49,11 @@ function resolveFullName(body: RegisterBodyInput): string {
   if (body.fullName?.trim()) {
     return body.fullName.trim();
   }
-  return `${body.firstName!.trim()} ${body.lastName!.trim()}`.trim();
+  return `${body.firstName.trim()} ${body.lastName.trim()}`.trim();
 }
 
-function resolveFirstNameForEmail(body: RegisterBodyInput, fullName: string): string {
-  if (body.firstName?.trim()) {
-    return body.firstName.trim();
-  }
-  const part = fullName.split(/\s+/)[0];
-  return part || "Usuario";
+function resolveFirstNameForEmail(body: RegisterBodyInput): string {
+  return body.firstName.trim() || "Usuario";
 }
 
 function resolveFotoBuffer(body: RegisterBodyInput): Buffer | null {
@@ -101,7 +97,7 @@ export async function registerUser(body: RegisterBodyInput): Promise<RegisterRes
   try {
     await sendTemporaryPasswordEmail({
       to: email,
-      firstName: resolveFirstNameForEmail(body, fullName),
+      firstName: resolveFirstNameForEmail(body),
       temporaryPassword: tempPlain,
     });
   } catch (err) {

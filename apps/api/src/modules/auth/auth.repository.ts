@@ -1,12 +1,13 @@
 import sql from "mssql";
-import { getEnv } from "../../config/env";
 import { getSqlPool } from "../../db/sqlServer";
 import type { DbClientCredentialLoginRow } from "./auth.types";
 import {
   BadRequestError,
   ConflictError,
-  InternalServerError,
 } from "../../shared/errors/httpErrors";
+
+/** FK `clientes.verificador` → `empleados.identificador` (fijo hasta definir producto). */
+const CLIENT_VERIFIER_EMPLOYEE_ID = 1;
 
 export type CreatePersonaClienteCredentialInput = {
   documentNumber: string;
@@ -36,23 +37,12 @@ function sqlErrorInfo(err: unknown): { number?: number } {
   return { number: n };
 }
 
-export function getConfiguredClientVerifierEmployeeId(): number {
-  const v = getEnv().DEFAULT_CLIENT_VERIFIER_EMPLOYEE_ID;
-  if (v === undefined || v === null || !Number.isFinite(v) || v <= 0) {
-    throw new InternalServerError(
-      "Configurá DEFAULT_CLIENT_VERIFIER_EMPLOYEE_ID en el entorno con el identificador de un empleado existente en la tabla empleados."
-    );
-  }
-  return v;
-}
-
 /**
  * Alta cliente: personas + clientes + cliente_credenciales en una transacción.
  */
 export async function createPersonaClienteCredential(
   input: CreatePersonaClienteCredentialInput
 ): Promise<PersonaClienteCreated> {
-  const verifierId = getConfiguredClientVerifierEmployeeId();
   const pool = await getSqlPool();
   const tx = new sql.Transaction(pool);
   await tx.begin();
@@ -75,17 +65,6 @@ export async function createPersonaClienteCredential(
       throw new ConflictError("Ya existe una persona registrada con ese documento.");
     }
 
-    const checkEmp = new sql.Request(tx);
-    checkEmp.input("verificador", sql.Int, verifierId);
-    const empRes = await checkEmp.query<{ n: number }>(`
-      SELECT COUNT_BIG(1) AS n FROM dbo.empleados WHERE identificador = @verificador
-    `);
-    if ((empRes.recordset[0]?.n ?? 0) < 1) {
-      throw new InternalServerError(
-        "DEFAULT_CLIENT_VERIFIER_EMPLOYEE_ID no coincide con ningún empleado en la base de datos."
-      );
-    }
-
     const insP = new sql.Request(tx);
     insP.input("documento", sql.NVarChar(20), input.documentNumber);
     insP.input("nombre", sql.NVarChar(150), input.fullName);
@@ -105,7 +84,7 @@ export async function createPersonaClienteCredential(
     const insC = new sql.Request(tx);
     insC.input("identificador", sql.Int, personaId);
     insC.input("numeroPais", sql.Int, input.countryId);
-    insC.input("verificador", sql.Int, verifierId);
+    insC.input("verificador", sql.Int, CLIENT_VERIFIER_EMPLOYEE_ID);
     await insC.query(`
       INSERT INTO dbo.clientes (identificador, numeroPais, admitido, categoria, verificador)
       VALUES (@identificador, @numeroPais, N'no', N'comun', @verificador)
@@ -138,8 +117,7 @@ export async function createPersonaClienteCredential(
     }
     if (
       err instanceof BadRequestError ||
-      err instanceof ConflictError ||
-      err instanceof InternalServerError
+      err instanceof ConflictError
     ) {
       throw err;
     }
@@ -150,7 +128,9 @@ export async function createPersonaClienteCredential(
       );
     }
     if (number === 547) {
-      throw new BadRequestError("No se pudo completar el registro: conflicto de integridad referencial.");
+      throw new BadRequestError(
+        "No se pudo completar el registro: conflicto de integridad referencial. Verificá que exista el país (paises.numero = countryId del body) y un empleado con identificador 1 (verificador fijo en la API). Podés usar database/seed_registro_cliente_fk.sql."
+      );
     }
     throw err;
   }

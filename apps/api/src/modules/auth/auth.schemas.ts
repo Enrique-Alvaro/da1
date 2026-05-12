@@ -33,11 +33,13 @@ function refineBase64Optional(path: string, value: string | null | undefined, ct
   }
 }
 
+/** Contrato pantalla registro (Figma): nombre, apellido, email, documento, dirección, país, frente/dorso ID. */
 export const registerBodySchema = z
   .object({
-    firstName: z.string().trim().min(1, "El nombre es obligatorio").max(75).optional(),
-    lastName: z.string().trim().min(1, "El apellido es obligatorio").max(75).optional(),
-    fullName: z.string().trim().min(1, "El nombre completo es obligatorio").max(150).optional(),
+    firstName: z.string().trim().min(1, "El nombre es obligatorio").max(75),
+    lastName: z.string().trim().min(1, "El apellido es obligatorio").max(75),
+    /** Compatibilidad api-docs / clientes antiguos; si viene, se ignora si ya hay firstName + lastName. */
+    fullName: z.string().trim().min(1).max(150).optional(),
     email: z
       .string()
       .trim()
@@ -54,15 +56,6 @@ export const registerBodySchema = z
     documentBackImageBase64: z.union([z.string(), z.null()]).optional(),
   })
   .superRefine((data, ctx) => {
-    const hasPair = !!(data.firstName?.trim() && data.lastName?.trim());
-    const hasFull = !!(data.fullName?.trim());
-    if (!hasPair && !hasFull) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Indicá nombre y apellido, o bien un nombre completo.",
-        path: ["firstName"],
-      });
-    }
     refineBase64Optional("photoBase64", data.photoBase64, ctx);
     refineBase64Optional("documentFrontImageBase64", data.documentFrontImageBase64, ctx);
     refineBase64Optional("documentBackImageBase64", data.documentBackImageBase64, ctx);
@@ -88,8 +81,7 @@ export const changeInitialPasswordBodySchema = z
       .string()
       .min(8, "La nueva contraseña debe tener al menos 8 caracteres")
       .regex(/[a-z]/, "La nueva contraseña debe contener al menos una minúscula")
-      .regex(/[A-Z]/, "La nueva contraseña debe contener al menos una mayúscula")
-      .regex(/[0-9]/, "La nueva contraseña debe contener al menos un número"),
+      .regex(/[A-Z]/, "La nueva contraseña debe contener al menos una mayúscula"),
   })
   .refine((data) => data.newPassword !== data.currentPassword, {
     message: "La nueva contraseña no puede ser igual a la contraseña temporal",

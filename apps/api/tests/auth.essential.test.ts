@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Request, Response } from "express";
 import type { DbClientCredentialLoginRow } from "../src/modules/auth/auth.types";
+import { changeInitialPasswordBodySchema } from "../src/modules/auth/auth.schemas";
 import { UnauthorizedError, NotImplementedError } from "../src/shared/errors/httpErrors";
 import { hashPassword } from "../src/shared/security/passwords";
 import { requireAccessToken } from "../src/shared/middlewares/requireAccessToken";
@@ -82,6 +84,8 @@ describe("auth essentials (Auth-2)", () => {
         })
       );
 
+      const buildSpy = vi.spyOn(jwtMod, "buildLoginTokenPayload");
+
       const result = await loginUser({ email: "qa.user@example.com", password: plain });
 
       expect(result.accessToken).toBeTruthy();
@@ -92,6 +96,34 @@ describe("auth essentials (Auth-2)", () => {
       expect(result.user.email).toBe("qa.user@example.com");
       expect(result.user.id).toBe(7);
       expect(result.user.country.id).toBe(1);
+      expect(buildSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ personaId: 7, tokenType: "initial_password_change" })
+      );
+    });
+
+    it("issues access JWT when password already finalized", async () => {
+      const plain = "FinalPass99";
+      const hash = await hashPassword(plain);
+      mocks.findCredentialByEmailWithPassword.mockResolvedValue(
+        baseCredentialRow({
+          password_hash: hash,
+          requires_password_change: Buffer.from([0]),
+        })
+      );
+      const buildSpy = vi.spyOn(jwtMod, "buildLoginTokenPayload").mockReturnValue({
+        sub: "7",
+        email: "qa.user@example.com",
+        type: "access",
+        jti: "jti-access",
+      });
+      vi.spyOn(jwtMod, "signAccessToken").mockReturnValue("signed-access-only");
+
+      const result = await loginUser({ email: "qa.user@example.com", password: plain });
+
+      expect(result.mustChangePassword).toBe(false);
+      expect(result.isFirstLogin).toBe(false);
+      expect(result.accessToken).toBe("signed-access-only");
+      expect(buildSpy).toHaveBeenCalledWith(expect.objectContaining({ personaId: 7, tokenType: "access" }));
     });
   });
 
@@ -145,25 +177,63 @@ describe("auth essentials (Auth-2)", () => {
       expect(result.user.email).toBe("qa.user@example.com");
       expect(mocks.updateClienteCredencialAfterInitialPassword).toHaveBeenCalled();
     });
+
+    it("rejects wrong current password", async () => {
+      vi.spyOn(jwtMod, "verifyAccessToken").mockReturnValue({
+        sub: "7",
+        email: "qa.user@example.com",
+        type: "initial_password_change",
+        jti: "test-jti",
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        expiresAt: new Date(Date.now() + 3600_000),
+      });
+      mocks.findCredentialByPersonaIdWithPassword.mockResolvedValue(
+        baseCredentialRow({
+          password_hash: await hashPassword("RealTemp99"),
+          requires_password_change: Buffer.from([1]),
+        })
+      );
+
+      await expect(
+        changeInitialPassword({
+          token: "jwt",
+          currentPassword: "WrongOne99",
+          newPassword: "NewStrongAb",
+        })
+      ).rejects.toMatchObject({ message: "La contraseña actual es incorrecta." });
+    });
+  });
+
+  describe("changeInitialPasswordBodySchema", () => {
+    it("rejects weak newPassword (short or missing case)", () => {
+      expect(
+        changeInitialPasswordBodySchema.safeParse({ currentPassword: "x", newPassword: "short" }).success
+      ).toBe(false);
+      expect(
+        changeInitialPasswordBodySchema.safeParse({ currentPassword: "x", newPassword: "alllowercase" })
+          .success
+      ).toBe(false);
+      expect(
+        changeInitialPasswordBodySchema.safeParse({ currentPassword: "x", newPassword: "NewStrongAb" })
+          .success
+      ).toBe(true);
+    });
   });
 
   describe("requireAccessToken middleware", () => {
     it("rejects initial_password_change with 401-style error", () => {
       const next = vi.fn();
-      requireAccessToken(
-        {
-          authUser: {
-            id: "7",
-            email: "a@b.com",
-            tokenType: "initial_password_change",
-            jti: "j",
-            exp: 1,
-            expiresAt: new Date(),
-          },
-        } as Parameters<typeof requireAccessToken>[0],
-        {} as Parameters<typeof requireAccessToken>[1],
-        next
-      );
+      const req = {
+        authUser: {
+          id: "7",
+          email: "a@b.com",
+          tokenType: "initial_password_change" as const,
+          jti: "j",
+          exp: 1,
+          expiresAt: new Date(),
+        },
+      } as unknown as Request;
+      requireAccessToken(req, {} as unknown as Response, next);
       expect(next).toHaveBeenCalledTimes(1);
       const err = next.mock.calls[0][0];
       expect(err).toBeInstanceOf(UnauthorizedError);
