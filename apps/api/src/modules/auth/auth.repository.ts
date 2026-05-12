@@ -1,20 +1,30 @@
 import sql from "mssql";
+import { getEnv } from "../../config/env";
 import { getSqlPool } from "../../db/sqlServer";
-import type { DbUserRow, DbUserWithPasswordRow } from "./auth.types";
-import { ConflictError, ValidationError } from "../../shared/errors/httpErrors";
+import type { DbClientCredentialLoginRow } from "./auth.types";
+import {
+  BadRequestError,
+  ConflictError,
+  InternalServerError,
+} from "../../shared/errors/httpErrors";
 
-export type CreateUserInput = {
-  id: string;
+export type CreatePersonaClienteCredentialInput = {
+  documentNumber: string;
+  fullName: string;
+  address: string | null;
+  countryId: number;
+  fotoBuffer: Buffer | null;
   email: string;
-  /** Bcrypt hash only — never plaintext. */
   passwordHash: string;
-  firstName: string;
-  lastName: string;
-  documentId: string;
-  address: string;
-  countryCode: string;
-  documentFrontImageUrl: string;
-  documentBackImageUrl: string;
+};
+
+export type PersonaClienteCreated = {
+  id: number;
+  documentNumber: string;
+  fullName: string;
+  status: string;
+  admitted: "si" | "no";
+  category: "comun" | "especial" | "plata" | "oro" | "platino";
 };
 
 function sqlErrorInfo(err: unknown): { number?: number } {
@@ -26,225 +36,221 @@ function sqlErrorInfo(err: unknown): { number?: number } {
   return { number: n };
 }
 
-export async function findUserByIdWithPassword(
-  userId: string
-): Promise<DbUserWithPasswordRow | null> {
-  const pool = await getSqlPool();
-  const result = await pool
-    .request()
-    .input("id", sql.UniqueIdentifier, userId)
-    .query<DbUserWithPasswordRow>(`
-      SELECT TOP (1)
-        id,
-        first_name,
-        last_name,
-        email,
-        password_hash,
-        document_id,
-        address,
-        country_code,
-        photo_url,
-        document_front_image_url,
-        document_back_image_url,
-        category,
-        status,
-        requires_password_change,
-        bidding_blocked_until_resolved,
-        delinquent_win_id,
-        account_service_suspended
-      FROM dbo.users
-      WHERE id = @id
-    `);
-  const row = result.recordset[0];
-  return row ?? null;
-}
-
-export async function findUserByEmailWithPassword(
-  email: string
-): Promise<DbUserWithPasswordRow | null> {
-  const pool = await getSqlPool();
-  const result = await pool
-    .request()
-    .input("email", sql.NVarChar(320), email.toLowerCase())
-    .query<DbUserWithPasswordRow>(`
-      SELECT TOP (1)
-        id,
-        first_name,
-        last_name,
-        email,
-        password_hash,
-        document_id,
-        address,
-        country_code,
-        photo_url,
-        document_front_image_url,
-        document_back_image_url,
-        category,
-        status,
-        requires_password_change,
-        bidding_blocked_until_resolved,
-        delinquent_win_id,
-        account_service_suspended
-      FROM dbo.users
-      WHERE email = @email
-    `);
-  const row = result.recordset[0];
-  return row ?? null;
+export function getConfiguredClientVerifierEmployeeId(): number {
+  const v = getEnv().DEFAULT_CLIENT_VERIFIER_EMPLOYEE_ID;
+  if (v === undefined || v === null || !Number.isFinite(v) || v <= 0) {
+    throw new InternalServerError(
+      "Configurá DEFAULT_CLIENT_VERIFIER_EMPLOYEE_ID en el entorno con el identificador de un empleado existente en la tabla empleados."
+    );
+  }
+  return v;
 }
 
 /**
- * Sets definitive password and clears first-login flag. Returns row without password_hash.
- * No rows if user missing or already completed initial change.
+ * Alta cliente: personas + clientes + cliente_credenciales en una transacción.
  */
-export async function updateInitialPassword(params: {
-  userId: string;
-  newPasswordHash: string;
-}): Promise<DbUserRow | null> {
+export async function createPersonaClienteCredential(
+  input: CreatePersonaClienteCredentialInput
+): Promise<PersonaClienteCreated> {
+  const verifierId = getConfiguredClientVerifierEmployeeId();
   const pool = await getSqlPool();
-  const result = await pool
-    .request()
-    .input("id", sql.UniqueIdentifier, params.userId)
-    .input("password_hash", sql.NVarChar(500), params.newPasswordHash)
-    .query<DbUserRow>(`
-      UPDATE dbo.users
-      SET
-        password_hash = @password_hash,
-        requires_password_change = 0,
-        updated_at = SYSUTCDATETIME()
-      OUTPUT
-        INSERTED.id,
-        INSERTED.first_name,
-        INSERTED.last_name,
-        INSERTED.email,
-        INSERTED.document_id,
-        INSERTED.address,
-        INSERTED.country_code,
-        INSERTED.photo_url,
-        INSERTED.document_front_image_url,
-        INSERTED.document_back_image_url,
-        INSERTED.category,
-        INSERTED.status,
-        INSERTED.requires_password_change,
-        INSERTED.bidding_blocked_until_resolved,
-        INSERTED.delinquent_win_id,
-        INSERTED.account_service_suspended
-      WHERE id = @id AND requires_password_change = 1
-    `);
-  const row = result.recordset[0];
-  return row ?? null;
-}
-
-export async function findUserByEmail(email: string): Promise<Pick<DbUserRow, "id"> | null> {
-  const pool = await getSqlPool();
-  const result = await pool
-    .request()
-    .input("email", sql.NVarChar(320), email.toLowerCase())
-    .query<{ id: string }>(`SELECT TOP (1) id FROM dbo.users WHERE email = @email`);
-  const row = result.recordset[0];
-  return row ? { id: row.id } : null;
-}
-
-export async function createUser(input: CreateUserInput): Promise<DbUserRow> {
-  const pool = await getSqlPool();
-  const req = pool.request();
-  req.input("id", sql.UniqueIdentifier, input.id);
-  req.input("first_name", sql.NVarChar(100), input.firstName);
-  req.input("last_name", sql.NVarChar(100), input.lastName);
-  req.input("email", sql.NVarChar(320), input.email);
-  // While requires_password_change = 1, password_hash stores the temporary password hash.
-  // After the initial password change (Phase 3+), this same column will store the definitive password hash.
-  req.input("password_hash", sql.NVarChar(500), input.passwordHash);
-  req.input("document_id", sql.NVarChar(80), input.documentId);
-  req.input("address", sql.NVarChar(500), input.address);
-  req.input("country_code", sql.NVarChar(2), input.countryCode);
-  req.input("photo_url", sql.NVarChar(2000), null);
-  req.input("document_front_image_url", sql.NVarChar(2000), input.documentFrontImageUrl);
-  req.input("document_back_image_url", sql.NVarChar(2000), input.documentBackImageUrl);
-  req.input("category", sql.NVarChar(20), "common");
-  req.input("status", sql.NVarChar(30), "pending_verification");
-  req.input("requires_password_change", sql.Bit, 1);
-  req.input("bidding_blocked_until_resolved", sql.Bit, 0);
-  req.input("account_service_suspended", sql.Bit, 0);
-
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
   try {
-    const result = await req.query<DbUserRow>(`
-      INSERT INTO dbo.users (
-        id,
-        first_name,
-        last_name,
-        email,
-        password_hash,
-        document_id,
-        address,
-        country_code,
-        photo_url,
-        document_front_image_url,
-        document_back_image_url,
-        category,
-        status,
-        requires_password_change,
-        bidding_blocked_until_resolved,
-        delinquent_win_id,
-        account_service_suspended
-      )
-      OUTPUT
-        INSERTED.id,
-        INSERTED.first_name,
-        INSERTED.last_name,
-        INSERTED.email,
-        INSERTED.document_id,
-        INSERTED.address,
-        INSERTED.country_code,
-        INSERTED.photo_url,
-        INSERTED.document_front_image_url,
-        INSERTED.document_back_image_url,
-        INSERTED.category,
-        INSERTED.status,
-        INSERTED.requires_password_change,
-        INSERTED.bidding_blocked_until_resolved,
-        INSERTED.delinquent_win_id,
-        INSERTED.account_service_suspended
-      VALUES (
-        @id,
-        @first_name,
-        @last_name,
-        @email,
-        @password_hash,
-        @document_id,
-        @address,
-        @country_code,
-        @photo_url,
-        @document_front_image_url,
-        @document_back_image_url,
-        @category,
-        @status,
-        @requires_password_change,
-        @bidding_blocked_until_resolved,
-        NULL,
-        @account_service_suspended
-      )
+    const checkCountry = new sql.Request(tx);
+    checkCountry.input("numero", sql.Int, input.countryId);
+    const countryRes = await checkCountry.query<{ n: number }>(`
+      SELECT COUNT_BIG(1) AS n FROM dbo.paises WHERE numero = @numero
     `);
-    const row = result.recordset[0];
-    if (!row) {
-      throw new Error("INSERT did not return OUTPUT row");
+    if ((countryRes.recordset[0]?.n ?? 0) < 1) {
+      throw new BadRequestError("El país indicado no es válido.");
     }
-    return row;
+
+    const checkDup = new sql.Request(tx);
+    checkDup.input("documento", sql.NVarChar(20), input.documentNumber);
+    const dupRes = await checkDup.query<{ n: number }>(`
+      SELECT COUNT_BIG(1) AS n FROM dbo.personas WHERE documento = @documento
+    `);
+    if ((dupRes.recordset[0]?.n ?? 0) > 0) {
+      throw new ConflictError("Ya existe una persona registrada con ese documento.");
+    }
+
+    const checkEmp = new sql.Request(tx);
+    checkEmp.input("verificador", sql.Int, verifierId);
+    const empRes = await checkEmp.query<{ n: number }>(`
+      SELECT COUNT_BIG(1) AS n FROM dbo.empleados WHERE identificador = @verificador
+    `);
+    if ((empRes.recordset[0]?.n ?? 0) < 1) {
+      throw new InternalServerError(
+        "DEFAULT_CLIENT_VERIFIER_EMPLOYEE_ID no coincide con ningún empleado en la base de datos."
+      );
+    }
+
+    const insP = new sql.Request(tx);
+    insP.input("documento", sql.NVarChar(20), input.documentNumber);
+    insP.input("nombre", sql.NVarChar(150), input.fullName);
+    insP.input("direccion", sql.NVarChar(250), input.address);
+    insP.input("foto", sql.VarBinary(sql.MAX), input.fotoBuffer);
+
+    const insPersona = await insP.query<{ identificador: number }>(`
+      INSERT INTO dbo.personas (documento, nombre, direccion, estado, foto)
+      OUTPUT INSERTED.identificador AS identificador
+      VALUES (@documento, @nombre, @direccion, N'activo', @foto)
+    `);
+    const personaId = insPersona.recordset[0]?.identificador;
+    if (personaId === undefined || personaId === null) {
+      throw new Error("INSERT personas did not return identificador");
+    }
+
+    const insC = new sql.Request(tx);
+    insC.input("identificador", sql.Int, personaId);
+    insC.input("numeroPais", sql.Int, input.countryId);
+    insC.input("verificador", sql.Int, verifierId);
+    await insC.query(`
+      INSERT INTO dbo.clientes (identificador, numeroPais, admitido, categoria, verificador)
+      VALUES (@identificador, @numeroPais, N'no', N'comun', @verificador)
+    `);
+
+    const insCred = new sql.Request(tx);
+    insCred.input("persona_id", sql.Int, personaId);
+    insCred.input("email", sql.NVarChar(320), input.email);
+    insCred.input("password_hash", sql.NVarChar(500), input.passwordHash);
+    await insCred.query(`
+      INSERT INTO dbo.cliente_credenciales (persona_id, email, password_hash, requires_password_change)
+      VALUES (@persona_id, @email, @password_hash, 1)
+    `);
+
+    await tx.commit();
+
+    return {
+      id: personaId,
+      documentNumber: input.documentNumber,
+      fullName: input.fullName,
+      status: "activo",
+      admitted: "no",
+      category: "comun",
+    };
   } catch (err) {
+    try {
+      await tx.rollback();
+    } catch {
+      /* transacción ya confirmada o rollback previo */
+    }
+    if (
+      err instanceof BadRequestError ||
+      err instanceof ConflictError ||
+      err instanceof InternalServerError
+    ) {
+      throw err;
+    }
     const { number } = sqlErrorInfo(err);
     if (number === 2627 || number === 2601) {
-      throw new ConflictError("El email ya está registrado.");
+      throw new ConflictError(
+        "Ya existe un registro con ese correo electrónico o número de documento."
+      );
     }
     if (number === 547) {
-      throw new ValidationError(
-        "El código de país no es válido o no está registrado en el sistema."
-      );
+      throw new BadRequestError("No se pudo completar el registro: conflicto de integridad referencial.");
     }
     throw err;
   }
 }
 
-/** Removes user after failed email delivery (compensating action). */
-export async function deleteUserById(id: string): Promise<void> {
+const credentialJoinSelect = `
+  SELECT TOP (1)
+    cc.persona_id,
+    cc.email,
+    cc.password_hash,
+    cc.requires_password_change,
+    p.documento AS document_number,
+    p.nombre AS full_name,
+    p.direccion AS address,
+    p.estado AS status,
+    cl.numeroPais AS country_id,
+    pa.nombre AS country_name,
+    cl.admitido AS admitted,
+    cl.categoria AS category
+  FROM dbo.cliente_credenciales AS cc
+  INNER JOIN dbo.personas AS p ON p.identificador = cc.persona_id
+  INNER JOIN dbo.clientes AS cl ON cl.identificador = p.identificador
+  LEFT JOIN dbo.paises AS pa ON pa.numero = cl.numeroPais
+`;
+
+export async function findCredentialByEmailWithPassword(
+  email: string
+): Promise<DbClientCredentialLoginRow | null> {
   const pool = await getSqlPool();
-  await pool.request().input("id", sql.UniqueIdentifier, id).query(`DELETE FROM dbo.users WHERE id = @id`);
+  const result = await pool
+    .request()
+    .input("email", sql.NVarChar(320), email.toLowerCase())
+    .query<DbClientCredentialLoginRow>(`${credentialJoinSelect} WHERE cc.email = @email`);
+  return result.recordset[0] ?? null;
+}
+
+export async function findCredentialByPersonaIdWithPassword(
+  personaId: number
+): Promise<DbClientCredentialLoginRow | null> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("persona_id", sql.Int, personaId)
+    .query<DbClientCredentialLoginRow>(`${credentialJoinSelect} WHERE cc.persona_id = @persona_id`);
+  return result.recordset[0] ?? null;
+}
+
+export type CredentialFlagsRow = {
+  requires_password_change: boolean | Buffer;
+};
+
+export async function findCredentialFlagsByPersonaId(
+  personaId: number
+): Promise<CredentialFlagsRow | null> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("persona_id", sql.Int, personaId)
+    .query<CredentialFlagsRow>(`
+      SELECT TOP (1) requires_password_change
+      FROM dbo.cliente_credenciales
+      WHERE persona_id = @persona_id
+    `);
+  return result.recordset[0] ?? null;
+}
+
+/**
+ * Cambio inicial: actualiza hash y apaga requires_password_change.
+ * Devuelve filas afectadas (0 si no estaba en estado “debe cambiar”).
+ */
+export async function updateClienteCredencialAfterInitialPassword(params: {
+  personaId: number;
+  newPasswordHash: string;
+}): Promise<number> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("persona_id", sql.Int, params.personaId)
+    .input("password_hash", sql.NVarChar(500), params.newPasswordHash)
+    .query(`
+      UPDATE dbo.cliente_credenciales
+      SET
+        password_hash = @password_hash,
+        requires_password_change = 0,
+        updated_at = SYSUTCDATETIME()
+      WHERE persona_id = @persona_id AND requires_password_change = 1
+    `);
+  return result.rowsAffected[0] ?? 0;
+}
+
+/** Compensación tras fallo de correo post-registro. */
+export async function deleteRegistrationCascade(personaId: number): Promise<void> {
+  const pool = await getSqlPool();
+  await pool.request().input("id", sql.Int, personaId).query(`
+    DELETE FROM dbo.cliente_credenciales WHERE persona_id = @id
+  `);
+  await pool.request().input("id", sql.Int, personaId).query(`
+    DELETE FROM dbo.clientes WHERE identificador = @id
+  `);
+  await pool.request().input("id", sql.Int, personaId).query(`
+    DELETE FROM dbo.personas WHERE identificador = @id
+  `);
 }

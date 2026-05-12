@@ -1,13 +1,26 @@
 import type { AuthUserContext } from "../../shared/types/auth";
 import { UnauthorizedError } from "../../shared/errors/httpErrors";
-import { mapUserRowToApi } from "./user.mapper";
+import { mapPersonaClienteToUserPublic } from "./user.mapper";
 import * as usersRepository from "./users.repository";
 
-/** Current profile from DB — never trust JWT claims alone for the response body. */
+function parsePersonIdFromAuth(authUser: AuthUserContext): number {
+  const raw = authUser.id?.trim() ?? "";
+  if (!/^\d+$/.test(raw)) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isSafeInteger(n) || n <= 0) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+  return n;
+}
+
+/** GET /users/me — requiere token tipo access. */
 export async function getCurrentUser(authUser: AuthUserContext) {
-  const row = await usersRepository.findUserById(authUser.id);
+  const personId = parsePersonIdFromAuth(authUser);
+  const row = await usersRepository.findProfileByPersonId(personId);
   if (!row) {
     throw new UnauthorizedError("No autorizado.");
   }
-  return mapUserRowToApi(row);
+  return mapPersonaClienteToUserPublic(row);
 }

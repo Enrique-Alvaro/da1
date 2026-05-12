@@ -1,5 +1,6 @@
+import * as authRepository from "../../modules/auth/auth.repository";
+import { mapPersonaClienteToUserPublic } from "../../modules/users/user.mapper";
 import * as usersRepository from "../../modules/users/users.repository";
-import { mapUserRowToApi } from "../../modules/users/user.mapper";
 import { ForbiddenError, UnauthorizedError } from "../errors/httpErrors";
 import { asyncHandler } from "../utils/asyncHandler";
 
@@ -11,25 +12,34 @@ function bit(v: boolean | Buffer | undefined): boolean {
 }
 
 /**
- * After `requireAuth` + `requireAccessToken`: loads profile and blocks operational use
- * until initial password change is done. Intended for bids, payments, etc. — not for `GET /users/me`.
+ * Tras `requireAuth` + `requireAccessToken`: exige contraseña definitiva (no primer login).
  */
 export const requireOperationalUser = asyncHandler(async (req, _res, next) => {
   if (!req.authUser) {
     throw new UnauthorizedError("No autorizado.");
   }
 
-  const row = await usersRepository.findUserById(req.authUser.id);
-  if (!row) {
+  const pid = Number.parseInt(req.authUser.id, 10);
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
     throw new UnauthorizedError("No autorizado.");
   }
 
-  if (bit(row.requires_password_change)) {
+  const flags = await authRepository.findCredentialFlagsByPersonaId(pid);
+  if (!flags) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+
+  if (bit(flags.requires_password_change)) {
     throw new ForbiddenError(
       "Debés completar el cambio inicial de contraseña antes de usar esta función."
     );
   }
 
-  req.currentUser = mapUserRowToApi(row);
+  const profile = await usersRepository.findProfileByPersonId(pid);
+  if (!profile) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+
+  req.currentUser = mapPersonaClienteToUserPublic(profile);
   next();
 });

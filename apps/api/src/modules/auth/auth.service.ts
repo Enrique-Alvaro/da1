@@ -1,40 +1,39 @@
-import { randomUUID } from "crypto";
 import * as authRepository from "./auth.repository";
-import type { DbUserRow } from "./auth.types";
-import type {
-  ForgotPasswordBodyInput,
-  LoginBodyInput,
-  RegisterBodyInput,
-  ResetPasswordBodyInput,
-} from "./auth.schemas";
-import { generateTemporaryPassword, hashPassword, verifyPassword } from "../../shared/security/passwords";
+import type { ForgotPasswordBodyInput, LoginBodyInput, RegisterBodyInput, ResetPasswordBodyInput } from "./auth.schemas";
+import { hashPassword, verifyPassword, generateTemporaryPassword } from "../../shared/security/passwords";
 import { buildLoginTokenPayload, signAccessToken, verifyAccessToken } from "../../shared/security/jwt";
-import { sendPasswordResetEmail, sendTemporaryPasswordEmail } from "../../shared/email/email.service";
-import { getEnv, getPasswordResetTtlMinutes } from "../../config/env";
-import {
-  generatePasswordResetToken,
-  hashPasswordResetToken,
-} from "../../shared/security/resetTokens";
-import * as passwordResetRepository from "./password-reset.repository";
-import { mapUserRowToApi } from "../users/user.mapper";
+import { sendTemporaryPasswordEmail } from "../../shared/email/email.service";
+import { mapCredentialLoginRowToUserPublic } from "../users/user.mapper";
+import type { UserPublic } from "../users/user.mapper";
 import type { AuthUserContext } from "../../shared/types/auth";
-import * as revokedTokenRepository from "./revoked-token.repository";
+import * as usersRepository from "../users/users.repository";
+import { mapPersonaClienteToUserPublic } from "../users/user.mapper";
 import {
   ConflictError,
-  GoneError,
-  InternalServerError,
+  NotImplementedError,
   UnauthorizedError,
 } from "../../shared/errors/httpErrors";
 
+export type RegisterSuccessUser = {
+  id: number;
+  documentNumber: string;
+  fullName: string;
+  email: string;
+  address: string | null;
+  status: string;
+  admitted: "si" | "no";
+  category: "comun" | "especial" | "plata" | "oro" | "platino";
+};
+
 export type RegisterResult = {
   message: string;
-  user: ReturnType<typeof mapUserRowToApi>;
+  user: RegisterSuccessUser;
   emailSentTo: string;
 };
 
 export type LoginResult = {
   accessToken: string;
-  user: ReturnType<typeof mapUserRowToApi>;
+  user: UserPublic;
   mustChangePassword: boolean;
   isFirstLogin: boolean;
 };
@@ -46,30 +45,92 @@ function bit(v: boolean | Buffer | undefined): boolean {
   return Boolean(v);
 }
 
-const FORGOT_PASSWORD_GENERIC_MESSAGE =
-  "Si existe una cuenta para este correo, las instrucciones de restablecimiento fueron enviadas.";
+function resolveFullName(body: RegisterBodyInput): string {
+  if (body.fullName?.trim()) {
+    return body.fullName.trim();
+  }
+  return `${body.firstName!.trim()} ${body.lastName!.trim()}`.trim();
+}
 
-function resolvePasswordResetLinkBase(): string {
-  const env = getEnv();
-  const trimmed = env.FRONTEND_URL?.trim();
-  if (trimmed) {
-    return trimmed.replace(/\/$/, "");
+function resolveFirstNameForEmail(body: RegisterBodyInput, fullName: string): string {
+  if (body.firstName?.trim()) {
+    return body.firstName.trim();
   }
-  if (env.NODE_ENV === "production") {
-    throw new InternalServerError(
-      "FRONTEND_URL es obligatorio en producción para generar el enlace de restablecimiento de contraseña."
-    );
+  const part = fullName.split(/\s+/)[0];
+  return part || "Usuario";
+}
+
+function resolveFotoBuffer(body: RegisterBodyInput): Buffer | null {
+  const front = body.documentFrontImageBase64;
+  if (front != null && typeof front === "string" && front.trim().length > 0) {
+    return Buffer.from(front.trim(), "base64");
   }
-  return "http://localhost:3000";
+  if (body.photoBase64 != null && typeof body.photoBase64 === "string" && body.photoBase64.trim().length > 0) {
+    return Buffer.from(body.photoBase64.trim(), "base64");
+  }
+  return null;
 }
 
 /**
- * Login: verify password against password_hash (temporary or definitive).
- * Same generic error for unknown email / wrong password.
+ * Registro: personas + clientes + credencial; contraseña temporal por correo.
+ * El dorso del documento (documentBackImageBase64) no se persiste en el esquema actual (solo una foto en personas).
+ */
+export async function registerUser(body: RegisterBodyInput): Promise<RegisterResult> {
+  const fullName = resolveFullName(body);
+  const email = body.email;
+  const address =
+    body.address === null || body.address === undefined
+      ? null
+      : body.address.trim() === ""
+        ? null
+        : body.address.trim();
+
+  const tempPlain = generateTemporaryPassword();
+  const tempHash = await hashPassword(tempPlain);
+
+  const created = await authRepository.createPersonaClienteCredential({
+    documentNumber: body.documentNumber.trim(),
+    fullName,
+    address,
+    countryId: body.countryId,
+    fotoBuffer: resolveFotoBuffer(body),
+    email,
+    passwordHash: tempHash,
+  });
+
+  try {
+    await sendTemporaryPasswordEmail({
+      to: email,
+      firstName: resolveFirstNameForEmail(body, fullName),
+      temporaryPassword: tempPlain,
+    });
+  } catch (err) {
+    await authRepository.deleteRegistrationCascade(created.id);
+    throw err;
+  }
+
+  return {
+    message:
+      "Se envió una contraseña temporal al correo indicado. Revisá tu casilla para continuar el registro.",
+    emailSentTo: email,
+    user: {
+      id: created.id,
+      documentNumber: created.documentNumber,
+      fullName: created.fullName,
+      email,
+      address,
+      status: created.status,
+      admitted: created.admitted,
+      category: created.category,
+    },
+  };
+}
+
+/**
+ * Login por email + contraseña; JWT stateless con sub = id de persona (string decimal).
  */
 export async function loginUser(body: LoginBodyInput): Promise<LoginResult> {
-  const email = body.email;
-  const row = await authRepository.findUserByEmailWithPassword(email);
+  const row = await authRepository.findCredentialByEmailWithPassword(body.email);
   if (!row) {
     throw new UnauthorizedError("Credenciales inválidas.");
   }
@@ -84,23 +145,22 @@ export async function loginUser(body: LoginBodyInput): Promise<LoginResult> {
   const tokenType = mustChangePassword ? "initial_password_change" : "access";
 
   const payload = buildLoginTokenPayload({
-    userId: row.id,
+    personaId: row.persona_id,
     email: row.email,
     tokenType,
   });
   const accessToken = signAccessToken(payload);
 
-  const { password_hash: _pw, ...withoutPassword } = row;
   return {
     accessToken,
-    user: mapUserRowToApi(withoutPassword as DbUserRow),
+    user: mapCredentialLoginRowToUserPublic(row),
     mustChangePassword,
     isFirstLogin,
   };
 }
 
 /**
- * First login flow: validate Bearer JWT (initial_password_change), set definitive password, issue access JWT.
+ * Primer acceso: Bearer `initial_password_change`, define contraseña definitiva.
  */
 export async function changeInitialPassword(input: {
   token: string;
@@ -113,7 +173,12 @@ export async function changeInitialPassword(input: {
     throw new ConflictError("El usuario ya completó el cambio inicial de contraseña.");
   }
 
-  const row = await authRepository.findUserByIdWithPassword(payload.sub);
+  const personaId = Number.parseInt(payload.sub, 10);
+  if (!Number.isSafeInteger(personaId) || personaId <= 0) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+
+  const row = await authRepository.findCredentialByPersonaIdWithPassword(personaId);
   if (!row) {
     throw new UnauthorizedError("No autorizado.");
   }
@@ -132,177 +197,48 @@ export async function changeInitialPassword(input: {
   }
 
   const newHash = await hashPassword(input.newPassword);
-  const updated = await authRepository.updateInitialPassword({
-    userId: row.id,
+  const affected = await authRepository.updateClienteCredencialAfterInitialPassword({
+    personaId,
     newPasswordHash: newHash,
   });
 
-  if (!updated) {
+  if (affected < 1) {
     throw new ConflictError("El usuario ya completó el cambio inicial de contraseña.");
   }
 
-  const accessPayload = buildLoginTokenPayload({
-    userId: updated.id,
-    email: updated.email,
-    tokenType: "access",
-  });
-  const accessToken = signAccessToken(accessPayload);
-
-  return {
-    accessToken,
-    user: mapUserRowToApi(updated),
-    mustChangePassword: false,
-    isFirstLogin: false,
-  };
-}
-
-/** Records JWT `jti` as revoked until token expiry (server-side logout). */
-export async function logout(ctx: AuthUserContext): Promise<void> {
-  if (!ctx.jti.trim()) {
+  const profile = await usersRepository.findProfileByPersonId(personaId);
+  if (!profile) {
     throw new UnauthorizedError("No autorizado.");
   }
-  await revokedTokenRepository.revokeToken({
-    tokenJti: ctx.jti,
-    userId: ctx.id,
-    expiresAt: ctx.expiresAt,
-  });
-}
-
-/** Generic message always — no account enumeration. */
-export async function forgotPassword(input: ForgotPasswordBodyInput): Promise<{ message: string }> {
-  const email = input.email;
-  const row = await authRepository.findUserByEmailWithPassword(email);
-
-  if (!row) {
-    return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
-  }
-
-  const base = resolvePasswordResetLinkBase();
-
-  const rawToken = generatePasswordResetToken();
-  const tokenHash = hashPasswordResetToken(rawToken);
-  const ttlMs = getPasswordResetTtlMinutes() * 60 * 1000;
-  const expiresAt = new Date(Date.now() + ttlMs);
-
-  await passwordResetRepository.createPasswordResetToken({
-    userId: row.id,
-    tokenHash,
-    expiresAt,
-  });
-
-  const resetUrl = `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
-
-  try {
-    await sendPasswordResetEmail({
-      to: row.email,
-      firstName: row.first_name.trim(),
-      resetUrl,
-    });
-  } catch (error) {
-    console.error("[auth/forgot-password] Email delivery failed", error);
-    throw new InternalServerError(
-      "No se pudo enviar el correo de restablecimiento. Intentá nuevamente más tarde."
-    );
-  }
-
-  return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
-}
-
-export async function resetPassword(input: ResetPasswordBodyInput): Promise<LoginResult> {
-  const tokenHash = hashPasswordResetToken(input.token);
-  const rec = await passwordResetRepository.findResetTokenByHash(tokenHash);
-
-  if (!rec) {
-    throw new UnauthorizedError(
-      "El token de restablecimiento es inválido o ya fue utilizado."
-    );
-  }
-
-  if (rec.used_at_utc != null) {
-    throw new UnauthorizedError(
-      "El token de restablecimiento es inválido o ya fue utilizado."
-    );
-  }
-
-  const now = new Date();
-  if (rec.expires_at_utc <= now) {
-    throw new GoneError("El token de restablecimiento expiró.");
-  }
-
-  const newHash = await hashPassword(input.password);
-  const updated = await passwordResetRepository.completePasswordReset({
-    userId: rec.user_id,
-    passwordHash: newHash,
-  });
 
   const accessPayload = buildLoginTokenPayload({
-    userId: updated.id,
-    email: updated.email,
+    personaId,
+    email: row.email,
     tokenType: "access",
   });
   const accessToken = signAccessToken(accessPayload);
 
   return {
     accessToken,
-    user: mapUserRowToApi(updated),
+    user: mapPersonaClienteToUserPublic(profile),
     mustChangePassword: false,
     isFirstLogin: false,
   };
 }
 
-/**
- * Register: duplicate check → hash temp password → INSERT user → send email.
- * Email cannot live inside a SQL transaction; if SMTP fails after INSERT, the user row is deleted (compensating).
- */
-export async function registerUser(body: RegisterBodyInput): Promise<RegisterResult> {
-  const email = body.email;
+/** Logout stateless: el cliente descarta el token; no hay revocación en servidor. */
+export async function logout(_ctx: AuthUserContext): Promise<void> {
+  return;
+}
 
-  const existing = await authRepository.findUserByEmail(email);
-  if (existing) {
-    throw new ConflictError("El email ya está registrado.");
-  }
+export async function forgotPassword(_input: ForgotPasswordBodyInput): Promise<{ message: string }> {
+  throw new NotImplementedError(
+    "El restablecimiento de contraseña por correo no está disponible en esta versión."
+  );
+}
 
-  const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await hashPassword(temporaryPassword);
-  const id = randomUUID();
-
-  const row = await authRepository.createUser({
-    id,
-    email,
-    passwordHash,
-    firstName: body.firstName.trim(),
-    lastName: body.lastName.trim(),
-    documentId: body.documentId.trim(),
-    address: body.address.trim(),
-    countryCode: body.country,
-    documentFrontImageUrl: body.documentFrontImageUrl.trim(),
-    documentBackImageUrl: body.documentBackImageUrl.trim(),
-  });
-
-  try {
-    await sendTemporaryPasswordEmail({
-      to: email,
-      firstName: body.firstName.trim(),
-      temporaryPassword,
-    });
-  } catch (error) {
-    console.error("[auth/register] Temporary password email failed", error);
-
-    try {
-      await authRepository.deleteUserById(id);
-    } catch (deleteError) {
-      console.error("[auth/register] Failed to delete user after email failure", deleteError);
-    }
-
-    throw new InternalServerError(
-      "No se pudo completar el registro: falló el envío del correo con la contraseña temporal. Intentá nuevamente más tarde."
-    );
-  }
-
-  return {
-    message:
-      "Se envió una contraseña temporal al correo indicado. Revisá tu casilla para completar el primer acceso.",
-    user: mapUserRowToApi(row),
-    emailSentTo: email,
-  };
+export async function resetPassword(_input: ResetPasswordBodyInput): Promise<LoginResult> {
+  throw new NotImplementedError(
+    "El restablecimiento de contraseña por token no está disponible en esta versión."
+  );
 }

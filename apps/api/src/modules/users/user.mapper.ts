@@ -1,49 +1,63 @@
-import type { DbUserRow } from "../auth/auth.types";
+import type { DbClientCredentialLoginRow, DbPersonaClienteProfileRow } from "../auth/auth.types";
 
+const CATEGORY_VALUES = ["comun", "especial", "plata", "oro", "platino"] as const;
+export type UserCategory = (typeof CATEGORY_VALUES)[number];
+
+/** Usuario unificado para login, perfil y middleware operacional. */
 export type UserPublic = {
-  id: string;
-  firstName: string;
-  lastName: string;
+  id: number;
+  documentNumber: string;
+  fullName: string;
   email: string;
-  documentId: string;
-  address: string;
-  country: string;
-  photoUrl: string | null;
-  documentFrontImageUrl: string;
-  documentBackImageUrl: string;
-  category: string;
+  address: string | null;
   status: string;
-  biddingBlockedUntilResolved: boolean;
-  delinquentWinId: string | null;
-  accountServiceSuspended: boolean;
-  requiresPasswordChange: boolean;
+  country: {
+    id: number;
+    name: string;
+  };
+  admitted: "si" | "no";
+  category: UserCategory;
 };
 
-function bit(v: boolean | Buffer | undefined): boolean {
-  if (Buffer.isBuffer(v)) {
-    return v[0] === 1;
+function parseCategory(value: string): UserCategory {
+  const v = value.trim().toLowerCase();
+  if ((CATEGORY_VALUES as readonly string[]).includes(v)) {
+    return v as UserCategory;
   }
-  return Boolean(v);
+  return "comun";
 }
 
-/** Maps dbo.users row to API contract (never exposes password_hash). */
-export function mapUserRowToApi(row: DbUserRow): UserPublic {
+export function mapPersonaClienteToUserPublic(row: DbPersonaClienteProfileRow): UserPublic {
+  const countryId = row.country_id ?? 0;
+  const countryName = row.country_name?.trim() || "";
+  const email = (row.email ?? "").trim();
   return {
     id: row.id,
-    firstName: row.first_name,
-    lastName: row.last_name,
-    email: row.email,
-    documentId: row.document_id,
+    documentNumber: row.document_number,
+    fullName: row.full_name,
+    email,
     address: row.address,
-    country: row.country_code,
-    photoUrl: row.photo_url,
-    documentFrontImageUrl: row.document_front_image_url,
-    documentBackImageUrl: row.document_back_image_url,
-    category: row.category,
     status: row.status,
-    biddingBlockedUntilResolved: bit(row.bidding_blocked_until_resolved),
-    delinquentWinId: row.delinquent_win_id,
-    accountServiceSuspended: bit(row.account_service_suspended),
-    requiresPasswordChange: bit(row.requires_password_change),
+    country: {
+      id: countryId,
+      name: countryName,
+    },
+    admitted: row.admitted === "si" ? "si" : "no",
+    category: parseCategory(row.category),
   };
+}
+
+export function mapCredentialLoginRowToUserPublic(row: DbClientCredentialLoginRow): UserPublic {
+  return mapPersonaClienteToUserPublic({
+    id: row.persona_id,
+    document_number: row.document_number,
+    full_name: row.full_name,
+    address: row.address,
+    status: row.status,
+    country_id: row.country_id,
+    country_name: row.country_name,
+    admitted: row.admitted,
+    category: row.category,
+    email: row.email,
+  });
 }

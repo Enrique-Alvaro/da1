@@ -1,23 +1,72 @@
 import { z } from "zod";
 
-export const registerBodySchema = z.object({
-  firstName: z.string().trim().min(1, "El nombre es obligatorio"),
-  lastName: z.string().trim().min(1, "El apellido es obligatorio"),
-  email: z
-    .string()
-    .trim()
-    .email("Email inválido")
-    .transform((s) => s.toLowerCase()),
-  documentId: z.string().trim().min(1, "El documento es obligatorio"),
-  address: z.string().trim().min(1, "La dirección es obligatoria"),
-  country: z
-    .string()
-    .trim()
-    .length(2, "El país debe ser un código ISO de 2 letras")
-    .transform((c) => c.toUpperCase()),
-  documentFrontImageUrl: z.string().trim().url("URL frontal del documento inválida"),
-  documentBackImageUrl: z.string().trim().url("URL trasera del documento inválida"),
-});
+const MAX_PHOTO_BASE64_CHARS = 6_000_000;
+
+function isReasonableBase64Photo(value: string): boolean {
+  const t = value.trim();
+  if (t.length === 0) {
+    return false;
+  }
+  if (t.length > MAX_PHOTO_BASE64_CHARS) {
+    return false;
+  }
+  try {
+    const buf = Buffer.from(t, "base64");
+    if (buf.length === 0) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function refineBase64Optional(path: string, value: string | null | undefined, ctx: z.RefinementCtx) {
+  if (value != null && typeof value === "string" && value.trim().length > 0) {
+    if (!isReasonableBase64Photo(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Imagen en Base64 inválida o excede el tamaño permitido.",
+        path: [path],
+      });
+    }
+  }
+}
+
+export const registerBodySchema = z
+  .object({
+    firstName: z.string().trim().min(1, "El nombre es obligatorio").max(75).optional(),
+    lastName: z.string().trim().min(1, "El apellido es obligatorio").max(75).optional(),
+    fullName: z.string().trim().min(1, "El nombre completo es obligatorio").max(150).optional(),
+    email: z
+      .string()
+      .trim()
+      .email("Email inválido")
+      .transform((s) => s.toLowerCase()),
+    documentNumber: z.string().trim().min(1, "El documento es obligatorio").max(20),
+    address: z.union([z.string(), z.null()]).optional(),
+    countryId: z.coerce
+      .number()
+      .int("El país debe ser un entero")
+      .positive("El país debe ser un entero positivo"),
+    photoBase64: z.union([z.string(), z.null()]).optional(),
+    documentFrontImageBase64: z.union([z.string(), z.null()]).optional(),
+    documentBackImageBase64: z.union([z.string(), z.null()]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasPair = !!(data.firstName?.trim() && data.lastName?.trim());
+    const hasFull = !!(data.fullName?.trim());
+    if (!hasPair && !hasFull) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Indicá nombre y apellido, o bien un nombre completo.",
+        path: ["firstName"],
+      });
+    }
+    refineBase64Optional("photoBase64", data.photoBase64, ctx);
+    refineBase64Optional("documentFrontImageBase64", data.documentFrontImageBase64, ctx);
+    refineBase64Optional("documentBackImageBase64", data.documentBackImageBase64, ctx);
+  });
 
 export type RegisterBodyInput = z.infer<typeof registerBodySchema>;
 

@@ -5,7 +5,7 @@ declare global {
   namespace Express {
     interface Request {
       authUser?: AuthUserContext;
-      /** Set by `requireOperationalUser` when the user may proceed past operational gates. */
+      /** Tras `requireOperationalUser`: perfil + email (credencial). */
       currentUser?: UserPublic;
     }
   }

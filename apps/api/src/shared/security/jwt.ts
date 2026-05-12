@@ -30,12 +30,12 @@ function requireJwtSecret(): string {
 }
 
 export function buildLoginTokenPayload(params: {
-  userId: string;
+  personaId: number;
   email: string;
   tokenType: LoginTokenType;
 }): LoginAccessPayload {
   return {
-    sub: params.userId,
+    sub: String(params.personaId),
     email: params.email.toLowerCase(),
     type: params.tokenType,
     jti: randomUUID(),
@@ -85,6 +85,7 @@ export function verifyAccessToken(token: string): JwtAuthPayload {
 
   if (
     !sub ||
+    !/^\d+$/.test(sub) ||
     typeof emailRaw !== "string" ||
     !email ||
     !jti ||
