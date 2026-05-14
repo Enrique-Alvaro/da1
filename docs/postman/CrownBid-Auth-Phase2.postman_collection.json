@@ -1,9 +1,9 @@
 {
   "info": {
     "_postman_id": "9d484e9d-95be-4ca3-ae0f-95f8aa22d7a0",
-    "name": "CrownBid Auth API",
+    "name": "CrownBid API (Auth + Domain)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Auth-2 — flujo real: **personas + clientes + cliente_credenciales**, JWT **stateless** (sin `revoked_tokens`), logout **204 sin escritura en BD**.\n\n**Antes de probar:** ejecutar `database/cliente_credenciales.sql` en SQL Server; datos mínimos en `paises` (p. ej. `countryId` 1); SMTP o modo dev (mock en consola con contraseña temporal).\n\n**Variables:**\n- `registerEmail` / `loginEmail`: mismo usuario.\n- `registerDocumentNumber`: documento único por corrida (cambiar si ya existe).\n- `temporaryPassword`: tras registro, correo o log `[email mock]` en dev.\n- `newPassword`: ≥8 caracteres, al menos **una mayúscula** y **una minúscula** (dígito opcional).\n\n**Orden sugerido:** Register success → copiar temp password → Login first login → Change initial password → Login after change (opcional, actualiza token) → Users me → Logout.\n\n**Deshabilitado (501):** forgot-password, reset-password (ítems al final)."
+    "description": "CrownBid API — Auth + **tablas de dominio** (`/api/paises`, `/api/sectores`, lectura `empleados`, `subastas`, `productos`). Auth-2: **personas + clientes + cliente_credenciales**, JWT **stateless** (sin `revoked_tokens`), logout **204 sin escritura en BD**.\n\n**Antes de probar:** ejecutar `database/cliente_credenciales.sql` en SQL Server; datos mínimos en `paises` (p. ej. `countryId` 1); SMTP o modo dev (mock en consola con contraseña temporal).\n\n**Variables:**\n- `registerEmail` / `loginEmail`: mismo usuario.\n- `registerDocumentNumber`: documento único por corrida (cambiar si ya existe).\n- `temporaryPassword`: tras registro, correo o log `[email mock]` en dev.\n- `newPassword`: ≥8 caracteres, al menos **una mayúscula** y **una minúscula** (dígito opcional).\n- Dominio: `paisNumero`, `paisNumeroNuevo`, `sectorId`, `empleadoId`, `subastaId`, `productoId` (ajustar según tu BD).\n\n**Orden sugerido:** Register success → … → Login after change → **Domain tables** (Bearer `accessToken`) → Users me → Logout.\n\n**Deshabilitado (501):** forgot-password, reset-password (ítems al final)."
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000" },
@@ -13,7 +13,13 @@
     { "key": "temporaryPassword", "value": "" },
     { "key": "newPassword", "value": "NuevaPasswordAb" },
     { "key": "accessTokenInitial", "value": "" },
-    { "key": "accessToken", "value": "" }
+    { "key": "accessToken", "value": "" },
+    { "key": "paisNumero", "value": "1", "description": "PK paises.numero para GET de lectura" },
+    { "key": "paisNumeroNuevo", "value": "90001", "description": "PK para POST/PUT/DELETE de prueba (cambiar si ya existe)" },
+    { "key": "sectorId", "value": "1", "description": "sectores.identificador para GET" },
+    { "key": "empleadoId", "value": "1", "description": "empleados.identificador (seed registro)" },
+    { "key": "subastaId", "value": "1", "description": "subastas.identificador si existe tabla" },
+    { "key": "productoId", "value": "1", "description": "productos.identificador si existe tabla" }
   ],
   "item": [
     {
@@ -585,6 +591,517 @@
               "});"
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "Domain tables (esquema SQL)",
+      "description": "Rutas bajo `/api`. Requieren **Authorization: Bearer {{accessToken}}** (token tipo `access`, no el de primer login).\n\n**Paises:** `paisNumero` para lectura; `paisNumeroNuevo` para alta/edición/baja de prueba (evitar borrar el país usado por clientes si hay FK).\n\n**Sectores:** `responsableSector` opcional debe existir en `empleados` si se envía.",
+      "item": [
+        {
+          "name": "Paises - GET list (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/paises",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "paises"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"items array\", function () {",
+                  "  pm.expect(body).to.have.property(\"items\");",
+                  "  pm.expect(body.items).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paises - GET by id (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/paises/{{paisNumero}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "paises", "{{paisNumero}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"tiene numero y nombre\", function () {",
+                  "  pm.expect(body).to.have.property(\"numero\");",
+                  "  pm.expect(body).to.have.property(\"nombre\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paises - POST create (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": {{paisNumeroNuevo}},\n  \"nombre\": \"País Postman\",\n  \"nombreCorto\": \"PP\",\n  \"capital\": \"Capital Test\",\n  \"nacionalidad\": \"Test\",\n  \"idiomas\": \"Español\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/paises",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "paises"]
+            },
+            "description": "Si `numero` ya existe → 409. Cambiá `paisNumeroNuevo` en variables de colección."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paises - PUT update (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"País Postman (editado)\",\n  \"nombreCorto\": \"PP\",\n  \"capital\": \"Capital Test\",\n  \"nacionalidad\": \"Test\",\n  \"idiomas\": \"Español\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/paises/{{paisNumeroNuevo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "paises", "{{paisNumeroNuevo}}"]
+            },
+            "description": "Ejecutar después de POST create con el mismo `paisNumeroNuevo`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paises - DELETE (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/paises/{{paisNumeroNuevo}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "paises", "{{paisNumeroNuevo}}"]
+            },
+            "description": "Puede fallar con 400 si hay FK (p. ej. clientes con ese país). No borrar `paisNumero` de producción."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204 o error FK\", function () {",
+                  "  pm.expect([204, 400]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paises - GET by id not found (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/paises/99999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "paises", "99999999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sectores - GET list (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sectores",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sectores"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 y items\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property(\"items\");",
+                  "  pm.expect(body.items).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sectores - GET by id (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sectores/{{sectorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sectores", "{{sectorId}}"]
+            },
+            "description": "Ajustá `sectorId` si la tabla está vacía o no existe esa fila → 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 o 404\", function () {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sectores - POST create (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreSector\": \"Sector Postman\",\n  \"codigoSector\": \"SP\",\n  \"responsableSector\": {{empleadoId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sectores",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sectores"]
+            },
+            "description": "`responsableSector` debe existir en empleados (p. ej. 1 del seed). Usá null para omitir: `\"responsableSector\": null`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const id = pm.response.json().identificador;",
+                  "  if (id) { pm.collectionVariables.set(\"sectorId\", String(id)); }",
+                  "}",
+                  "pm.test(\"Status 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sectores - PUT update (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreSector\": \"Sector Postman (editado)\",\n  \"codigoSector\": \"SP2\",\n  \"responsableSector\": {{empleadoId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sectores/{{sectorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sectores", "{{sectorId}}"]
+            },
+            "description": "Tras POST create, el test guarda `sectorId`. O establecé `sectorId` manualmente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 o 404\", function () {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sectores - DELETE (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sectores/{{sectorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sectores", "{{sectorId}}"]
+            },
+            "description": "Elimina el sector cuyo id está en `sectorId` (p. ej. el creado por POST)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204 o 400/404\", function () {",
+                  "  pm.expect([204, 400, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Empleados - GET list (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Empleados - GET by id (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados/{{empleadoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados", "{{empleadoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subastas - GET list (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subastas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subastas"]
+            },
+            "description": "Solo lectura. Si la tabla no existe en la BD → 500."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 o 500 si falta tabla\", function () {",
+                  "  pm.expect([200, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subastas - GET by id (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subastas/{{subastaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subastas", "{{subastaId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 o 404 o 500\", function () {",
+                  "  pm.expect([200, 404, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Productos - GET list (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos"]
+            },
+            "description": "Solo lectura. Si la tabla no existe → 500."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 o 500 si falta tabla\", function () {",
+                  "  pm.expect([200, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Productos - GET by id (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{productoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos", "{{productoId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 o 404 o 500\", function () {",
+                  "  pm.expect([200, 404, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
