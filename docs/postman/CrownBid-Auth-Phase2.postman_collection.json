@@ -1,0 +1,654 @@
+{
+  "info": {
+    "_postman_id": "9d484e9d-95be-4ca3-ae0f-95f8aa22d7a0",
+    "name": "CrownBid Auth API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Auth-2 — flujo real: **personas + clientes + cliente_credenciales**, JWT **stateless** (sin `revoked_tokens`), logout **204 sin escritura en BD**.\n\n**Antes de probar:** ejecutar `database/cliente_credenciales.sql` en SQL Server; datos mínimos en `paises` (p. ej. `countryId` 1); SMTP o modo dev (mock en consola con contraseña temporal).\n\n**Variables:**\n- `registerEmail` / `loginEmail`: mismo usuario.\n- `registerDocumentNumber`: documento único por corrida (cambiar si ya existe).\n- `temporaryPassword`: tras registro, correo o log `[email mock]` en dev.\n- `newPassword`: ≥8 caracteres, al menos **una mayúscula** y **una minúscula** (dígito opcional).\n\n**Orden sugerido:** Register success → copiar temp password → Login first login → Change initial password → Login after change (opcional, actualiza token) → Users me → Logout.\n\n**Deshabilitado (501):** forgot-password, reset-password (ítems al final)."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "registerEmail", "value": "nasser.phase2.postman@example.com" },
+    { "key": "loginEmail", "value": "nasser.phase2.postman@example.com" },
+    { "key": "registerDocumentNumber", "value": "12345678" },
+    { "key": "temporaryPassword", "value": "" },
+    { "key": "newPassword", "value": "NuevaPasswordAb" },
+    { "key": "accessTokenInitial", "value": "" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health - API",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health - DB",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health/db",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health", "db"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200 o 503\", function () {",
+              "  pm.expect([200, 503]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register - success (201)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Nasser\",\n  \"lastName\": \"El Bacha\",\n  \"email\": \"{{registerEmail}}\",\n  \"documentNumber\": \"{{registerDocumentNumber}}\",\n  \"address\": \"Av. Siempre Viva 123\",\n  \"countryId\": 1,\n  \"documentFrontImageBase64\": null,\n  \"documentBackImageBase64\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
+        },
+        "description": "`countryId` debe existir en `paises.numero`. Ajustá `registerDocumentNumber` si el documento ya está usado."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"Respuesta Auth-2: message, user, emailSentTo\", function () {",
+              "  pm.expect(body).to.have.property(\"message\");",
+              "  pm.expect(body).to.have.property(\"emailSentTo\");",
+              "  pm.expect(body).to.have.property(\"user\");",
+              "  pm.expect(body.emailSentTo).to.eql(body.user.email);",
+              "});",
+              "",
+              "pm.test(\"No expone password ni hash\", function () {",
+              "  pm.expect(body).to.not.have.property(\"temporaryPassword\");",
+              "  pm.expect(body).to.not.have.property(\"passwordHash\");",
+              "  pm.expect(body.user).to.not.have.property(\"passwordHash\");",
+              "  pm.expect(body.user).to.not.have.property(\"password_hash\");",
+              "  pm.expect(body.user).to.not.have.property(\"requiresPasswordChange\");",
+              "});",
+              "",
+              "pm.test(\"user id entero y perfil español\", function () {",
+              "  pm.expect(body.user.id).to.be.a(\"number\");",
+              "  pm.expect(body.user).to.have.property(\"documentNumber\");",
+              "  pm.expect(body.user).to.have.property(\"fullName\");",
+              "  pm.expect(body.user).to.have.property(\"email\");",
+              "  pm.expect(body.user).to.have.property(\"status\");",
+              "  pm.expect(body.user).to.have.property(\"admitted\");",
+              "  pm.expect(body.user).to.have.property(\"category\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register - duplicate email (409)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Otro\",\n  \"lastName\": \"Usuario\",\n  \"email\": \"{{registerEmail}}\",\n  \"documentNumber\": \"87654321\",\n  \"address\": \"Otra calle 1\",\n  \"countryId\": 1,\n  \"documentFrontImageBase64\": null,\n  \"documentBackImageBase64\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
+        },
+        "description": "Mismo email que Register success, **otro** documentNumber → conflicto en credencial (409)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 409\", function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register - invalid email (422)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Nasser\",\n  \"lastName\": \"El Bacha\",\n  \"email\": \"not-an-email\",\n  \"documentNumber\": \"99999999\",\n  \"address\": \"Av. Siempre Viva 123\",\n  \"countryId\": 1,\n  \"documentFrontImageBase64\": null,\n  \"documentBackImageBase64\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 422\", function () {",
+              "  pm.response.to.have.status(422);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login - success first login (200)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{loginEmail}}\",\n  \"password\": \"{{temporaryPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Completá `temporaryPassword` desde el correo o logs dev. Flags **solo** en raíz: mustChangePassword / isFirstLogin. JWT `sub` = id persona (string numérico)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"accessToken y primer login (sin flags en user)\", function () {",
+              "  pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+              "  pm.expect(body.mustChangePassword).to.eql(true);",
+              "  pm.expect(body.isFirstLogin).to.eql(true);",
+              "  pm.expect(body.user).to.not.have.property(\"requiresPasswordChange\");",
+              "});",
+              "",
+              "pm.test(\"JWT sub numérico\", function () {",
+              "  const parts = body.accessToken.split(\".\");",
+              "  const payload = JSON.parse(atob(parts[1].replace(/-/g, \"+\").replace(/_/g, \"/\")));",
+              "  pm.expect(/^[0-9]+$/.test(payload.sub)).to.be.true;",
+              "  pm.expect(payload.type).to.eql(\"initial_password_change\");",
+              "});",
+              "",
+              "if (pm.response.code === 200 && body.accessToken) {",
+              "  pm.collectionVariables.set(\"accessTokenInitial\", body.accessToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login - invalid credentials (401)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{loginEmail}}\",\n  \"password\": \"wrong-password-xyz\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"mensaje genérico\", function () {",
+              "  pm.expect(body.message).to.include(\"Credenciales\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login - invalid email (422)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"secret\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 422\", function () {",
+              "  pm.response.to.have.status(422);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Change initial password - success (200)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessTokenInitial}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"{{temporaryPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/change-initial-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "change-initial-password"]
+        },
+        "description": "Bearer token tipo `initial_password_change` (variable `accessTokenInitial`)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"JWT access y flags en raíz\", function () {",
+              "  pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+              "  pm.expect(body.mustChangePassword).to.eql(false);",
+              "  pm.expect(body.isFirstLogin).to.eql(false);",
+              "  pm.expect(body.user).to.not.have.property(\"requiresPasswordChange\");",
+              "});",
+              "",
+              "pm.test(\"JWT type access\", function () {",
+              "  const parts = body.accessToken.split(\".\");",
+              "  const payload = JSON.parse(atob(parts[1].replace(/-/g, \"+\").replace(/_/g, \"/\")));",
+              "  pm.expect(payload.type).to.eql(\"access\");",
+              "});",
+              "",
+              "if (pm.response.code === 200 && body.accessToken) {",
+              "  pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Change initial password - wrong current password (401)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessTokenInitial}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"wrong-temporary-password\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/change-initial-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "change-initial-password"]
+        },
+        "description": "Requiere token initial válido; ejecutar **antes** de \"Change initial password - success\" o con otro usuario."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Change initial password - already completed (409)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessTokenInitial}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"{{temporaryPassword}}\",\n  \"newPassword\": \"OtraPasswordAb\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/change-initial-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "change-initial-password"]
+        },
+        "description": "Después de \"Change initial password - success\" con el mismo `accessTokenInitial` (ya no requiere cambio) → 409."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 409\", function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login - success after password change (200)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{loginEmail}}\",\n  \"password\": \"{{newPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Login con contraseña definitiva (`newPassword`). Actualiza `accessToken`."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"sesión normal\", function () {",
+              "  pm.expect(body.mustChangePassword).to.eql(false);",
+              "  pm.expect(body.isFirstLogin).to.eql(false);",
+              "  pm.expect(body.user).to.not.have.property(\"requiresPasswordChange\");",
+              "});",
+              "",
+              "if (pm.response.code === 200 && body.accessToken) {",
+              "  pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth logout (204)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "logout"]
+        },
+        "description": "Bearer **access**. Stateless: no se persiste revocación en BD; el cliente descarta el token."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 204\", function () {",
+              "  pm.response.to.have.status(204);",
+              "});",
+              "",
+              "pm.test(\"sin cuerpo\", function () {",
+              "  pm.expect(pm.response.text()).to.eql(\"\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users me - success (200)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "me"]
+        },
+        "description": "Solo token **access** (mismo shape que `user` en login)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "pm.test(\"perfil público sin hash\", function () {",
+              "  pm.expect(body).to.not.have.property(\"password_hash\");",
+              "  pm.expect(body).to.not.have.property(\"passwordHash\");",
+              "  pm.expect(body.id).to.be.a(\"number\");",
+              "  pm.expect(body).to.have.property(\"country\");",
+              "  pm.expect(body.country).to.have.property(\"id\");",
+              "  pm.expect(body.country).to.have.property(\"name\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users me - missing token (401)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "me"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users me - first-login token rejected (401)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessTokenInitial}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "users", "me"]
+        },
+        "description": "Token `initial_password_change` no válido para /me (requireAccessToken)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 401\", function () {",
+              "  pm.response.to.have.status(401);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Forgot password - not implemented (501)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{loginEmail}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/forgot-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "forgot-password"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 501\", function () {",
+              "  pm.response.to.have.status(501);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reset password - not implemented (501)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"dummy-token-value-here\",\n  \"password\": \"NuevaPasswordAb\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/reset-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "reset-password"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 501\", function () {",
+              "  pm.response.to.have.status(501);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

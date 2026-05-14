@@ -1,27 +1,14 @@
 /**
- * Prueba rápida de conectividad a SQL Server.
+ * Prueba rápida de conectividad a SQL Server (CLI).
  * Uso: desde apps/api → npm run db:test
  */
 import "dotenv/config";
 import sql from "mssql";
+import { loadEnv } from "../src/config/env";
 
 async function main(): Promise<void> {
-  const connStr = process.env.DATABASE_URL?.trim();
-  if (!connStr) {
-    console.error(
-      "Falta DATABASE_URL en .env. Ejemplo:\n" +
-        '  DATABASE_URL=Server=localhost,1433;Database=CrownBid;User Id=sa;Password=tu_clave;Encrypt=true;TrustServerCertificate=true'
-    );
-    process.exit(1);
-  }
-
-  if (connStr.includes("jdbc:")) {
-    console.error(
-      "DATABASE_URL parece formato JDBC. En Node.js usá cadena estilo ADO, por ejemplo:\n" +
-        "  Server=localhost,1433;Database=CrownBid;User Id=...;Password=...;Encrypt=true;TrustServerCertificate=true"
-    );
-    process.exit(1);
-  }
+  const env = loadEnv();
+  const connStr = env.sqlServerConnectionString;
 
   console.info("Intentando conectar…");
   let pool: sql.ConnectionPool;
