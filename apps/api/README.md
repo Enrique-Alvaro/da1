@@ -31,7 +31,37 @@ Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE
 
 **Cierre Auth (Phase 8):** QA manual y checklist — `docs/auth-phase-8-manual-qa.md`. Resumen para frontend/mobile — `docs/auth-final-summary.md`.
 
-**Endpoints previstos fuera de esta fase:** otros módulos de negocio (pujas, pagos, etc.) según roadmap.
+### Envío de productos (sin cambios de esquema SQL)
+
+Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
+
+| Método | Ruta | Rol |
+|--------|------|-----|
+| POST | `/api/productos/submissions` | Cliente (`access` + contraseña definitiva) |
+| GET | `/api/users/me/item-submissions` | Cliente |
+| GET | `/api/users/me/item-submissions/:id` | Cliente |
+| DELETE | `/api/users/me/item-submissions/:id` | Cliente (solo `disponible=no`, sin catálogo) |
+| POST | `/api/auth/employee/login` | Empleado (env `EMPLOYEE_ADMIN_*`) |
+| GET | `/api/admin/productos/revision` | Empleado |
+| POST | `/api/admin/productos/:id/decision` | Empleado (`approve` \| `reject`) |
+| PATCH | `/api/admin/productos/:id/auction-assignment` | Empleado |
+
+**Limitaciones del esquema fijo:** no hay columna de motivo de rechazo ni historial; `disponible=no` agrupa pendiente y no aprobado; las declaraciones legales se validan pero no se persisten.
+
+**Foto de envío:** `GET /api/users/me/item-submissions/:id/photos/:photoId` (cliente, binario `application/octet-stream`).
+
+### QA manual — parche correcciones envío de productos
+
+1. **Rutas productos:** `GET /api/productos` y `GET /api/productos/:id` montados una sola vez; `POST /api/productos/submissions` no es capturado por `/:id`.
+2. **Ocultar pendientes:** Con producto `disponible=no`, `GET /api/productos/:id` → 404; el dueño lo ve en `GET /api/users/me/item-submissions/:id`.
+3. **Admin reject:** `POST .../decision` con `{ "decision": "reject" }` → `decisionApplied: "not_approved"` + `limitations`; producto ya aprobado → 409.
+4. **Admin approve:** Producto programado o vendido → 409.
+5. **Asignación subasta:** Body con `catalogId` y `subastaId` juntos → 422; `subastaId` inexistente → 404.
+6. **Cancelar con seguro:** Producto con `seguro` no nulo → 409 al `DELETE` del envío.
+7. **Foto ajena:** Otro cliente con su token → 404 en foto de otro dueño.
+8. **Concurrencia asignación:** (opcional) dos `PATCH .../auction-assignment` simultáneos → uno 409.
+
+**Endpoints previstos fuera de esta fase:** pujas, pagos, métricas, etc.
 
 ## Auth flow quick check (local)
 

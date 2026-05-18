@@ -30,6 +30,14 @@ const rawSchema = z.object({
   FRONTEND_URL: z.string().optional(),
   /** Password reset link TTL; default 30 in code when unset. */
   PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().optional(),
+
+  /** Empleado revisor inicial en alta de producto (FK productos.revisor). */
+  DEFAULT_REVIEWER_EMPLOYEE_ID: z.coerce.number().int().positive().optional(),
+
+  /** Login TPO empleado/admin (sin tabla de credenciales de empleado). */
+  EMPLOYEE_ADMIN_EMAIL: z.string().optional(),
+  EMPLOYEE_ADMIN_PASSWORD: z.string().optional(),
+  EMPLOYEE_ADMIN_ID: z.coerce.number().int().positive().optional(),
 });
 
 export type Env = z.infer<typeof rawSchema> & {
@@ -85,4 +93,29 @@ export function getEnv(): Env {
 /** Minutes until password reset token expires (env override or 30). */
 export function getPasswordResetTtlMinutes(): number {
   return getEnv().PASSWORD_RESET_TOKEN_TTL_MINUTES ?? 30;
+}
+
+export function getDefaultReviewerEmployeeId(): number {
+  const id = getEnv().DEFAULT_REVIEWER_EMPLOYEE_ID;
+  if (id === undefined || !Number.isSafeInteger(id) || id <= 0) {
+    throw new Error(
+      "DEFAULT_REVIEWER_EMPLOYEE_ID is required for product submissions. Set it in apps/api/.env (must exist in dbo.empleados)."
+    );
+  }
+  return id;
+}
+
+export function getEmployeeAdminCredentials(): {
+  email: string;
+  password: string;
+  employeeId: number;
+} | null {
+  const env = getEnv();
+  const email = env.EMPLOYEE_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = env.EMPLOYEE_ADMIN_PASSWORD;
+  const employeeId = env.EMPLOYEE_ADMIN_ID;
+  if (!email || !password || employeeId === undefined) {
+    return null;
+  }
+  return { email, password, employeeId };
 }

@@ -24,16 +24,19 @@ const SELECT_LIST = `
   seguro
 `;
 
+/** Solo productos aprobados (disponible = si). Los envíos pendientes no se listan aquí. */
 export async function listProductos(): Promise<ProductoRow[]> {
   const pool = await getSqlPool();
   const result = await pool.request().query<ProductoRow>(`
     SELECT ${SELECT_LIST}
     FROM dbo.productos
+    WHERE disponible = N'si'
     ORDER BY identificador
   `);
   return result.recordset;
 }
 
+/** Solo productos aprobados; pendientes se tratan como inexistentes en rutas públicas. */
 export async function findProductoById(identificador: number): Promise<ProductoRow | null> {
   const pool = await getSqlPool();
   const result = await pool
@@ -43,6 +46,7 @@ export async function findProductoById(identificador: number): Promise<ProductoR
       SELECT TOP (1) ${SELECT_LIST}
       FROM dbo.productos
       WHERE identificador = @identificador
+        AND disponible = N'si'
     `);
   return result.recordset[0] ?? null;
 }

@@ -16,6 +16,8 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
     id: payload.sub,
     email: payload.email,
     tokenType: payload.type as AuthTokenType,
+    role: payload.role,
+    employeeId: payload.employeeId,
     jti: payload.jti,
     exp: payload.exp,
     expiresAt: payload.expiresAt,
