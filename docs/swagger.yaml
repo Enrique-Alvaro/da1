@@ -44,6 +44,10 @@ tags:
     description: CRUD for payment alternatives
   - name: Item Submissions
     description: Module for clients to offer their belongings for future auctions
+  - name: Domain tables
+    description: |
+      CRUD aligned with the professor SQL schema (`paises`, `sectores`, etc.).
+      In the running API these routes are mounted under **`/api`** (e.g. `GET /api/paises`).
 
 paths:
   # ──────────────────────────────────────────────
@@ -113,6 +117,338 @@ paths:
                 $ref: '#/components/schemas/User'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  # ──────────────────────────────────────────────
+  # DOMAIN TABLES (professor schema — also under /api in server)
+  # ──────────────────────────────────────────────
+  /paises:
+    get:
+      tags: [Domain tables]
+      summary: List countries (paises)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaisListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Domain tables]
+      summary: Create country
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaisCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pais'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /paises/{id}:
+    get:
+      tags: [Domain tables]
+      summary: Get country by numero (PK)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pais'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Domain tables]
+      summary: Update country
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaisUpdateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pais'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Domain tables]
+      summary: Delete country
+      description: May fail with 400/409 if referenced by clientes or other FKs.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '204':
+          description: No content
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /sectores:
+    get:
+      tags: [Domain tables]
+      summary: List sectors (sectores)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SectorListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Domain tables]
+      summary: Create sector
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SectorCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sector'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /sectores/{id}:
+    get:
+      tags: [Domain tables]
+      summary: Get sector by identificador
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sector'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Domain tables]
+      summary: Update sector
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SectorUpdateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sector'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Domain tables]
+      summary: Delete sector
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '204':
+          description: No content
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /empleados:
+    get:
+      tags: [Domain tables]
+      summary: List employees (read-only)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmpleadoListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /empleados/{id}:
+    get:
+      tags: [Domain tables]
+      summary: Get employee by identificador (read-only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empleado'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /subastas:
+    get:
+      tags: [Domain tables]
+      summary: List auctions from dbo.subastas (read-only)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubastaListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /subastas/{id}:
+    get:
+      tags: [Domain tables]
+      summary: Get auction row by identificador (read-only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subasta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /productos:
+    get:
+      tags: [Domain tables]
+      summary: List products from dbo.productos (read-only)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /productos/{id}:
+    get:
+      tags: [Domain tables]
+      summary: Get product row by identificador (read-only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ──────────────────────────────────────────────
   # AUCTIONS
@@ -527,6 +863,14 @@ components:
         type: string
         format: uuid
       description: The unique identifier of the payment method.
+    IntIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: Integer primary key (e.g. paises.numero or sectores.identificador).
 
   responses:
     BadRequest:
@@ -620,6 +964,209 @@ components:
     PaymentMethodType:
       type: string
       enum: [credit_card, bank_account, certified_check]
+
+    Pais:
+      type: object
+      properties:
+        numero:
+          type: integer
+        nombre:
+          type: string
+        nombreCorto:
+          type: string
+          nullable: true
+        capital:
+          type: string
+        nacionalidad:
+          type: string
+        idiomas:
+          type: string
+
+    PaisListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pais'
+
+    PaisCreateRequest:
+      type: object
+      required: [numero, nombre, capital, nacionalidad, idiomas]
+      properties:
+        numero:
+          type: integer
+          minimum: 1
+        nombre:
+          type: string
+        nombreCorto:
+          type: string
+          nullable: true
+        capital:
+          type: string
+        nacionalidad:
+          type: string
+        idiomas:
+          type: string
+
+    PaisUpdateRequest:
+      type: object
+      required: [nombre, capital, nacionalidad, idiomas]
+      properties:
+        nombre:
+          type: string
+        nombreCorto:
+          type: string
+          nullable: true
+        capital:
+          type: string
+        nacionalidad:
+          type: string
+        idiomas:
+          type: string
+
+    Sector:
+      type: object
+      properties:
+        identificador:
+          type: integer
+        nombreSector:
+          type: string
+        codigoSector:
+          type: string
+          nullable: true
+        responsableSector:
+          type: integer
+          nullable: true
+
+    SectorListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sector'
+
+    SectorCreateRequest:
+      type: object
+      required: [nombreSector]
+      properties:
+        nombreSector:
+          type: string
+        codigoSector:
+          type: string
+          nullable: true
+        responsableSector:
+          type: integer
+          nullable: true
+
+    SectorUpdateRequest:
+      type: object
+      required: [nombreSector]
+      properties:
+        nombreSector:
+          type: string
+        codigoSector:
+          type: string
+          nullable: true
+        responsableSector:
+          type: integer
+          nullable: true
+
+    Empleado:
+      type: object
+      properties:
+        identificador:
+          type: integer
+        cargo:
+          type: string
+          nullable: true
+        sector:
+          type: integer
+          nullable: true
+
+    EmpleadoListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Empleado'
+
+    Subasta:
+      type: object
+      properties:
+        identificador:
+          type: integer
+        fecha:
+          type: string
+          format: date
+          nullable: true
+        hora:
+          type: string
+          nullable: true
+        estado:
+          type: string
+          nullable: true
+        subastador:
+          type: integer
+          nullable: true
+        ubicacion:
+          type: string
+          nullable: true
+        capacidadAsistentes:
+          type: integer
+          nullable: true
+        tieneDeposito:
+          type: string
+          nullable: true
+        seguridadPropia:
+          type: string
+          nullable: true
+        categoria:
+          type: string
+          nullable: true
+
+    SubastaListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subasta'
+
+    Producto:
+      type: object
+      properties:
+        identificador:
+          type: integer
+        fecha:
+          type: string
+          format: date
+          nullable: true
+        disponible:
+          type: string
+          nullable: true
+        descripcionCatalogo:
+          type: string
+          nullable: true
+        descripcionCompleta:
+          type: string
+        revisor:
+          type: integer
+        duenio:
+          type: integer
+        seguro:
+          type: string
+          nullable: true
+
+    ProductoListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Producto'
 
     # ─── DOMAIN MODELS ──────────────────────────
     User:
