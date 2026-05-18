@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "MiPrimerProyecto",
-    "slug": "MiPrimerProyecto",
+  "name": "DesarrolloDeApis1TP",
+  "slug": "desarrollodeapis1tp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "miprimerproyecto",
+  "scheme": "desarrollodeapis1tp",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0bb0e307-ff43-49d7-a154-d8e9fb6e3939"
+      }
+    },
+    "owner": "juanpeirettis-organization"
   }
 }

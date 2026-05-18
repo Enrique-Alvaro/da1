@@ -1,4 +1,25 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+node_modules/
+.expo/
+.expo-shared/
+dist/
+build/
+android/
+ios/
+web-build/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+.env
+.env.local
+.DS_Store
+/*.log
+/.vscode/
+*.keystore
+*.local
+coverage/
+/.turbo/
+/.next/
+expo-debug.log# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
 node_modules/

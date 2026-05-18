@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -40,6 +40,8 @@ export function AnimatedSplashOverlay() {
         }
       })}
       style={styles.backgroundSolidColor}
+      // On web the splash overlay can intercept pointer events; allow clicks to pass through there
+      pointerEvents={Platform.OS === 'web' ? 'none' : 'auto'}
     />
   );
 }
