@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { login } from '@/services/api';
 
 function isValidEmail(email: string) {
   // simple email regex
@@ -21,6 +22,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const emailError = emailTouched || submitAttempted ? !isValidEmail(email) && email.length > 0 : false;
   const showTopError = submitAttempted && (!email || !isValidEmail(email));
@@ -46,14 +49,28 @@ export default function LoginScreen() {
     }
   }
 
-  function onSubmit() {
+  async function onSubmit() {
     setSubmitAttempted(true);
     if (!email || !password || !isValidEmail(email)) {
       console.warn('Validation failed');
       return;
     }
-    console.log('Login submit', { email, password });
-  router.push('/explore');
+
+    setLoading(true);
+    setServerError(null);
+
+    try {
+      const response = await login(email, password);
+      if (response.mustChangePassword || response.isFirstLogin) {
+        router.push('/new-password?mode=initial');
+        return;
+      }
+      router.push('/explore');
+    } catch (error: any) {
+      setServerError(error?.message || 'Error de autenticación. Revisa tus credenciales.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -74,6 +91,12 @@ export default function LoginScreen() {
           <View style={styles.errorBanner}>
             <ThemedText style={styles.errorBannerTitle}>Formato de email inválido</ThemedText>
             <ThemedText>Por favor ingresa un email válido (ej: usuario@ejemplo.com)</ThemedText>
+          </View>
+        )}
+        {serverError && (
+          <View style={styles.errorBanner}>
+            <ThemedText style={styles.errorBannerTitle}>Error</ThemedText>
+            <ThemedText>{serverError}</ThemedText>
           </View>
         )}
 
@@ -101,9 +124,9 @@ export default function LoginScreen() {
             placeholderTextColor="#9AA0A6"
           />
 
-          <Pressable style={styles.primaryButton} onPress={onSubmit}>
+          <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
             <ThemedText type="default" style={styles.primaryButtonText}>
-              Iniciar Sesión
+              {loading ? 'Cargando...' : 'Iniciar Sesión'}
             </ThemedText>
           </Pressable>
 

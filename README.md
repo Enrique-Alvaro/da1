@@ -25,6 +25,22 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## App Screens and Routes
+
+The project includes several feature screens in `src/app`:
+
+- `explore.tsx` — main explore screen with navigation to product posting and payment methods.
+- `post-article.tsx` — upload and submit an item for auction review.
+- `post-article-success.tsx` / `post-article-error.tsx` — submission result screens.
+- `payment-methods.tsx` — list and manage payment guarantees.
+- `select-payment-method.tsx` — choose a payment method type.
+- `add-payment-card.tsx`, `add-bank-account.tsx`, `add-certified-check.tsx` — forms for adding new payment methods.
+- `payment-method-verify.tsx` — verification flow for added payment methods.
+- `reserve-funds.tsx` — reserve funds for auction participation.
+- `payment-verify-success.tsx` / `payment-verify-error.tsx` — verification outcome screens.
+
+Each screen is available through Expo Router route matching the file name, for example `/payment-methods`, `/post-article`, `/select-payment-method`, etc.
+
 ## Get a fresh project
 
 When you're ready, run:

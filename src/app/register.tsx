@@ -7,15 +7,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { registerUser } from '@/services/api';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [documentId, setDocumentId] = useState('');
   const [address, setAddress] = useState('');
+  const [country, setCountry] = useState('AR');
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const countries = ['AR', 'US', 'ES', 'CO', 'BR'];
 
   async function requestPermissions() {
     const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
@@ -48,10 +55,31 @@ export default function RegisterScreen() {
     }
   }
 
-  function onSubmit() {
-    console.log('Register', { firstName, lastName, email, address });
-    // Simulate server register -> show confirmation
-  router.push('register-confirmation' as any);
+  async function onSubmit() {
+    setServerError(null);
+    if (!firstName || !lastName || !email || !documentId || !address || !frontImage || !backImage || !country) {
+      setServerError('Completa todos los campos obligatorios y sube ambas imágenes del documento.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await registerUser({
+        firstName,
+        lastName,
+        email,
+        documentId,
+        address,
+        country,
+        documentFrontImageUrl: frontImage,
+        documentBackImageUrl: backImage,
+      });
+      router.push('/register-confirmation');
+    } catch (error: any) {
+      setServerError(error?.message || 'No se pudo completar el registro.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -69,10 +97,21 @@ export default function RegisterScreen() {
             <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
 
             <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
-            <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" />
+            <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+
+            <ThemedText style={styles.label}>Documento</ThemedText>
+            <TextInput style={styles.input} value={documentId} onChangeText={setDocumentId} placeholder="DNI / Pasaporte" />
 
             <ThemedText style={styles.label}>Dirección</ThemedText>
             <TextInput style={styles.input} value={address} onChangeText={setAddress} />
+
+            <ThemedText style={styles.label}>País</ThemedText>
+            <Pressable style={[styles.input, styles.selectInput]} onPress={() => {
+              const next = countries[(countries.indexOf(country) + 1) % countries.length];
+              setCountry(next);
+            }}>
+              <ThemedText>{country}</ThemedText>
+            </Pressable>
 
             <ThemedText style={styles.label}>Verificación de Identidad</ThemedText>
             <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -113,8 +152,16 @@ export default function RegisterScreen() {
               </View>
             </View>
 
-            <Pressable style={styles.primaryButton} onPress={onSubmit}>
-              <ThemedText type="default" style={styles.primaryButtonText}>Crear Cuenta</ThemedText>
+            {serverError ? (
+              <View style={styles.errorBanner}>
+                <ThemedText style={styles.errorBannerTitle}>Error</ThemedText>
+                <ThemedText>{serverError}</ThemedText>
+              </View>
+            ) : null}
+            <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
+              <ThemedText type="default" style={styles.primaryButtonText}>
+                {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
+              </ThemedText>
             </Pressable>
           </View>
         </ScrollView>
@@ -129,6 +176,9 @@ const styles = StyleSheet.create({
   label: { marginTop: Spacing.two, marginBottom: 6 },
   input: { borderWidth: 1, borderColor: '#E6E9EB', padding: 12, borderRadius: 10, backgroundColor: '#FFF', marginBottom: Spacing.three },
   uploadBox: { borderWidth: 1, borderColor: '#E6E9EB', padding: 16, borderRadius: 8, marginBottom: Spacing.three, alignItems: 'center' },
+  selectInput: { backgroundColor: '#F7F7F8' },
+  errorBanner: { backgroundColor: '#FFECEC', borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: '#E74C3C', marginBottom: Spacing.three },
+  errorBannerTitle: { fontWeight: '700', marginBottom: 6, color: '#C0392B' },
   primaryButton: { backgroundColor: '#F47B1F', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: Spacing.two },
   primaryButtonText: { color: '#fff' },
   preview: { width: '100%', height: 120, borderRadius: 8 },

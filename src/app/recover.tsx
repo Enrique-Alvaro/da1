@@ -6,15 +6,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { forgotPassword } from '@/services/api';
 
 export default function RecoverScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function onSend() {
-    console.log('Send recover to', email);
-    // after sending, route to new-password with a placeholder
-  router.push('/new-password' as any);
+  async function onSend() {
+    setServerError(null);
+    if (!email) {
+      setServerError('Ingresa tu email para continuar.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await forgotPassword(email);
+      router.push('/new-password?mode=reset');
+    } catch (error: any) {
+      setServerError(error?.message || 'No se pudo enviar el correo de recuperación.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -31,8 +46,16 @@ export default function RecoverScreen() {
           <ThemedText style={styles.label}>Email</ThemedText>
           <TextInput value={email} onChangeText={setEmail} placeholder="usuario@ejemplo.com" style={styles.input} />
 
-          <Pressable style={styles.primaryButton} onPress={onSend}>
-            <ThemedText type="default" style={styles.primaryButtonText}>Enviar Instrucciones</ThemedText>
+          {serverError ? (
+            <View style={styles.errorBanner}>
+              <ThemedText style={styles.errorBannerTitle}>Error</ThemedText>
+              <ThemedText>{serverError}</ThemedText>
+            </View>
+          ) : null}
+          <Pressable style={styles.primaryButton} onPress={onSend} disabled={loading}>
+            <ThemedText type="default" style={styles.primaryButtonText}>
+              {loading ? 'Enviando...' : 'Enviar Instrucciones'}
+            </ThemedText>
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={() => router.push('/')}>
@@ -48,6 +71,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', flexDirection: 'row' },
   safeArea: { flex: 1, paddingHorizontal: Spacing.four, alignItems: 'center', gap: Spacing.three, paddingBottom: BottomTabInset + Spacing.three, maxWidth: MaxContentWidth, width: '100%' },
   infoBox: { backgroundColor: '#EAF3FF', padding: 12, borderRadius: 8, marginBottom: Spacing.three },
+  errorBanner: { backgroundColor: '#FFECEC', borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: '#E74C3C', marginBottom: Spacing.three },
+  errorBannerTitle: { fontWeight: '700', marginBottom: 6, color: '#C0392B' },
   label: { marginTop: Spacing.two, marginBottom: 6 },
   input: { borderWidth: 1, borderColor: '#E6E9EB', padding: 12, borderRadius: 10, backgroundColor: '#FFF', marginBottom: Spacing.three },
   primaryButton: { backgroundColor: '#F47B1F', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginBottom: Spacing.two },

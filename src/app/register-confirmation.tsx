@@ -13,8 +13,10 @@ export default function RegisterConfirmation() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={{ width: '100%', alignItems: 'center' }}>
-          <ThemedText type="title">Te hemos enviado un correo de confirmación</ThemedText>
-          <ThemedText type="small" style={{ marginTop: Spacing.two, marginBottom: Spacing.four }}>Por favor revisa tu correo electrónico para continuar el proceso de registro</ThemedText>
+          <ThemedText type="title">Registro Completo</ThemedText>
+          <ThemedText type="small" style={{ marginTop: Spacing.two, marginBottom: Spacing.four }}>
+            Recibirás una contraseña temporal por correo. Usala para iniciar sesión y completar el primer cambio de contraseña.
+          </ThemedText>
           <Pressable style={styles.primaryButton} onPress={() => router.push('/')}>
             <ThemedText type="default" style={styles.primaryButtonText}>Continuar</ThemedText>
           </Pressable>

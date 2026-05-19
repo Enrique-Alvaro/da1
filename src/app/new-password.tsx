@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,21 +6,47 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { changeInitialPassword, resetPassword } from '@/services/api';
 
 export default function NewPasswordScreen() {
   const router = useRouter();
-  const [code, setCode] = useState('');
+  const searchParams = useSearchParams();
+  const mode = searchParams.mode === 'reset' ? 'reset' : 'initial';
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [token, setToken] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function onReset() {
-    console.log('Reset', { code, newPass, confirmPass });
-    // basic checks
+  async function onReset() {
+    setServerError(null);
     if (!newPass || newPass.length < 8 || newPass !== confirmPass) {
-      console.warn('Password requirements not met');
+      setServerError('Las contraseñas deben coincidir y tener al menos 8 caracteres.');
       return;
     }
-    router.push('/');
+
+    setLoading(true);
+    try {
+      if (mode === 'reset') {
+        if (!token) {
+          setServerError('Ingresa el token que recibiste por correo.');
+          return;
+        }
+        await resetPassword(token, newPass);
+      } else {
+        if (!currentPassword) {
+          setServerError('Ingresa tu contraseña temporal actual.');
+          return;
+        }
+        await changeInitialPassword(currentPassword, newPass);
+      }
+      router.push('/explore');
+    } catch (error: any) {
+      setServerError(error?.message || 'No se pudo actualizar la contraseña.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -28,12 +54,23 @@ export default function NewPasswordScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ThemedText type="title">Nueva Contraseña</ThemedText>
         <ThemedText type="small" style={{ marginTop: 6 }}>
-          Ingresa el código y tu nueva contraseña
+          {mode === 'reset'
+            ? 'Ingresa el token recibido por correo y define tu nueva contraseña.'
+            : 'Ingresa tu contraseña temporal actual y define una contraseña definitiva.'}
         </ThemedText>
 
         <View style={{ width: '100%', marginTop: Spacing.four }}>
-          <ThemedText style={styles.label}>Código de Verificación</ThemedText>
-          <TextInput value={code} onChangeText={setCode} placeholder="000000" style={styles.input} />
+          {mode === 'reset' ? (
+            <>
+              <ThemedText style={styles.label}>Token de Restablecimiento</ThemedText>
+              <TextInput value={token} onChangeText={setToken} placeholder="token de un solo uso" style={styles.input} autoCapitalize="none" />
+            </>
+          ) : (
+            <>
+              <ThemedText style={styles.label}>Contraseña Temporal Actual</ThemedText>
+              <TextInput value={currentPassword} onChangeText={setCurrentPassword} placeholder="Contraseña temporal" secureTextEntry style={styles.input} />
+            </>
+          )}
 
           <ThemedText style={styles.label}>Nueva Contraseña</ThemedText>
           <TextInput value={newPass} onChangeText={setNewPass} placeholder="Mínimo 8 caracteres" secureTextEntry style={styles.input} />
@@ -41,8 +78,17 @@ export default function NewPasswordScreen() {
           <ThemedText style={styles.label}>Confirmar Contraseña</ThemedText>
           <TextInput value={confirmPass} onChangeText={setConfirmPass} placeholder="Repite tu contraseña" secureTextEntry style={styles.input} />
 
-          <Pressable style={styles.primaryButton} onPress={onReset}>
-            <ThemedText type="default" style={styles.primaryButtonText}>Restablecer Contraseña</ThemedText>
+          {serverError ? (
+            <View style={styles.errorBanner}>
+              <ThemedText style={styles.errorBannerTitle}>Error</ThemedText>
+              <ThemedText>{serverError}</ThemedText>
+            </View>
+          ) : null}
+
+          <Pressable style={styles.primaryButton} onPress={onReset} disabled={loading}>
+            <ThemedText type="default" style={styles.primaryButtonText}>
+              {loading ? 'Enviando...' : 'Restablecer Contraseña'}
+            </ThemedText>
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={() => router.push('/')}>
@@ -62,4 +108,6 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: '#F47B1F', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginBottom: Spacing.two },
   primaryButtonText: { color: '#fff' },
   secondaryButton: { backgroundColor: '#F6F6F6', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  errorBanner: { backgroundColor: '#FFECEC', borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: '#E74C3C', marginBottom: Spacing.three },
+  errorBannerTitle: { fontWeight: '700', marginBottom: 6, color: '#C0392B' },
 });

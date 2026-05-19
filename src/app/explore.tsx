@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -19,6 +20,7 @@ export default function TabTwoScreen() {
     bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
   };
   const theme = useTheme();
+  const router = useRouter();
 
   const contentPlatformStyle = Platform.select({
     android: {
@@ -44,6 +46,16 @@ export default function TabTwoScreen() {
           <ThemedText style={styles.centerText} themeColor="textSecondary">
             This starter app includes example{'\n'}code to help you get started.
           </ThemedText>
+
+          <Pressable style={[styles.primaryButton, { backgroundColor: theme.primary }]} onPress={() => router.push('/post-article')}>
+            <ThemedText type="default" style={styles.primaryButtonText}>
+              Postular Artículo
+            </ThemedText>
+          </Pressable>
+
+          <Pressable style={[styles.secondaryButton, { borderColor: theme.backgroundSelected }]} onPress={() => router.push('/payment-methods')}>
+            <ThemedText>Métodos de Pago</ThemedText>
+          </Pressable>
 
           <ExternalLink href="https://docs.expo.dev" asChild>
             <Pressable style={({ pressed }) => pressed && styles.pressed}>
@@ -149,6 +161,25 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  primaryButton: {
+    marginTop: Spacing.four,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.four,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: '#fff',
+  },
+  secondaryButton: {
+    marginTop: Spacing.two,
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
   },
   linkButton: {
     flexDirection: 'row',
