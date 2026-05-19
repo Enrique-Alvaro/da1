@@ -6,6 +6,7 @@ import { sectoresRoutes } from "../modules/sectores/sectores.routes";
 import { empleadosRoutes } from "../modules/empleados/empleados.routes";
 import { subastasRoutes } from "../modules/subastas/subastas.routes";
 import { productosRoutes } from "../modules/productos/productos.routes";
+import { adminRoutes } from "../modules/admin/admin.routes";
 
 export const apiRouter = Router();
 
@@ -16,3 +17,4 @@ apiRouter.use("/sectores", sectoresRoutes);
 apiRouter.use("/empleados", empleadosRoutes);
 apiRouter.use("/subastas", subastasRoutes);
 apiRouter.use("/productos", productosRoutes);
+apiRouter.use("/admin", adminRoutes);

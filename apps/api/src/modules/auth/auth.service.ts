@@ -1,18 +1,25 @@
 import * as authRepository from "./auth.repository";
 import type { ForgotPasswordBodyInput, LoginBodyInput, RegisterBodyInput, ResetPasswordBodyInput } from "./auth.schemas";
 import { hashPassword, verifyPassword, generateTemporaryPassword } from "../../shared/security/passwords";
-import { buildLoginTokenPayload, signAccessToken, verifyAccessToken } from "../../shared/security/jwt";
+import {
+  buildEmployeeTokenPayload,
+  buildLoginTokenPayload,
+  signAccessToken,
+  verifyAccessToken,
+} from "../../shared/security/jwt";
 import { sendTemporaryPasswordEmail } from "../../shared/email/email.service";
 import { mapCredentialLoginRowToUserPublic } from "../users/user.mapper";
 import type { UserPublic } from "../users/user.mapper";
 import type { AuthUserContext } from "../../shared/types/auth";
 import * as usersRepository from "../users/users.repository";
 import { mapPersonaClienteToUserPublic } from "../users/user.mapper";
+import { getEmployeeAdminCredentials } from "../../config/env";
 import {
   ConflictError,
   NotImplementedError,
   UnauthorizedError,
 } from "../../shared/errors/httpErrors";
+import * as submissionsRepository from "../productos/productos-submissions.repository";
 
 export type RegisterSuccessUser = {
   id: number;
@@ -237,4 +244,30 @@ export async function resetPassword(_input: ResetPasswordBodyInput): Promise<Log
   throw new NotImplementedError(
     "El restablecimiento de contraseña por token no está disponible en esta versión."
   );
+}
+
+export type EmployeeLoginResult = {
+  accessToken: string;
+  employeeId: number;
+  email: string;
+};
+
+export async function loginEmployee(email: string, password: string): Promise<EmployeeLoginResult> {
+  const creds = getEmployeeAdminCredentials();
+  if (!creds) {
+    throw new UnauthorizedError("Login de empleado no configurado.");
+  }
+  if (email.trim().toLowerCase() !== creds.email || password !== creds.password) {
+    throw new UnauthorizedError("Credenciales inválidas.");
+  }
+  await submissionsRepository.assertEmployeeExists(creds.employeeId);
+  const payload = buildEmployeeTokenPayload({
+    employeeId: creds.employeeId,
+    email: creds.email,
+  });
+  return {
+    accessToken: signAccessToken(payload),
+    employeeId: creds.employeeId,
+    email: creds.email,
+  };
 }

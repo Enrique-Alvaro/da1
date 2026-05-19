@@ -9,11 +9,13 @@ import {
   register,
   resetPassword,
 } from "./auth.controller";
+import { employeeLogin } from "./auth-employee.controller";
 
 export const authRoutes = Router();
 
 authRoutes.post("/register", register);
 authRoutes.post("/login", login);
+authRoutes.post("/employee/login", employeeLogin);
 authRoutes.post("/change-initial-password", changeInitialPassword);
 authRoutes.post("/forgot-password", forgotPassword);
 authRoutes.post("/reset-password", resetPassword);

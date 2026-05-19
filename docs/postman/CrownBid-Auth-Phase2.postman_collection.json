@@ -3,7 +3,7 @@
     "_postman_id": "9d484e9d-95be-4ca3-ae0f-95f8aa22d7a0",
     "name": "CrownBid API (Auth + Domain)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "CrownBid API — Auth + **tablas de dominio** (`/api/paises`, `/api/sectores`, lectura `empleados`, `subastas`, `productos`). Auth-2: **personas + clientes + cliente_credenciales**, JWT **stateless** (sin `revoked_tokens`), logout **204 sin escritura en BD**.\n\n**Antes de probar:** ejecutar `database/cliente_credenciales.sql` en SQL Server; datos mínimos en `paises` (p. ej. `countryId` 1); SMTP o modo dev (mock en consola con contraseña temporal).\n\n**Variables:**\n- `registerEmail` / `loginEmail`: mismo usuario.\n- `registerDocumentNumber`: documento único por corrida (cambiar si ya existe).\n- `temporaryPassword`: tras registro, correo o log `[email mock]` en dev.\n- `newPassword`: ≥8 caracteres, al menos **una mayúscula** y **una minúscula** (dígito opcional).\n- Dominio: `paisNumero`, `paisNumeroNuevo`, `sectorId`, `empleadoId`, `subastaId`, `productoId` (ajustar según tu BD).\n\n**Orden sugerido:** Register success → … → Login after change → **Domain tables** (Bearer `accessToken`) → Users me → Logout.\n\n**Deshabilitado (501):** forgot-password, reset-password (ítems al final)."
+    "description": "CrownBid API — Auth, dominio SQL, **envío de productos** y **revisión empleado** (sin cambios de esquema).\n\n**Antes de probar:**\n1. `database/cliente_credenciales.sql` + `database/seed_registro_cliente_fk.sql`\n2. En `apps/api/.env`: `DEFAULT_REVIEWER_EMPLOYEE_ID=1` y credenciales `EMPLOYEE_ADMIN_*` (ver `.env.example`)\n3. Reiniciar la API\n\n**Cliente:** Register → Login first login → Change password → Login after change → `accessToken`\n\n**Empleado:** `POST /api/auth/employee/login` → `employeeAccessToken` (no usa tabla de credenciales; valida contra `.env`)\n\n**Envíos:** Tras login cliente → POST `/api/productos/submissions` (6 imágenes) → empleado aprueba → opcional PATCH auction-assignment\n\n**Variables clave:** `submissionId`, `submissionPhotoId`, `employeeAccessToken`, `productoId` (aprobado en catálogo público)\n\n**Deshabilitado (501):** forgot-password, reset-password"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000" },
@@ -19,7 +19,15 @@
     { "key": "sectorId", "value": "1", "description": "sectores.identificador para GET" },
     { "key": "empleadoId", "value": "1", "description": "empleados.identificador (seed registro)" },
     { "key": "subastaId", "value": "1", "description": "subastas.identificador si existe tabla" },
-    { "key": "productoId", "value": "1", "description": "productos.identificador si existe tabla" }
+    { "key": "productoId", "value": "1", "description": "productos.identificador aprobado (disponible=si)" },
+    { "key": "employeeAdminEmail", "value": "admin@crownbid.local", "description": "Debe coincidir con EMPLOYEE_ADMIN_EMAIL en .env" },
+    { "key": "employeeAdminPassword", "value": "EmpleadoAdmin2026!", "description": "Debe coincidir con EMPLOYEE_ADMIN_PASSWORD en .env" },
+    { "key": "employeeAccessToken", "value": "", "description": "JWT empleado (role empleado); se setea en Employee login" },
+    { "key": "submissionId", "value": "", "description": "ID producto/envío; se setea en POST submissions" },
+    { "key": "submissionPhotoId", "value": "", "description": "fotos.identificador; primera foto del detalle" },
+    { "key": "catalogId", "value": "", "description": "catalogos.identificador para PATCH assignment (opcional)" },
+    { "key": "precioBase", "value": "1500", "description": "itemsCatalogo.precioBase (> 0.01)" },
+    { "key": "comision", "value": "150", "description": "itemsCatalogo.comision (> 0.01)" }
   ],
   "item": [
     {
@@ -1060,7 +1068,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "productos"]
             },
-            "description": "Solo lectura. Si la tabla no existe → 500."
+            "description": "Solo productos con `disponible = si` (aprobados). Envíos pendientes no aparecen aquí."
           },
           "event": [
             {
@@ -1097,6 +1105,461 @@
                 "exec": [
                   "pm.test(\"Status 200 o 404 o 500\", function () {",
                   "  pm.expect([200, 404, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Empleado (auth env)",
+      "description": "Login TPO: credenciales en `apps/api/.env` (`EMPLOYEE_ADMIN_EMAIL`, `EMPLOYEE_ADMIN_PASSWORD`, `EMPLOYEE_ADMIN_ID`). Requiere fila en `dbo.empleados` (seed id=1).",
+      "item": [
+        {
+          "name": "Employee login - success (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employeeAdminEmail}}\",\n  \"password\": \"{{employeeAdminPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/employee/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "employee", "login"]
+            },
+            "description": "Usuario empleado generado por configuración (no hay tabla de credenciales de empleado).\n\n**.env ejemplo:**\n```\nEMPLOYEE_ADMIN_EMAIL=admin@crownbid.local\nEMPLOYEE_ADMIN_PASSWORD=EmpleadoAdmin2026!\nEMPLOYEE_ADMIN_ID=1\nDEFAULT_REVIEWER_EMPLOYEE_ID=1\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test(\"empleado en respuesta\", function () {",
+                  "  pm.expect(body.role).to.eql(\"empleado\");",
+                  "  pm.expect(body).to.have.property(\"employeeId\");",
+                  "  pm.expect(body).to.have.property(\"accessToken\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 && body.accessToken) {",
+                  "  pm.collectionVariables.set(\"employeeAccessToken\", body.accessToken);",
+                  "  if (body.employeeId) {",
+                  "    pm.collectionVariables.set(\"empleadoId\", String(body.employeeId));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Employee login - invalid credentials (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employeeAdminEmail}}\",\n  \"password\": \"wrong-password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/employee/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "employee", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Envío de productos (cliente)",
+      "description": "Requiere `accessToken` de cliente con contraseña definitiva. `DEFAULT_REVIEWER_EMPLOYEE_ID` en .env.",
+      "item": [
+        {
+          "name": "POST submission - create (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"catalogDescription\": \"Reloj vintage Postman\",\n  \"fullDescriptionUrl\": \"https://example.com/docs/reloj-postman.pdf\",\n  \"images\": [\n    { \"filename\": \"1.jpg\", \"mimeType\": \"image/jpeg\", \"base64\": \"/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\" },\n    { \"filename\": \"2.jpg\", \"mimeType\": \"image/jpeg\", \"base64\": \"/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\" },\n    { \"filename\": \"3.jpg\", \"mimeType\": \"image/jpeg\", \"base64\": \"/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\" },\n    { \"filename\": \"4.jpg\", \"mimeType\": \"image/jpeg\", \"base64\": \"/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\" },\n    { \"filename\": \"5.jpg\", \"mimeType\": \"image/jpeg\", \"base64\": \"/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\" },\n    { \"filename\": \"6.jpg\", \"mimeType\": \"image/jpeg\", \"base64\": \"/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\" }\n  ],\n  \"declarations\": {\n    \"legitimateOwner\": true,\n    \"noLegalRestrictions\": true,\n    \"acceptsDocumentationRequest\": true,\n    \"acceptsReturnCostsIfRejected\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/submissions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos", "submissions"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 201 && body.id) {",
+                  "  pm.collectionVariables.set(\"submissionId\", String(body.id));",
+                  "  pm.collectionVariables.set(\"productoId\", String(body.id));",
+                  "  if (body.photos && body.photos.length > 0) {",
+                  "    pm.collectionVariables.set(\"submissionPhotoId\", String(body.photos[0].id));",
+                  "  }",
+                  "}",
+                  "",
+                  "pm.test(\"pendiente de revisión\", function () {",
+                  "  pm.expect(body.status).to.eql(\"pending_review\");",
+                  "  pm.expect(body.available).to.eql(\"no\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET my item-submissions - list (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/item-submissions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me", "item-submissions"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"items array\", function () {",
+                  "  pm.expect(body).to.have.property(\"items\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET my item-submission - detail (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/item-submissions/{{submissionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me", "item-submissions", "{{submissionId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.photos && body.photos.length > 0) {",
+                  "  pm.collectionVariables.set(\"submissionPhotoId\", String(body.photos[0].id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET my submission photo (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/item-submissions/{{submissionId}}/photos/{{submissionPhotoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me", "item-submissions", "{{submissionId}}", "photos", "{{submissionPhotoId}}"]
+            },
+            "description": "Respuesta binaria (`application/octet-stream`)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE my item-submission - cancel (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/item-submissions/{{submissionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me", "item-submissions", "{{submissionId}}"]
+            },
+            "description": "Solo si `disponible=no`, sin catálogo, sin seguro. Ejecutar al final si querés limpiar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET producto público pendiente - hidden (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/productos/{{submissionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "productos", "{{submissionId}}"]
+            },
+            "description": "Envío pendiente no debe ser visible en GET /api/productos/:id"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404 para pendiente\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin productos (empleado)",
+      "description": "Bearer `{{employeeAccessToken}}`. Ejecutar **Employee login** antes.",
+      "item": [
+        {
+          "name": "GET revision queue (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/productos/revision",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "productos", "revision"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST decision - approve (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/productos/{{submissionId}}/decision",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "productos", "{{submissionId}}", "decision"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"aprobado\", function () {",
+                  "  pm.expect(body.decisionApplied).to.eql(\"approved\");",
+                  "  pm.expect(body.available).to.eql(\"si\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST decision - reject (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"reject\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/productos/{{submissionId}}/decision",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "productos", "{{submissionId}}", "decision"]
+            },
+            "description": "Usar en otro envío (no después de approve). Incluye `limitations` honestas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test(\"not_approved con limitations\", function () {",
+                  "  pm.expect(body.decisionApplied).to.eql(\"not_approved\");",
+                  "  pm.expect(body.limitations).to.have.property(\"rejectionNotPersisted\", true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH auction-assignment - new catalog (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subastaId\": {{subastaId}},\n  \"catalogDescription\": \"Catálogo Postman TPO\",\n  \"precioBase\": {{precioBase}},\n  \"comision\": {{comision}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/productos/{{submissionId}}/auction-assignment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "productos", "{{submissionId}}", "auction-assignment"]
+            },
+            "description": "Requiere producto aprobado y `subastaId` válido en BD (fecha > hoy+10 días según schema)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 o 404 subasta\", function () {",
+                  "  pm.expect([200, 404, 409, 422, 500]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"programado\", function () {",
+                  "    pm.expect(body.status).to.eql(\"scheduled\");",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - cliente token forbidden (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/productos/revision",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "productos", "revision"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () {",
+                  "  pm.response.to.have.status(403);",
                   "});"
                 ]
               }
