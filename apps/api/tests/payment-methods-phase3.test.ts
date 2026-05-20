@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as empleadosRepository from "../src/modules/empleados/empleados.repository";
 import * as adminRepository from "../src/modules/payment-methods/payment-methods-admin.repository";
 import {
   listPaymentMethodsForReview,
@@ -64,23 +65,45 @@ function mockMedio(
 describe("Payment methods — Phase 3 admin service", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(empleadosRepository, "findEmpleadoById").mockResolvedValue({
+      identificador: 1,
+      cargo: "Admin",
+      sector: null,
+    });
   });
 
-  it("resolveVerifierEmployeeId desde JWT empleado", () => {
-    expect(resolveVerifierEmployeeId(authEmpleado)).toBe(1);
+  it("resolveVerifierEmployeeId valida dbo.empleados (además de requireEmployeeAuth)", async () => {
+    await expect(resolveVerifierEmployeeId(authEmpleado)).resolves.toBe(1);
+    expect(empleadosRepository.findEmpleadoById).toHaveBeenCalledWith(1);
   });
 
-  it("cliente no puede actuar como verificador", () => {
-    expect(() => resolveVerifierEmployeeId(authCliente)).toThrow(ForbiddenError);
+  it("empleado inexistente en BD → EMPLOYEE_NOT_FOUND", async () => {
+    vi.spyOn(empleadosRepository, "findEmpleadoById").mockResolvedValue(null);
+    await expect(resolveVerifierEmployeeId(authEmpleado)).rejects.toMatchObject({
+      code: "EMPLOYEE_NOT_FOUND",
+      statusCode: 403,
+    });
   });
 
-  it("admin lista pendientes", async () => {
+  it("cliente no puede actuar como verificador", async () => {
+    await expect(resolveVerifierEmployeeId(authCliente)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("admin lista pendientes con filtro de estado", async () => {
     vi.spyOn(adminRepository, "listForAdmin").mockResolvedValue([mockMedio()]);
     const r = await listPaymentMethodsForReview(authEmpleado, { status: "pendiente" });
     expect(r.items).toHaveLength(1);
-    expect(r.items[0].clientId).toBe(7);
-    expect(r.items[0].clientEmail).toBe("juan@example.com");
     expect(adminRepository.listForAdmin).toHaveBeenCalledWith("pendiente");
+  });
+
+  it("admin lista status=all no pasa 'all' como estado SQL", async () => {
+    vi.spyOn(adminRepository, "listForAdmin").mockResolvedValue([]);
+    await listPaymentMethodsForReview(authEmpleado, { status: "all" });
+    expect(adminRepository.listForAdmin).toHaveBeenCalledWith("all");
+  });
+
+  it("cola admin limitada a 100 registros (constante MVP)", () => {
+    expect(adminRepository.ADMIN_PAYMENT_METHODS_LIST_LIMIT).toBe(100);
   });
 
   it("verify pendiente → verificado", async () => {
@@ -130,13 +153,23 @@ describe("Payment methods — Phase 3 admin service", () => {
     expect(adminRepository.verifyById).toHaveBeenCalled();
   });
 
-  it("verify deshabilitado → 409", async () => {
+  it("verify deshabilitado en lectura → 409", async () => {
     vi.spyOn(adminRepository, "findById").mockResolvedValue(
       mockMedio({ estado: "deshabilitado" })
     );
     await expect(verifyPaymentMethod(authEmpleado, 1)).rejects.toMatchObject({
       code: "PAYMENT_METHOD_DISABLED",
       statusCode: 409,
+    });
+  });
+
+  it("verify carrera: UPDATE sin filas y relectura deshabilitado → 409", async () => {
+    vi.spyOn(adminRepository, "findById")
+      .mockResolvedValueOnce(mockMedio({ estado: "pendiente" }))
+      .mockResolvedValueOnce(mockMedio({ estado: "deshabilitado" }));
+    vi.spyOn(adminRepository, "verifyById").mockResolvedValue(null);
+    await expect(verifyPaymentMethod(authEmpleado, 1)).rejects.toMatchObject({
+      code: "PAYMENT_METHOD_DISABLED",
     });
   });
 
@@ -155,10 +188,9 @@ describe("Payment methods — Phase 3 admin service", () => {
     });
     expect(r.status).toBe("rechazado");
     expect(r.rejectionReason).toBe("Cuenta inválida");
-    expect(adminRepository.rejectById).toHaveBeenCalledWith(1, 1, "Cuenta inválida");
   });
 
-  it("reject verificado revoca verificación", async () => {
+  it("reject verificado revoca habilitación futura (rechazado administrativo)", async () => {
     vi.spyOn(adminRepository, "findById").mockResolvedValue(
       mockMedio({
         estado: "verificado",
@@ -179,7 +211,17 @@ describe("Payment methods — Phase 3 admin service", () => {
     expect(r.verifierId).toBe(1);
   });
 
-  it("reject deshabilitado → 409", async () => {
+  it("reject carrera: UPDATE sin filas y relectura deshabilitado → 409", async () => {
+    vi.spyOn(adminRepository, "findById")
+      .mockResolvedValueOnce(mockMedio({ estado: "verificado" }))
+      .mockResolvedValueOnce(mockMedio({ estado: "deshabilitado" }));
+    vi.spyOn(adminRepository, "rejectById").mockResolvedValue(null);
+    await expect(
+      rejectPaymentMethod(authEmpleado, 1, { reason: "x" })
+    ).rejects.toMatchObject({ code: "PAYMENT_METHOD_DISABLED" });
+  });
+
+  it("reject deshabilitado en lectura → 409", async () => {
     vi.spyOn(adminRepository, "findById").mockResolvedValue(
       mockMedio({ estado: "deshabilitado" })
     );

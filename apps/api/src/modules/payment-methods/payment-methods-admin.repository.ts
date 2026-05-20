@@ -1,7 +1,13 @@
 import sql from "mssql";
 import { getSqlPool } from "../../db/sqlServer";
 import type { MedioPagoRow } from "./payment-methods.repository";
-import type { PaymentMethodStatusFilter } from "./payment-methods-admin.schema";
+import type {
+  PaymentMethodStatus,
+  PaymentMethodStatusFilter,
+} from "./payment-methods-admin.schema";
+
+/** Límite MVP de la cola de revisión admin (sin paginación). */
+export const ADMIN_PAYMENT_METHODS_LIST_LIMIT = 100;
 
 export type MedioPagoAdminListRow = MedioPagoRow & {
   client_name: string;
@@ -35,12 +41,13 @@ export async function listForAdmin(
 
   let whereClause = "";
   if (status !== "all") {
-    request.input("estado", sql.VarChar(20), status);
+    const dbStatus = status as PaymentMethodStatus;
+    request.input("estado", sql.VarChar(20), dbStatus);
     whereClause = "WHERE mp.estado = @estado";
   }
 
   const result = await request.query<MedioPagoAdminListRow>(`
-    SELECT
+    SELECT TOP (${ADMIN_PAYMENT_METHODS_LIST_LIMIT})
       ${MP_SELECT},
       p.nombre AS client_name,
       cc.email AS client_email
@@ -101,7 +108,7 @@ export async function verifyById(
         actualizadoEn = SYSUTCDATETIME(),
         motivoRechazo = NULL
       OUTPUT INSERTED.*
-      WHERE identificador = @id
+      WHERE identificador = @id AND estado <> 'deshabilitado'
     `);
   return result.recordset[0] ?? null;
 }
@@ -126,7 +133,7 @@ export async function rejectById(
         verificadoEn = NULL,
         actualizadoEn = SYSUTCDATETIME()
       OUTPUT INSERTED.*
-      WHERE identificador = @id
+      WHERE identificador = @id AND estado <> 'deshabilitado'
     `);
   return result.recordset[0] ?? null;
 }

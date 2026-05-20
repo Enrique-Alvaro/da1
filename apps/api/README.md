@@ -77,11 +77,17 @@ Requiere `POST /api/auth/employee/login` → token con `role: empleado` y `emplo
 
 | Método | Ruta | Rol |
 |--------|------|-----|
-| GET | `/api/admin/payment-methods?status=pendiente` | Empleado — cola de revisión (default `pendiente`) |
+| GET | `/api/admin/payment-methods?status=pendiente` | Empleado — cola de revisión (default `pendiente`, máx. **100** ítems, sin paginación) |
 | PATCH | `/api/admin/payment-methods/:id/verify` | Empleado — `estado = verificado` |
 | PATCH | `/api/admin/payment-methods/:id/reject` | Empleado — body `{ "reason": "..." }` |
 
-**Notas:** el cliente no puede verificar sus propios medios. La habilitación para **pujar** (medio verificado + `admitido=si`) es **Fase 4**.
+**Notas:** el cliente no puede verificar sus propios medios. El servicio revalida `dbo.empleados` por `employeeId` del JWT (además de `requireEmployeeAuth`).
+
+**Revocación administrativa:** un empleado puede rechazar un medio ya **verificado** (`verificado` → `rechazado`). Ese medio deja de habilitar pujas futuras; **no** altera operaciones históricas ya registradas.
+
+**Carrera con `deshabilitado`:** verify/reject en SQL exigen `estado <> 'deshabilitado'`; si el cliente deshabilita entre lectura y UPDATE, la API responde 409 `PAYMENT_METHOD_DISABLED`.
+
+La habilitación para **pujar** (medio verificado + `admitido=si`) es **Fase 4**.
 
 **Endpoints previstos fuera de esta fase:** pujas con guard, métricas, etc.
 

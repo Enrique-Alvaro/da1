@@ -10,11 +10,17 @@ export const PAYMENT_METHOD_STATUSES = [
   "deshabilitado",
 ] as const;
 
-export type PaymentMethodStatusFilter = (typeof PAYMENT_METHOD_STATUSES)[number] | "all";
+/** Valores persistidos en dbo.mediosPago.estado. */
+export type PaymentMethodStatus = (typeof PAYMENT_METHOD_STATUSES)[number];
+
+/** Filtro de listado admin; "all" no es un estado de BD. */
+export type PaymentMethodStatusFilter = PaymentMethodStatus | "all";
+
+const STATUS_FILTER_VALUES = [...PAYMENT_METHOD_STATUSES, "all"] as const;
 
 export const adminPaymentMethodListQuerySchema = z.object({
   status: z
-    .enum([...PAYMENT_METHOD_STATUSES, "all"])
+    .enum(STATUS_FILTER_VALUES)
     .optional()
     .default("pendiente"),
 });
