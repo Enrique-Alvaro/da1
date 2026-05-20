@@ -1,4 +1,4 @@
-import { useRouter, useSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { changeInitialPassword, resetPassword } from '@/services/api';
 
 export default function NewPasswordScreen() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useLocalSearchParams<{ mode?: string }>();
   const mode = searchParams.mode === 'reset' ? 'reset' : 'initial';
   const [currentPassword, setCurrentPassword] = useState('');
   const [token, setToken] = useState('');

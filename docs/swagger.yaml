@@ -41,7 +41,11 @@ tags:
   - name: User Activity
     description: Tracing of the user's historical actions (bids, wins)
   - name: Payment Methods
-    description: CRUD for payment alternatives
+    description: Client payment methods (Fases 2–4; mounted under /api)
+  - name: Admin Payment Methods
+    description: Employee verification queue (Fase 3)
+  - name: Auction Bids
+    description: Assistant registration and bids (Fase 4)
   - name: Item Submissions
     description: Module for clients to offer their belongings for future auctions
   - name: Domain tables
@@ -676,29 +680,29 @@ paths:
           $ref: '#/components/responses/Unauthorized'
 
   # ──────────────────────────────────────────────
-  # PAYMENT METHODS
+  # PAYMENT METHODS (Fases 2–4 — /api/users/me/...)
   # ──────────────────────────────────────────────
   /users/me/payment-methods:
     get:
       tags: [Payment Methods]
-      summary: List user's payment methods
+      summary: List my payment methods
+      description: Requires access token and operational client password. Does not require admitido=si.
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: List of connected payment sources
+          description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PaymentMethod'
+                $ref: '#/components/schemas/PaymentMethodListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
-          
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       tags: [Payment Methods]
-      summary: Create a newly registered payment method
+      summary: Register payment method (starts as pendiente)
       security:
         - BearerAuth: []
       requestBody:
@@ -709,60 +713,176 @@ paths:
               $ref: '#/components/schemas/CreatePaymentMethodRequest'
       responses:
         '201':
-          description: Payment method securely preserved
+          description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaymentMethod'
+                $ref: '#/components/schemas/CreatePaymentMethodResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
-  /users/me/payment-methods/{paymentMethodId}:
-    put:
+  /users/me/payment-methods/{id}/disable:
+    patch:
       tags: [Payment Methods]
-      summary: Update payment method details
+      summary: Disable own payment method
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/PaymentMethodIdParam'
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '200':
+          description: Disabled (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisablePaymentMethodResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/payment-methods:
+    get:
+      tags: [Admin Payment Methods]
+      summary: List payment methods for employee review
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pendiente, verificado, rechazado, deshabilitado, all]
+            default: pendiente
+      responses:
+        '200':
+          description: OK (max 100 items)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPaymentMethodListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/payment-methods/{id}/verify:
+    patch:
+      tags: [Admin Payment Methods]
+      summary: Verify payment method
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      responses:
+        '200':
+          description: Verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethodVerifyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /admin/payment-methods/{id}/reject:
+    patch:
+      tags: [Admin Payment Methods]
+      summary: Reject or revoke payment method
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdatePaymentMethodRequest'
+              $ref: '#/components/schemas/RejectPaymentMethodRequest'
       responses:
         '200':
-          description: Payload successfully applied
+          description: Rejected
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaymentMethod'
+                $ref: '#/components/schemas/PaymentMethodRejectResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-          
-    delete:
-      tags: [Payment Methods]
-      summary: Disconnect a payment method
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /subastas/{id}/asistentes:
+    post:
+      tags: [Auction Bids]
+      summary: Register as auction assistant (bidder)
+      description: Option A — required before bidding. Validates client category >= auction category.
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/PaymentMethodIdParam'
+        - $ref: '#/components/parameters/IntIdParam'
       responses:
-        '204':
-          description: Hard or soft deleted successfully
+        '201':
+          description: Registered (idempotent if already registered)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterAsistenteResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /subastas/{id}/pujos:
+    post:
+      tags: [Auction Bids]
+      summary: Place a bid
+      description: |
+        Requires admitted client, prior assistant registration, verified payment method,
+        matching auction currency, and valid bid amount. itemId is itemsCatalogo.identificador.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IntIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBidRequest'
+      responses:
+        '201':
+          description: Bid placed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBidResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   # ──────────────────────────────────────────────
   # ITEM SUBMISSIONS
@@ -917,13 +1037,17 @@ components:
       properties:
         error:
           type: string
-          example: "InvalidBidAmountError"
+          example: "ConflictError"
         message:
           type: string
-          example: "The bid amount must be strictly greater than the current bid."
+          example: "El medio de pago está pendiente de verificación."
         statusCode:
           type: integer
           example: 409
+        code:
+          type: string
+          nullable: true
+          example: "PAYMENT_METHOD_PENDING_VERIFICATION"
 
     ErrorValidationResponse:
       type: object
@@ -1330,12 +1454,20 @@ components:
 
     CreateBidRequest:
       type: object
-      required: [amount]
+      required: [itemId, amount, paymentMethodId]
       properties:
+        itemId:
+          type: integer
+          minimum: 1
+          description: dbo.itemsCatalogo.identificador (not productos.identificador)
         amount:
           type: number
-          format: float
-          description: Must be strictly larger than currentBid.
+          format: double
+          minimum: 0.01
+        paymentMethodId:
+          type: integer
+          minimum: 1
+          description: Client-owned verified medio de pago
 
     Bid:
       type: object
@@ -1368,52 +1500,132 @@ components:
           items:
             $ref: '#/components/schemas/Bid'
 
-    PaymentMethod:
+    PaymentMethodPublic:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        type:
-          $ref: '#/components/schemas/PaymentMethodType'
-        displayName:
-          type: string
-          example: "Visa ending in 4432"
-        lastFour:
-          type: string
-        bankName:
-          type: string
-        holderName:
-          type: string
-        verified:
-          type: boolean
-          description: Users need evaluated payment methods to participate safely.
-        status:
-          type: string
-          enum: [active, inactive]
+        id: { type: integer }
+        type: { type: string, description: tipo (cuenta_bancaria, tarjeta_credito, cheque_certificado, ...) }
+        status: { type: string, enum: [pendiente, verificado, rechazado, deshabilitado] }
+        currency: { type: string, enum: [ARS, USD] }
+        holder: { type: string }
+        entity: { type: string, nullable: true }
+        lastDigits: { type: string, nullable: true }
+        aliasOrCbu: { type: string, nullable: true }
+        guaranteeAmount: { type: number, nullable: true }
+        availableAmount: { type: number, nullable: true }
+        rejectionReason: { type: string, nullable: true }
+        verifiedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    PaymentMethodListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentMethodPublic'
 
     CreatePaymentMethodRequest:
       type: object
-      required: [type, holderName, details]
+      required: [tipo, moneda, titular]
       properties:
-        type:
-          $ref: '#/components/schemas/PaymentMethodType'
-        holderName:
+        tipo:
           type: string
-        bankName:
+          enum: [cuenta_bancaria, cuenta_bancaria_extranjera, tarjeta_credito, tarjeta_credito_extranjera, cheque_certificado]
+        moneda:
           type: string
-        details:
-          type: object
-          description: Raw attributes to attach provider payload securely.
+          enum: [ARS, USD]
+        titular:
+          type: string
+        entidad:
+          type: string
+          nullable: true
+        ultimosDigitos:
+          type: string
+          description: Exactly 4 digits for cards
+        aliasOCbu:
+          type: string
+          nullable: true
+        montoGarantia:
+          type: number
+          description: Required for cheque_certificado
 
-    UpdatePaymentMethodRequest:
+    CreatePaymentMethodResponse:
       type: object
       properties:
-        holderName:
+        id: { type: integer }
+        type: { type: string }
+        status: { type: string }
+        message: { type: string }
+
+    DisablePaymentMethodResponse:
+      type: object
+      properties:
+        id: { type: integer }
+        status: { type: string }
+
+    AdminPaymentMethodItem:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodPublic'
+        - type: object
+          properties:
+            clientId: { type: integer }
+            clientName: { type: string }
+            clientEmail: { type: string, nullable: true }
+            verifierId: { type: integer, nullable: true }
+
+    AdminPaymentMethodListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminPaymentMethodItem'
+
+    RejectPaymentMethodRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
           type: string
-        status:
-          type: string
-          enum: [active, inactive]
+          minLength: 1
+          maxLength: 500
+
+    PaymentMethodVerifyResponse:
+      type: object
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        verifierId: { type: integer, nullable: true }
+        verifiedAt: { type: string, format: date-time, nullable: true }
+
+    PaymentMethodRejectResponse:
+      type: object
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        rejectionReason: { type: string, nullable: true }
+        verifierId: { type: integer, nullable: true }
+
+    RegisterAsistenteResponse:
+      type: object
+      properties:
+        id: { type: integer }
+        auctionId: { type: integer }
+        clientId: { type: integer }
+        bidderNumber: { type: integer }
+
+    CreateBidResponse:
+      type: object
+      properties:
+        id: { type: integer }
+        auctionId: { type: integer }
+        itemId: { type: integer }
+        amount: { type: number }
+        assistantId: { type: integer }
+        paymentMethodId: { type: integer }
+        winner: { type: string, example: "no" }
 
     ItemSubmission:
       type: object

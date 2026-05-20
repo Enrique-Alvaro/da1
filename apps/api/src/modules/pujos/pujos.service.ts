@@ -4,7 +4,6 @@ import {
   isPremiumAuctionCategory,
   parseCategoryRank,
 } from "../../shared/domain/auction-categories";
-import { isPaymentCurrencyCompatibleWithAuction } from "../../shared/domain/payment-currency";
 import {
   ConflictError,
   ForbiddenError,
@@ -13,6 +12,7 @@ import {
   UnauthorizedError,
 } from "../../shared/errors/httpErrors";
 import { findByIdAndCliente } from "../payment-methods/payment-methods.repository";
+import type { MedioPagoRow } from "../payment-methods/payment-methods.repository";
 import {
   requireSubastaById,
   SUBASTA_ESTADO_ABIERTA,
@@ -20,18 +20,17 @@ import {
 } from "../subastas/subastas.repository";
 import { findClienteByPersonId } from "../users/users.repository";
 import type { CreateBidBody } from "./pujos.schema";
+import { assertPaymentMethodForBid } from "./pujos-payment-validation";
 import {
   countAsistentesBySubasta,
   findAsistenteByClienteAndSubasta,
   findItemInSubasta,
-  getNextNumeroPostor,
   getMaxBidForItem,
-  insertAsistente,
+  insertAsistenteInTransaction,
   insertBidInTransaction,
   type AsistenteRow,
   type ItemEnSubastaRow,
 } from "./pujos.repository";
-import type { MedioPagoRow } from "../payment-methods/payment-methods.repository";
 
 export type AssertCanBidResult = {
   clienteId: number;
@@ -40,6 +39,7 @@ export type AssertCanBidResult = {
   item: ItemEnSubastaRow;
   medioPago: MedioPagoRow;
   currentBest: number;
+  auctionCurrency: string;
 };
 
 function requireClienteAuthUser(authUser: AuthUserContext | undefined): number {
@@ -47,7 +47,10 @@ function requireClienteAuthUser(authUser: AuthUserContext | undefined): number {
     throw new UnauthorizedError("No autenticado.", "UNAUTHENTICATED");
   }
   if (authUser.role === "empleado") {
-    throw new ForbiddenError("Esta acción no está disponible para empleados.");
+    throw new ForbiddenError(
+      "Esta acción no está disponible para empleados.",
+      "CLIENT_AUTH_REQUIRED"
+    );
   }
   const personId = Number.parseInt(authUser.id, 10);
   if (!Number.isFinite(personId) || personId <= 0) {
@@ -82,7 +85,7 @@ function assertSubastaMoneda(subasta: SubastaRow): string {
   return moneda;
 }
 
-function assertCategoryAllowed(clientCategory: string, auctionCategory: string | null): void {
+export function assertCategoryAllowed(clientCategory: string, auctionCategory: string | null): void {
   if (!auctionCategory) {
     throw new ConflictError("La subasta no tiene categoría válida.", "AUCTION_CATEGORY_INVALID");
   }
@@ -98,55 +101,6 @@ function assertCategoryAllowed(clientCategory: string, auctionCategory: string |
       "CLIENT_CATEGORY_NOT_ALLOWED"
     );
   }
-}
-
-function assertPaymentMethodForBid(
-  medio: MedioPagoRow | null,
-  auctionCurrency: string,
-  bidAmount: number
-): MedioPagoRow {
-  if (!medio) {
-    throw new NotFoundError("Medio de pago no encontrado.", "PAYMENT_METHOD_NOT_FOUND");
-  }
-  switch (medio.estado) {
-    case "pendiente":
-      throw new ConflictError(
-        "El medio de pago está pendiente de verificación.",
-        "PAYMENT_METHOD_PENDING_VERIFICATION"
-      );
-    case "rechazado":
-      throw new ConflictError("El medio de pago fue rechazado.", "PAYMENT_METHOD_REJECTED");
-    case "deshabilitado":
-      throw new ConflictError("El medio de pago está deshabilitado.", "PAYMENT_METHOD_DISABLED");
-    case "verificado":
-      break;
-    default:
-      throw new ConflictError(
-        "El medio de pago no está verificado.",
-        "PAYMENT_METHOD_NOT_VERIFIED"
-      );
-  }
-  if (!isPaymentCurrencyCompatibleWithAuction(medio, auctionCurrency)) {
-    throw new ConflictError(
-      "La moneda del medio de pago no coincide con la de la subasta.",
-      "PAYMENT_METHOD_CURRENCY_NOT_ALLOWED"
-    );
-  }
-  if (medio.tipo === "cheque_certificado") {
-    if (medio.montoDisponible == null) {
-      throw new ConflictError(
-        "El cheque certificado no tiene monto disponible configurado.",
-        "PAYMENT_METHOD_INSUFFICIENT_FUNDS"
-      );
-    }
-    if (Number(medio.montoDisponible) < bidAmount) {
-      throw new ConflictError(
-        "El monto disponible del cheque certificado es insuficiente para esta puja.",
-        "PAYMENT_METHOD_INSUFFICIENT_FUNDS"
-      );
-    }
-  }
-  return medio;
 }
 
 export function validateBidAmountRules(
@@ -221,8 +175,11 @@ export async function assertCanBid(params: {
     throw new NotFoundError("Ítem no encontrado en esta subasta.", "ITEM_NOT_FOUND");
   }
 
-  const medioPago = await findByIdAndCliente(params.paymentMethodId, cliente.identificador);
-  const medio = assertPaymentMethodForBid(medioPago, auctionCurrency, params.amount);
+  const medioPagoRow = await findByIdAndCliente(params.paymentMethodId, cliente.identificador);
+  assertPaymentMethodForBid(medioPagoRow, auctionCurrency, params.amount);
+  if (!medioPagoRow) {
+    throw new NotFoundError("Medio de pago no encontrado.", "PAYMENT_METHOD_NOT_FOUND");
+  }
 
   const basePrice = Number(item.precioBase);
   const currentBest = await resolveCurrentBestForItem(params.itemId, basePrice);
@@ -238,8 +195,9 @@ export async function assertCanBid(params: {
     subasta,
     asistente,
     item,
-    medioPago: medio,
+    medioPago: medioPagoRow,
     currentBest,
+    auctionCurrency,
   };
 }
 
@@ -257,6 +215,7 @@ export async function registerAsistenteForAuction(
 
   const subasta = await requireSubastaById(auctionId);
   assertSubastaAbierta(subasta);
+  assertCategoryAllowed(cliente.categoria, subasta.categoria);
 
   const existing = await findAsistenteByClienteAndSubasta(cliente.identificador, auctionId);
   if (existing) {
@@ -273,23 +232,7 @@ export async function registerAsistenteForAuction(
     }
   }
 
-  const numeroPostor = await getNextNumeroPostor(auctionId);
-  try {
-    return await insertAsistente(cliente.identificador, auctionId, numeroPostor);
-  } catch (err) {
-    const { number } = err as { number?: number };
-    if (number === 2627 || number === 2601) {
-      const again = await findAsistenteByClienteAndSubasta(cliente.identificador, auctionId);
-      if (again) {
-        return again;
-      }
-      throw new ConflictError(
-        "No se pudo registrar el asistente por conflicto.",
-        "ASSISTANT_REGISTRATION_CONFLICT"
-      );
-    }
-    throw err;
-  }
+  return insertAsistenteInTransaction(cliente.identificador, auctionId);
 }
 
 export async function createBid(
@@ -313,6 +256,9 @@ export async function createBid(
     importe: body.amount,
     basePrice,
     auctionCategory: ctx.subasta.categoria ?? "",
+    clienteId: ctx.clienteId,
+    paymentMethodId: body.paymentMethodId,
+    auctionCurrency: ctx.auctionCurrency,
     validateAmount: validateBidAmountRules,
   });
 

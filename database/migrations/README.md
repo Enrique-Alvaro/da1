@@ -77,4 +77,5 @@ El esquema académico define `CHECK (estado IN ('activo', 'incativo'))`. Antes d
 
 ## Estado del plan
 
-`READY_FOR_PHASE_1_IMPLEMENTATION` → tras aplicar `001_*.sql`: **Phase 1 DB lista** para Fase 2 (API medios de pago).
+- Tras aplicar `001_*.sql`: base lista para API medios de pago y pujas (Fases 2–4).
+- **Fase 5 (cierre backend):** documentación en `docs/payment-methods-backend-closure.md`, checklist `docs/payment-methods-manual-checklist.md`, OpenAPI y Postman actualizados.

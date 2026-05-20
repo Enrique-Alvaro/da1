@@ -1,0 +1,325 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "CrownBid — Payment Methods & Bids",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Fases 2–4: medios de pago, verificación empleado, asistentes y pujas.\n\n**Prerrequisitos:**\n1. `database/migrations/001_medios_pago_subasta_moneda.sql`\n2. Colección Auth (`CrownBid-Auth-Phase2`) o tokens manuales\n3. `clientes.admitido = 'si'` para pujar (SQL si no hay endpoint admin)\n4. Variables: `subastaId`, `itemId` (itemsCatalogo), subasta `abierta`\n\n**Orden sugerido:** Employee login → Client login → Create PM → Verify → Register assistant → Bid\n\nDocs: `docs/payment-methods-backend-closure.md`"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "employeeAccessToken", "value": "" },
+    { "key": "employeeAdminEmail", "value": "admin@crownbid.local" },
+    { "key": "employeeAdminPassword", "value": "EmpleadoAdmin2026!" },
+    { "key": "paymentMethodId", "value": "" },
+    { "key": "verifiedPaymentMethodId", "value": "" },
+    { "key": "subastaId", "value": "1" },
+    { "key": "itemId", "value": "1", "description": "itemsCatalogo.identificador" },
+    { "key": "bidAmount", "value": "10100" },
+    { "key": "assistantId", "value": "" },
+    { "key": "bidId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Employee login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employeeAdminEmail}}\",\n  \"password\": \"{{employeeAdminPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/employee/login"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 200) {",
+                "  const b = pm.response.json();",
+                "  const t = b.accessToken || b.token;",
+                "  if (t) pm.collectionVariables.set('employeeAccessToken', t);",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Payment methods — client",
+      "item": [
+        {
+          "name": "List my payment methods",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/users/me/payment-methods"
+          }
+        },
+        {
+          "name": "Create tarjeta_credito",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"tarjeta_credito\",\n  \"moneda\": \"ARS\",\n  \"titular\": \"Cliente Postman\",\n  \"entidad\": \"Visa\",\n  \"ultimosDigitos\": \"4242\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/me/payment-methods"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 201) {",
+                "  const id = pm.response.json().id;",
+                "  pm.collectionVariables.set('paymentMethodId', String(id));",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "Create cuenta_bancaria",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"cuenta_bancaria\",\n  \"moneda\": \"ARS\",\n  \"titular\": \"Cliente Postman\",\n  \"entidad\": \"Banco Test\",\n  \"aliasOCbu\": \"alias.test.pm\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/me/payment-methods"
+          }
+        },
+        {
+          "name": "Create cheque_certificado",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"cheque_certificado\",\n  \"moneda\": \"ARS\",\n  \"titular\": \"Cliente Postman\",\n  \"entidad\": \"Banco Test\",\n  \"montoGarantia\": 500000\n}"
+            },
+            "url": "{{baseUrl}}/api/users/me/payment-methods"
+          }
+        },
+        {
+          "name": "Disable payment method",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/users/me/payment-methods/{{paymentMethodId}}/disable"
+          }
+        },
+        {
+          "name": "NEG — CVV not allowed",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"tarjeta_credito\",\n  \"moneda\": \"ARS\",\n  \"titular\": \"Test\",\n  \"entidad\": \"Visa\",\n  \"ultimosDigitos\": \"1234\",\n  \"cvv\": \"123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/me/payment-methods"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('400 CVV', () => pm.response.to.have.status(400));"], "type": "text/javascript" }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Payment methods — admin",
+      "item": [
+        {
+          "name": "List pending",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/payment-methods?status=pendiente"
+          }
+        },
+        {
+          "name": "Verify payment method",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/payment-methods/{{paymentMethodId}}/verify"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('verifiedPaymentMethodId', pm.collectionVariables.get('paymentMethodId'));",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "Reject payment method",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Documentación incompleta (Postman)\"\n}" },
+            "url": "{{baseUrl}}/api/admin/payment-methods/{{paymentMethodId}}/reject"
+          }
+        },
+        {
+          "name": "NEG — client cannot list admin",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/payment-methods"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('403', () => pm.response.to.have.status(403));"], "type": "text/javascript" }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "Auction — assistant & bids",
+      "item": [
+        {
+          "name": "Register assistant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{subastaId}}/asistentes"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 201) {",
+                "  pm.collectionVariables.set('assistantId', String(pm.response.json().id));",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "Create bid (verified PM)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": {{itemId}},\n  \"amount\": {{bidAmount}},\n  \"paymentMethodId\": {{verifiedPaymentMethodId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/subastas/{{subastaId}}/pujos"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 201) {",
+                "  pm.collectionVariables.set('bidId', String(pm.response.json().id));",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        },
+        {
+          "name": "NEG — bid without paymentMethodId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"itemId\": {{itemId}},\n  \"amount\": {{bidAmount}}\n}" },
+            "url": "{{baseUrl}}/api/subastas/{{subastaId}}/pujos"
+          }
+        },
+        {
+          "name": "NEG — bid with pending PM (use paymentMethodId unverified)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": {{itemId}},\n  \"amount\": {{bidAmount}},\n  \"paymentMethodId\": {{paymentMethodId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/subastas/{{subastaId}}/pujos"
+          }
+        },
+        {
+          "name": "NEG — body cliente forbidden",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": {{itemId}},\n  \"amount\": {{bidAmount}},\n  \"paymentMethodId\": {{verifiedPaymentMethodId}},\n  \"cliente\": 999\n}"
+            },
+            "url": "{{baseUrl}}/api/subastas/{{subastaId}}/pujos"
+          }
+        },
+        {
+          "name": "NEG — employee token bid",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": {{itemId}},\n  \"amount\": {{bidAmount}},\n  \"paymentMethodId\": 1\n}"
+            },
+            "url": "{{baseUrl}}/api/subastas/{{subastaId}}/pujos"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('CLIENT_AUTH_REQUIRED', () => {",
+                "  pm.expect(pm.response.json().code).to.eql('CLIENT_AUTH_REQUIRED');",
+                "});"
+              ],
+              "type": "text/javascript"
+            }
+          }]
+        }
+      ]
+    }
+  ]
+}

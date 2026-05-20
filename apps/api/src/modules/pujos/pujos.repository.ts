@@ -1,6 +1,11 @@
 import sql from "mssql";
 import { getSqlPool } from "../../db/sqlServer";
+import { AppError } from "../../shared/errors/AppError";
 import { ConflictError } from "../../shared/errors/httpErrors";
+import {
+  assertPaymentMethodForBid,
+  type MedioPagoBidRow,
+} from "./pujos-payment-validation";
 
 export type AsistenteRow = {
   identificador: number;
@@ -22,6 +27,15 @@ export type PujoRow = {
   importe: number;
   ganador: string;
 };
+
+const MEDIO_PAGO_BID_SELECT = `
+  identificador,
+  cliente,
+  tipo,
+  estado,
+  moneda,
+  montoDisponible
+`;
 
 export async function findAsistenteByClienteAndSubasta(
   clienteId: number,
@@ -51,27 +65,78 @@ export async function countAsistentesBySubasta(subastaId: number): Promise<numbe
   return Number(result.recordset[0]?.n ?? 0);
 }
 
-export async function insertAsistente(
+/**
+ * Inscripción atómica: bloquea filas de la subasta, asigna siguiente numeroPostor e inserta.
+ */
+export async function insertAsistenteInTransaction(
   clienteId: number,
-  subastaId: number,
-  numeroPostor: number
+  subastaId: number
 ): Promise<AsistenteRow> {
   const pool = await getSqlPool();
-  const result = await pool
-    .request()
-    .input("cliente", sql.Int, clienteId)
-    .input("subasta", sql.Int, subastaId)
-    .input("numeroPostor", sql.Int, numeroPostor)
-    .query<AsistenteRow>(`
+  const tx = new sql.Transaction(pool);
+  await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
+  try {
+    const reqExisting = new sql.Request(tx);
+    reqExisting.input("cliente", sql.Int, clienteId);
+    reqExisting.input("subasta", sql.Int, subastaId);
+    const existingRes = await reqExisting.query<AsistenteRow>(`
+      SELECT TOP (1) identificador, numeroPostor, cliente, subasta
+      FROM dbo.asistentes WITH (UPDLOCK, HOLDLOCK)
+      WHERE cliente = @cliente AND subasta = @subasta
+    `);
+    const existing = existingRes.recordset[0];
+    if (existing) {
+      await tx.commit();
+      return existing;
+    }
+
+    const reqMax = new sql.Request(tx);
+    reqMax.input("subasta", sql.Int, subastaId);
+    const maxRes = await reqMax.query<{ maxNum: number | null }>(`
+      SELECT MAX(numeroPostor) AS maxNum
+      FROM dbo.asistentes WITH (UPDLOCK, HOLDLOCK)
+      WHERE subasta = @subasta
+    `);
+    const numeroPostor = (maxRes.recordset[0]?.maxNum ?? 0) + 1;
+
+    const reqIns = new sql.Request(tx);
+    reqIns.input("cliente", sql.Int, clienteId);
+    reqIns.input("subasta", sql.Int, subastaId);
+    reqIns.input("numeroPostor", sql.Int, numeroPostor);
+    const insRes = await reqIns.query<AsistenteRow>(`
       INSERT INTO dbo.asistentes (numeroPostor, cliente, subasta)
       OUTPUT INSERTED.identificador, INSERTED.numeroPostor, INSERTED.cliente, INSERTED.subasta
       VALUES (@numeroPostor, @cliente, @subasta)
     `);
-  const row = result.recordset[0];
-  if (!row) {
-    throw new Error("INSERT asistentes did not return row");
+    const row = insRes.recordset[0];
+    if (!row) {
+      throw new Error("INSERT asistentes did not return row");
+    }
+
+    await tx.commit();
+    return row;
+  } catch (err) {
+    try {
+      await tx.rollback();
+    } catch {
+      /* noop */
+    }
+    if (err instanceof AppError) {
+      throw err;
+    }
+    const { number } = err as { number?: number };
+    if (number === 2627 || number === 2601) {
+      const again = await findAsistenteByClienteAndSubasta(clienteId, subastaId);
+      if (again) {
+        return again;
+      }
+      throw new ConflictError(
+        "No se pudo registrar el asistente por conflicto.",
+        "ASSISTANT_REGISTRATION_CONFLICT"
+      );
+    }
+    throw err;
   }
-  return row;
 }
 
 export async function getMaxBidForItem(itemId: number): Promise<number | null> {
@@ -107,12 +172,31 @@ export async function findItemInSubasta(
   return result.recordset[0] ?? null;
 }
 
+async function loadMedioPagoForBidInTransaction(
+  tx: sql.Transaction,
+  paymentMethodId: number,
+  clienteId: number
+): Promise<MedioPagoBidRow | null> {
+  const req = new sql.Request(tx);
+  req.input("id", sql.Int, paymentMethodId);
+  req.input("cliente", sql.Int, clienteId);
+  const result = await req.query<MedioPagoBidRow>(`
+    SELECT TOP (1) ${MEDIO_PAGO_BID_SELECT}
+    FROM dbo.mediosPago WITH (UPDLOCK, HOLDLOCK)
+    WHERE identificador = @id AND cliente = @cliente
+  `);
+  return result.recordset[0] ?? null;
+}
+
 export type InsertBidInput = {
   asistenteId: number;
   itemId: number;
   importe: number;
   basePrice: number;
   auctionCategory: string;
+  clienteId: number;
+  paymentMethodId: number;
+  auctionCurrency: string;
   validateAmount: (
     amount: number,
     currentBest: number,
@@ -122,13 +206,20 @@ export type InsertBidInput = {
 };
 
 /**
- * Transacción: lee mejor oferta con bloqueo, revalida importe e inserta puja.
+ * Transacción: revalida medio de pago, lee mejor oferta con bloqueo, revalida importe e inserta puja.
  */
 export async function insertBidInTransaction(input: InsertBidInput): Promise<PujoRow> {
   const pool = await getSqlPool();
   const tx = new sql.Transaction(pool);
   await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
   try {
+    const medioRow = await loadMedioPagoForBidInTransaction(
+      tx,
+      input.paymentMethodId,
+      input.clienteId
+    );
+    assertPaymentMethodForBid(medioRow, input.auctionCurrency, input.importe);
+
     const reqLock = new sql.Request(tx);
     reqLock.input("itemId", sql.Int, input.itemId);
     const bestRes = await reqLock.query<{ importe: number | null }>(`
@@ -163,7 +254,7 @@ export async function insertBidInTransaction(input: InsertBidInput): Promise<Puj
     } catch {
       /* noop */
     }
-    if (err instanceof ConflictError) {
+    if (err instanceof AppError) {
       throw err;
     }
     const { number } = err as { number?: number };
@@ -175,16 +266,4 @@ export async function insertBidInTransaction(input: InsertBidInput): Promise<Puj
     }
     throw err;
   }
-}
-
-export async function getNextNumeroPostor(subastaId: number): Promise<number> {
-  const pool = await getSqlPool();
-  const result = await pool
-    .request()
-    .input("subasta", sql.Int, subastaId)
-    .query<{ maxNum: number | null }>(`
-      SELECT MAX(numeroPostor) AS maxNum FROM dbo.asistentes WHERE subasta = @subasta
-    `);
-  const max = result.recordset[0]?.maxNum;
-  return (max ?? 0) + 1;
 }

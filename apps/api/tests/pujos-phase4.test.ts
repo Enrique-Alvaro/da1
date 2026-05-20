@@ -5,8 +5,12 @@ import * as subastasRepository from "../src/modules/subastas/subastas.repository
 import * as pujosRepository from "../src/modules/pujos/pujos.repository";
 import {
   assertCanBid,
+  assertCategoryAllowed,
+  createBid,
+  registerAsistenteForAuction,
   validateBidAmountRules,
 } from "../src/modules/pujos/pujos.service";
+import { assertPaymentMethodForBid } from "../src/modules/pujos/pujos-payment-validation";
 import type { AuthUserContext } from "../src/shared/types/auth";
 import {
   ConflictError,
@@ -127,7 +131,7 @@ describe("Pujas — Fase 4 assertCanBid", () => {
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
-  it("empleado → Forbidden", async () => {
+  it("empleado → CLIENT_AUTH_REQUIRED", async () => {
     await expect(
       assertCanBid({
         authUser: authEmpleado,
@@ -136,7 +140,7 @@ describe("Pujas — Fase 4 assertCanBid", () => {
         amount: 10100,
         paymentMethodId: 3,
       })
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toMatchObject({ code: "CLIENT_AUTH_REQUIRED", statusCode: 403 });
   });
 
   it("sin fila cliente → CLIENT_NOT_FOUND", async () => {
@@ -243,6 +247,128 @@ describe("Pujas — Fase 4 assertCanBid", () => {
   it("puja válida con medio verificado", async () => {
     const ctx = await callBid(10100);
     expect(ctx.medioPago.estado).toBe("verificado");
+  });
+});
+
+describe("Pujas — revalidación de medio en transacción", () => {
+  it("assertPaymentMethodForBid rechaza deshabilitado (misma lógica que UPDLOCK en insert)", () => {
+    try {
+      assertPaymentMethodForBid(
+        {
+          identificador: 3,
+          cliente: 7,
+          tipo: "tarjeta_credito",
+          estado: "deshabilitado",
+          moneda: "ARS",
+          montoDisponible: null,
+        },
+        "ARS",
+        10100
+      );
+      expect.fail("debía lanzar PAYMENT_METHOD_DISABLED");
+    } catch (e) {
+      expect(e).toMatchObject({ code: "PAYMENT_METHOD_DISABLED" });
+    }
+  });
+
+  it("assertPaymentMethodForBid rechaza rechazado", () => {
+    try {
+      assertPaymentMethodForBid(
+        {
+          identificador: 3,
+          cliente: 7,
+          tipo: "tarjeta_credito",
+          estado: "rechazado",
+          moneda: "ARS",
+          montoDisponible: null,
+        },
+        "ARS",
+        10100
+      );
+      expect.fail("debía lanzar PAYMENT_METHOD_REJECTED");
+    } catch (e) {
+      expect(e).toMatchObject({ code: "PAYMENT_METHOD_REJECTED" });
+    }
+  });
+});
+
+describe("Pujas — registro asistente", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue(clienteAdmitido);
+    vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(subastaAbierta);
+    vi.spyOn(pujosRepository, "findAsistenteByClienteAndSubasta").mockResolvedValue(null);
+    vi.spyOn(pujosRepository, "countAsistentesBySubasta").mockResolvedValue(0);
+    vi.spyOn(pujosRepository, "insertAsistenteInTransaction").mockResolvedValue(asistente);
+  });
+
+  it("categoría insuficiente → CLIENT_CATEGORY_NOT_ALLOWED", async () => {
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
+      ...clienteAdmitido,
+      categoria: "comun",
+    });
+    vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue({
+      ...subastaAbierta,
+      categoria: "oro",
+    });
+    await expect(registerAsistenteForAuction(authCliente, 10)).rejects.toMatchObject({
+      code: "CLIENT_CATEGORY_NOT_ALLOWED",
+    });
+    expect(pujosRepository.insertAsistenteInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("inscripción usa insertAsistenteInTransaction", async () => {
+    const row = await registerAsistenteForAuction(authCliente, 10);
+    expect(row.identificador).toBe(50);
+    expect(pujosRepository.insertAsistenteInTransaction).toHaveBeenCalledWith(7, 10);
+  });
+
+  it("idempotente si ya existe asistente", async () => {
+    vi.spyOn(pujosRepository, "findAsistenteByClienteAndSubasta").mockResolvedValue(asistente);
+    const row = await registerAsistenteForAuction(authCliente, 10);
+    expect(row).toEqual(asistente);
+    expect(pujosRepository.insertAsistenteInTransaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("Pujas — createBid pasa revalidación de medio a transacción", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue(clienteAdmitido);
+    vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(subastaAbierta);
+    vi.spyOn(pujosRepository, "findAsistenteByClienteAndSubasta").mockResolvedValue(asistente);
+    vi.spyOn(pujosRepository, "findItemInSubasta").mockResolvedValue(item);
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(mockMedio());
+    vi.spyOn(pujosRepository, "getMaxBidForItem").mockResolvedValue(null);
+    vi.spyOn(pujosRepository, "insertBidInTransaction").mockResolvedValue({
+      identificador: 1,
+      asistente: 50,
+      item: 100,
+      importe: 10100,
+      ganador: "no",
+    });
+  });
+
+  it("insertBidInTransaction recibe clienteId, paymentMethodId y auctionCurrency", async () => {
+    await createBid(authCliente, 10, {
+      itemId: 100,
+      amount: 10100,
+      paymentMethodId: 3,
+    });
+    expect(pujosRepository.insertBidInTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clienteId: 7,
+        paymentMethodId: 3,
+        auctionCurrency: "ARS",
+        importe: 10100,
+      })
+    );
+  });
+});
+
+describe("Pujas — assertCategoryAllowed", () => {
+  it("comun no puede oro", () => {
+    expect(() => assertCategoryAllowed("comun", "oro")).toThrow(ForbiddenError);
   });
 });
 

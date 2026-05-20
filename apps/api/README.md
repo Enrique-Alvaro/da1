@@ -61,42 +61,49 @@ Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
 7. **Foto ajena:** Otro cliente con su token → 404 en foto de otro dueño.
 8. **Concurrencia asignación:** (opcional) dos `PATCH .../auction-assignment` simultáneos → uno 409.
 
-### Medios de pago — Fase 2 (requiere migración `database/migrations/001_medios_pago_subasta_moneda.sql`)
+# Medios de pago y autorización de pujas
 
-| Método | Ruta | Rol |
-|--------|------|-----|
-| GET | `/api/users/me/payment-methods` | Cliente (`access` + contraseña definitiva) |
-| POST | `/api/users/me/payment-methods` | Cliente — alta en `pendiente` |
-| PATCH | `/api/users/me/payment-methods/:id/disable` | Cliente — `deshabilitado` (idempotente) |
+**Cierre Fase 5:** informe [`../../docs/payment-methods-backend-closure.md`](../../docs/payment-methods-backend-closure.md) · checklist manual [`../../docs/payment-methods-manual-checklist.md`](../../docs/payment-methods-manual-checklist.md) · Postman [`../../docs/postman/CrownBid-Payment-Methods-Bids.postman_collection.json`](../../docs/postman/CrownBid-Payment-Methods-Bids.postman_collection.json) · OpenAPI [`../../docs/swagger.yaml`](../../docs/swagger.yaml).
 
-**Notas:** no exige `admitido=si` para registrar medios; la verificación la hace la empresa. No almacenar PAN completo ni CVV.
+Requiere migración `database/migrations/001_medios_pago_subasta_moneda.sql`.
 
-### Medios de pago — Fase 3 (empleado / verificador)
+## Flujo backend
 
-Requiere `POST /api/auth/employee/login` → token con `role: empleado` y `employeeId` (FK `dbo.empleados.identificador`).
+1. El **cliente** registra medios de pago (`POST` → siempre `pendiente`).
+2. La **empresa** (empleado) verifica o rechaza cada medio.
+3. Para **pujar** hacen falta **dos** aprobaciones: `clientes.admitido = 'si'` y al menos un medio `verificado` seleccionado en la puja.
+4. El cliente debe **inscribirse** en la subasta (`POST .../asistentes`) antes de pujar.
+5. El backend valida categoría, subasta abierta, moneda, importe y revalida el medio **dentro de la transacción** de la puja.
 
-| Método | Ruta | Rol |
-|--------|------|-----|
-| GET | `/api/admin/payment-methods?status=pendiente` | Empleado — cola de revisión (default `pendiente`, máx. **100** ítems, sin paginación) |
-| PATCH | `/api/admin/payment-methods/:id/verify` | Empleado — `estado = verificado` |
-| PATCH | `/api/admin/payment-methods/:id/reject` | Empleado — body `{ "reason": "..." }` |
+**Regla final:** sin medio verificado el cliente puede ver datos de subasta permitidos por otras rutas, pero **no puede pujar**. El frontend no sustituye estas validaciones.
 
-**Notas:** el cliente no puede verificar sus propios medios. El servicio revalida `dbo.empleados` por `employeeId` del JWT (además de `requireEmployeeAuth`).
+## Endpoints
 
-**Revocación administrativa:** un empleado puede rechazar un medio ya **verificado** (`verificado` → `rechazado`). Ese medio deja de habilitar pujas futuras; **no** altera operaciones históricas ya registradas.
+### Cliente (`Bearer` access + contraseña definitiva)
 
-**Carrera con `deshabilitado`:** verify/reject en SQL exigen `estado <> 'deshabilitado'`; si el cliente deshabilita entre lectura y UPDATE, la API responde 409 `PAYMENT_METHOD_DISABLED`.
+| Método | Path | Body | Respuesta | Errores principales |
+|--------|------|------|-----------|---------------------|
+| GET | `/api/users/me/payment-methods` | — | `{ items: PaymentMethodPublic[] }` | 401 |
+| POST | `/api/users/me/payment-methods` | ver abajo | `{ id, type, status, message }` | 400 `CVV_*`, `FULL_CARD_*`, 403 `CLIENT_NOT_FOUND` |
+| PATCH | `/api/users/me/payment-methods/:id/disable` | — | `{ id, status }` | 404 `PAYMENT_METHOD_NOT_FOUND` |
+| POST | `/api/subastas/:id/asistentes` | — | `{ id, auctionId, clientId, bidderNumber }` | 403 `CLIENT_NOT_APPROVED`, `CLIENT_CATEGORY_NOT_ALLOWED` |
+| POST | `/api/subastas/:id/pujos` | `itemId`, `amount`, `paymentMethodId` | ver abajo | 403/404/409 (ver informe) |
 
-### Pujas — Fase 4 (requiere migración 001 + medios verificados)
+**POST medio de pago (campos en español):**
 
-El backend es la fuente de verdad: **sin medio de pago verificado no se puede pujar**. La validación del frontend no alza.
+```json
+{
+  "tipo": "tarjeta_credito",
+  "moneda": "ARS",
+  "titular": "Juan Pérez",
+  "entidad": "Visa",
+  "ultimosDigitos": "3456"
+}
+```
 
-| Método | Ruta | Rol |
-|--------|------|-----|
-| POST | `/api/subastas/:id/asistentes` | Cliente admitido — inscripción como postor (Opción A: obligatoria antes de pujar) |
-| POST | `/api/subastas/:id/pujos` | Cliente admitido + asistente + medio verificado |
+Cheque: `tipo: "cheque_certificado"`, `montoGarantia` obligatorio; `montoDisponible` se inicializa igual a la garantía.
 
-**Body `POST .../pujos`:**
+**POST puja:**
 
 ```json
 {
@@ -106,11 +113,56 @@ El backend es la fuente de verdad: **sin medio de pago verificado no se puede pu
 }
 ```
 
-**Reglas:** `clientes.admitido = 'si'`; categoría del cliente ≥ categoría de la subasta; subasta `estado = abierta`; `paymentMethodId` del cliente con `estado = verificado` y misma `moneda` que `subastas.moneda`; cheque certificado valida `montoDisponible >= amount` (**no** se descuenta en Fase 4); importe según reglas (+1% / +20% sobre mejor oferta salvo subastas `oro`/`platino`). Campos `cliente`, `asistente`, etc. en el body → **400** `BODY_FIELD_NOT_ALLOWED`.
+- **`itemId`:** `dbo.itemsCatalogo.identificador` (ítem del catálogo de la subasta), **no** `dbo.productos.identificador`.
+- **201:** `{ id, auctionId, itemId, amount, assistantId, paymentMethodId, winner }`.
 
-**Respuesta 201:** `{ id, auctionId, itemId, amount, assistantId, paymentMethodId, winner }`.
+### Empleado (`POST /api/auth/employee/login` → `role: empleado`, `employeeId`)
 
-**Endpoints previstos fuera de esta fase:** métricas, consumo de saldo de cheque en adjudicación, OpenAPI/Postman final (Fase 5).
+| Método | Path | Body | Respuesta |
+|--------|------|------|-----------|
+| GET | `/api/admin/payment-methods?status=pendiente` | query `status`: `pendiente` (default), `verificado`, `rechazado`, `deshabilitado`, `all` | `{ items: AdminPaymentMethodItem[] }` (máx. 100) |
+| PATCH | `/api/admin/payment-methods/:id/verify` | — | `{ id, status, verifierId, verifiedAt }` |
+| PATCH | `/api/admin/payment-methods/:id/reject` | `{ "reason": "..." }` | `{ id, status, rejectionReason, verifierId }` |
+
+## Reglas de datos importantes
+
+- No persistir PAN completo ni CVV.
+- Solo el empleado verifica/rechaza; el cliente no puede fijar `estado` ni `verificador`.
+- `pendiente` / `rechazado` / `deshabilitado` no habilitan pujas.
+- Cheque: validar `montoDisponible >= amount` al pujar; **no** descontar saldo en esta fase.
+
+## Transiciones de estado del medio
+
+**Cliente — disable:**
+
+| Desde | A |
+|-------|---|
+| `pendiente` | `deshabilitado` |
+| `verificado` | `deshabilitado` |
+| `rechazado` | `rechazado` (sin cambio; idempotente) |
+| `deshabilitado` | `deshabilitado` (idempotente) |
+
+**Empleado — verify:**
+
+| Desde | A |
+|-------|---|
+| `pendiente` | `verificado` |
+| `verificado` | `verificado` (idempotente) |
+| `rechazado` | `verificado` |
+| `deshabilitado` | 409 `PAYMENT_METHOD_DISABLED` |
+
+**Empleado — reject:**
+
+| Desde | A |
+|-------|---|
+| `pendiente` | `rechazado` |
+| `rechazado` | `rechazado` (actualiza motivo) |
+| `verificado` | `rechazado` (revocación administrativa; no borra pujas históricas) |
+| `deshabilitado` | 409 `PAYMENT_METHOD_DISABLED` |
+
+## Contrato de errores
+
+Listado completo en [`../../docs/payment-methods-backend-closure.md`](../../docs/payment-methods-backend-closure.md) §6.
 
 ## Auth flow quick check (local)
 

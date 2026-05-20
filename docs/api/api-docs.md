@@ -837,11 +837,32 @@ Flujo simplificado: alta de producto con descripciones y fotos para revisión.
 
 ---
 
+## Medios de pago y pujas (implementado — Fases 2–5)
+
+Contrato detallado en `apps/api/README.md` (sección **Medios de pago y autorización de pujas**), OpenAPI `docs/swagger.yaml` y cierre `docs/payment-methods-backend-closure.md`.
+
+| Método | Ruta |
+| --- | --- |
+| GET | `/users/me/payment-methods` |
+| POST | `/users/me/payment-methods` |
+| PATCH | `/users/me/payment-methods/{id}/disable` |
+| GET | `/admin/payment-methods?status=pendiente` |
+| PATCH | `/admin/payment-methods/{id}/verify` |
+| PATCH | `/admin/payment-methods/{id}/reject` |
+| POST | `/subastas/{id}/asistentes` |
+| POST | `/subastas/{id}/pujos` |
+
+**Puja:** body `{ itemId, amount, paymentMethodId }` — `itemId` = `itemsCatalogo.identificador`. Sin medio **verificado** el backend responde error; ver el cliente puede consultar subastas por otras rutas.
+
+Checklist manual: `docs/payment-methods-manual-checklist.md`.
+
+---
+
 ## Endpoints no incluidos en esta versión del contrato
 
 Los siguientes **no** forman parte del alcance documentado aquí (no enviar desde el cliente salvo acuerdo explícito con backend):
 
-- Medios de pago: `GET/POST/PUT/DELETE /users/me/payment-methods`, verificación y reserva de fondos.
+- Reserva de fondos / consumo de cheque en adjudicación (solo validación al pujar).
 - Cuenta de cobro vendedor: `GET/PUT /users/me/seller/payout-account`.
 - Aumento de cobertura: `POST /items/{itemId}/insurance/coverage-increase`.
 - Marcar notificación leída: `PATCH /users/me/notifications/{notificationId}`.
