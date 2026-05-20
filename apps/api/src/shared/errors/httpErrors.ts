@@ -1,36 +1,36 @@
 import { AppError } from "./AppError";
 
 export class BadRequestError extends AppError {
-  constructor(message: string) {
-    super("BadRequestError", message, 400);
+  constructor(message: string, code?: string) {
+    super("BadRequestError", message, 400, code);
     this.name = "BadRequestError";
   }
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message: string) {
-    super("UnauthorizedError", message, 401);
+  constructor(message: string, code?: string) {
+    super("UnauthorizedError", message, 401, code);
     this.name = "UnauthorizedError";
   }
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message: string) {
-    super("ForbiddenError", message, 403);
+  constructor(message: string, code?: string) {
+    super("ForbiddenError", message, 403, code);
     this.name = "ForbiddenError";
   }
 }
 
 export class NotFoundError extends AppError {
-  constructor(message: string) {
-    super("NotFoundError", message, 404);
+  constructor(message: string, code?: string) {
+    super("NotFoundError", message, 404, code);
     this.name = "NotFoundError";
   }
 }
 
 export class ConflictError extends AppError {
-  constructor(message: string) {
-    super("ConflictError", message, 409);
+  constructor(message: string, code?: string) {
+    super("ConflictError", message, 409, code);
     this.name = "ConflictError";
   }
 }

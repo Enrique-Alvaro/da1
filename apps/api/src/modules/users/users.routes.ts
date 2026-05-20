@@ -10,10 +10,31 @@ import {
   listMySubmissions,
 } from "../productos/productos-submissions.controller";
 import { getMe } from "./users.controller";
+import {
+  createPaymentMethod,
+  disablePaymentMethod,
+  listMyPaymentMethods,
+} from "../payment-methods/payment-methods.controller";
 
 export const usersRoutes = Router();
 
 usersRoutes.get("/me", requireAuth, requireAccessToken, getMe);
+
+/** Contraseña definitiva (requireOperationalUser); no exige clientes.admitido = 'si'. */
+const clientOperationalChain = [
+  requireAuth,
+  requireAccessToken,
+  requireClienteAuth,
+  requireOperationalUser,
+] as const;
+
+usersRoutes.get("/me/payment-methods", ...clientOperationalChain, listMyPaymentMethods);
+usersRoutes.post("/me/payment-methods", ...clientOperationalChain, createPaymentMethod);
+usersRoutes.patch(
+  "/me/payment-methods/:id/disable",
+  ...clientOperationalChain,
+  disablePaymentMethod
+);
 
 const submissionChain = [
   requireAuth,

@@ -15,9 +15,8 @@ Aplicación móvil y API para participación en subastas físicas con soporte on
 
 ```
 ├── apps/
-│   ├── api/          # Backend Express (estructura preparada; implementación pendiente)
-│   └── mobile/       # Cliente React Native (estructura preparada)
-├── assets/           # Recursos estáticos (p. ej. icono de app)
+│   ├── api/          # Backend Express + TypeScript
+│   └── mobile/       # App Expo (src/, assets/, app.json)
 ├── database/         # Esquema SQL Server (`schema.sql`)
 ├── docs/
 │   ├── api/          # api-docs.md, PDF exportado
@@ -32,7 +31,7 @@ Aplicación móvil y API para participación en subastas físicas con soporte on
 - Contrato de API descrito en `docs/api/api-docs.md`.
 - Esquema relacional MVP en `database/schema.sql` (listo para ejecutar en BD vacía).
 - Wireframes en `docs/design/wireframes/`.
-- Carpetas `apps/api` y `apps/mobile` con placeholders; sin dependencias instaladas ni código de negocio implementado.
+- Backend en `apps/api`; app móvil en `apps/mobile` (Expo Router, pantallas de auth, medios de pago, subastas).
 
 ## Próximos pasos
 

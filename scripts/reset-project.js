@@ -11,9 +11,9 @@ const path = require("path");
 const readline = require("readline");
 
 const root = process.cwd();
-const oldDirs = ["src", "scripts"];
+const oldDirs = ["apps/mobile/src", "scripts"];
 const exampleDir = "example";
-const newAppDir = "src/app";
+const newAppDir = "apps/mobile/src/app";
 const exampleDirPath = path.join(root, exampleDir);
 
 const indexContent = `import { Text, View, StyleSheet } from "react-native";

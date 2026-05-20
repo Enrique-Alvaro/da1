@@ -1,12 +1,45 @@
 # @crownbid/mobile
 
-Cliente móvil CrownBid (React Native).
+Cliente móvil CrownBid (Expo + React Native + expo-router).
 
-## Estado
+## Estructura
 
-Carpetas `src/*` y `assets/` preparadas para el código de la app. **No** se inicializó React Native ni Expo en esta pasada.
+```
+apps/mobile/
+├── app.json          # Configuración Expo
+├── assets/           # Imágenes e iconos
+├── src/
+│   ├── app/          # Pantallas (file-based routing)
+│   ├── components/
+│   ├── constants/
+│   ├── hooks/
+│   └── services/     # Cliente HTTP hacia @crownbid/api
+└── tsconfig.json
+```
 
-## Próximo
+## Scripts
 
-1. Ejecutar `npx @react-native-community/cli init` o crear proyecto Expo en esta carpeta (o migrar el árbol generado bajo `src/`).
-2. Configurar navegación, tema y servicios HTTP hacia `@crownbid/api`.
+Desde la raíz del monorepo:
+
+```bash
+npm run dev:mobile    # expo start
+npm run android
+npm run ios
+npm run web
+```
+
+Desde esta carpeta:
+
+```bash
+npm run start
+npm run typecheck
+```
+
+## Alias TypeScript
+
+- `@/*` → `src/*`
+- `@/assets/*` → `assets/*`
+
+## API
+
+Configurar la URL del backend en `src/services/api.ts` (por defecto apunta al servidor local de `apps/api`).

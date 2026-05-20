@@ -6,11 +6,15 @@ export const errorMiddleware: ErrorRequestHandler = (err, req, res, _next) => {
   const env = getEnv();
 
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({
+    const body: { error: string; message: string; statusCode: number; code?: string } = {
       error: err.error,
       message: err.message,
       statusCode: err.statusCode,
-    });
+    };
+    if (err.code) {
+      body.code = err.code;
+    }
+    res.status(err.statusCode).json(body);
     return;
   }
 
