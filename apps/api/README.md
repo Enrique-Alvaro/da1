@@ -69,9 +69,21 @@ Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
 | POST | `/api/users/me/payment-methods` | Cliente — alta en `pendiente` |
 | PATCH | `/api/users/me/payment-methods/:id/disable` | Cliente — `deshabilitado` (idempotente) |
 
-**Notas:** no exige `admitido=si` para registrar medios; la verificación la hace la empresa (Fase 3). No almacenar PAN completo ni CVV.
+**Notas:** no exige `admitido=si` para registrar medios; la verificación la hace la empresa. No almacenar PAN completo ni CVV.
 
-**Endpoints previstos fuera de esta fase:** verificación admin de medios, pujas con guard, métricas, etc.
+### Medios de pago — Fase 3 (empleado / verificador)
+
+Requiere `POST /api/auth/employee/login` → token con `role: empleado` y `employeeId` (FK `dbo.empleados.identificador`).
+
+| Método | Ruta | Rol |
+|--------|------|-----|
+| GET | `/api/admin/payment-methods?status=pendiente` | Empleado — cola de revisión (default `pendiente`) |
+| PATCH | `/api/admin/payment-methods/:id/verify` | Empleado — `estado = verificado` |
+| PATCH | `/api/admin/payment-methods/:id/reject` | Empleado — body `{ "reason": "..." }` |
+
+**Notas:** el cliente no puede verificar sus propios medios. La habilitación para **pujar** (medio verificado + `admitido=si`) es **Fase 4**.
+
+**Endpoints previstos fuera de esta fase:** pujas con guard, métricas, etc.
 
 ## Auth flow quick check (local)
 
