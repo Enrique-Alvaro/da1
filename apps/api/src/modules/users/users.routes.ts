@@ -20,6 +20,7 @@ export const usersRoutes = Router();
 
 usersRoutes.get("/me", requireAuth, requireAccessToken, getMe);
 
+/** Contraseña definitiva (requireOperationalUser); no exige clientes.admitido = 'si'. */
 const clientOperationalChain = [
   requireAuth,
   requireAccessToken,

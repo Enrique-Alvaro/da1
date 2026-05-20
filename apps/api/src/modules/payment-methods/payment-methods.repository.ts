@@ -150,7 +150,10 @@ export async function disableMedioPago(id: number, clienteId: number): Promise<M
     .query<MedioPagoRow>(`
       UPDATE dbo.mediosPago
       SET
-        estado = 'deshabilitado',
+        estado = CASE
+          WHEN estado = 'rechazado' THEN estado
+          ELSE 'deshabilitado'
+        END,
         actualizadoEn = SYSUTCDATETIME()
       OUTPUT INSERTED.*
       WHERE identificador = @id AND cliente = @cliente

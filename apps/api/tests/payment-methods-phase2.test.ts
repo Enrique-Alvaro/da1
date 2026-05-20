@@ -20,19 +20,6 @@ const authCliente: AuthUserContext = {
   expiresAt: new Date(),
 };
 
-const profileRow = {
-  id: 7,
-  document_number: "40123456",
-  full_name: "Juan Pérez",
-  address: null,
-  status: "activo",
-  country_id: 1,
-  country_name: "Argentina",
-  admitted: "no" as const,
-  category: "comun",
-  email: "juan@example.com",
-};
-
 function mockMedio(overrides: Partial<paymentMethodsRepository.MedioPagoRow> = {}) {
   const now = new Date("2026-01-15T12:00:00.000Z");
   return {
@@ -56,19 +43,26 @@ function mockMedio(overrides: Partial<paymentMethodsRepository.MedioPagoRow> = {
   };
 }
 
+const clienteIdentity = {
+  identificador: 7,
+  admitido: "no",
+  categoria: "comun",
+};
+
 describe("Payment methods — Phase 2 service", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(usersRepository, "findProfileByPersonId").mockResolvedValue(profileRow);
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue(clienteIdentity);
   });
 
-  it("resolveClienteId devuelve persona id cuando existe cliente", async () => {
+  it("resolveClienteId usa findClienteByPersonId (fila real en dbo.clientes)", async () => {
     const id = await resolveClienteId(authCliente);
     expect(id).toBe(7);
+    expect(usersRepository.findClienteByPersonId).toHaveBeenCalledWith(7);
   });
 
-  it("resolveClienteId sin cliente → CLIENT_NOT_FOUND", async () => {
-    vi.spyOn(usersRepository, "findProfileByPersonId").mockResolvedValue(null);
+  it("resolveClienteId sin fila en clientes → CLIENT_NOT_FOUND", async () => {
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue(null);
     await expect(resolveClienteId(authCliente)).rejects.toMatchObject({
       statusCode: 403,
       code: "CLIENT_NOT_FOUND",
@@ -98,7 +92,7 @@ describe("Payment methods — Phase 2 service", () => {
     expect(paymentMethodsRepository.insertMedioPago).toHaveBeenCalled();
   });
 
-  it("createPaymentMethod rechaza CVV", async () => {
+  it("createPaymentMethod rechaza CVV con CVV_NOT_ALLOWED", async () => {
     await expect(
       createPaymentMethod(authCliente, {
         tipo: "tarjeta_credito",
@@ -108,7 +102,9 @@ describe("Payment methods — Phase 2 service", () => {
         ultimosDigitos: "3456",
         cvv: "123",
       })
-    ).rejects.toBeInstanceOf(BadRequestError);
+    ).rejects.toMatchObject({
+      code: "CVV_NOT_ALLOWED",
+    });
   });
 
   it("createPaymentMethod rechaza número de tarjeta completo", async () => {
@@ -168,12 +164,23 @@ describe("Payment methods — Phase 2 service", () => {
     ).rejects.toBeInstanceOf(BadRequestError);
   });
 
-  it("disablePaymentMethod idempotente", async () => {
+  it("disablePaymentMethod idempotente si ya deshabilitado", async () => {
     vi.spyOn(paymentMethodsRepository, "disableMedioPago").mockResolvedValue(
       mockMedio({ estado: "deshabilitado" })
     );
     const r = await disablePaymentMethod(authCliente, 1);
     expect(r.status).toBe("deshabilitado");
+  });
+
+  it("disablePaymentMethod en rechazado conserva estado rechazado", async () => {
+    vi.spyOn(paymentMethodsRepository, "disableMedioPago").mockResolvedValue(
+      mockMedio({
+        estado: "rechazado",
+        motivoRechazo: "Datos inválidos",
+      })
+    );
+    const r = await disablePaymentMethod(authCliente, 1);
+    expect(r.status).toBe("rechazado");
   });
 
   it("disablePaymentMethod ajeno → 404", async () => {
@@ -182,9 +189,18 @@ describe("Payment methods — Phase 2 service", () => {
   });
 });
 
+describe("usersRepository — contrato cliente", () => {
+  it("expone findClienteByPersonId para validación explícita de dbo.clientes", () => {
+    expect(typeof usersRepository.findClienteByPersonId).toBe("function");
+    expect(typeof usersRepository.findProfileByPersonId).toBe("function");
+    // findProfileByPersonId: INNER JOIN dbo.clientes — sin fila de cliente no hay perfil.
+    // Medios de pago usan findClienteByPersonId por contrato explícito del flujo de pagos.
+  });
+});
+
 describe("Payment methods — schema", () => {
   it("ultimosDigitos inválidos fallan validación", async () => {
-    vi.spyOn(usersRepository, "findProfileByPersonId").mockResolvedValue(profileRow);
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue(clienteIdentity);
     await expect(
       createPaymentMethod(authCliente, {
         tipo: "tarjeta_credito",

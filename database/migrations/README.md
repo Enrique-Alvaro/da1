@@ -40,6 +40,20 @@ Tabla auxiliar para garantías de pago del **cliente** (`cliente` → `clientes.
 
 Soportan la **Opción A** (inscripción explícita antes de pujar).
 
+**Precondición en BD con datos reales:** antes de aplicar `001_*.sql`, verificar que no haya duplicados (la migración no limpia datos). Si alguna consulta devuelve filas, resolver duplicados manualmente antes de crear los índices únicos.
+
+```sql
+SELECT cliente, subasta, COUNT(*) AS total
+FROM dbo.asistentes
+GROUP BY cliente, subasta
+HAVING COUNT(*) > 1;
+
+SELECT subasta, numeroPostor, COUNT(*) AS total
+FROM dbo.asistentes
+GROUP BY subasta, numeroPostor
+HAVING COUNT(*) > 1;
+```
+
 ## Notas para fases posteriores (no implementadas en Fase 1)
 
 ### `PATCH disable` de medios (backend)
@@ -48,7 +62,7 @@ Soportan la **Opción A** (inscripción explícita antes de pujar).
 |------------|-------------------------|
 | `pendiente` → `deshabilitado` | Permitido |
 | `verificado` → `deshabilitado` | Permitido |
-| `rechazado` → `deshabilitado` | Idempotente (ya rechazado; sin cambio necesario) |
+| `rechazado` → `rechazado` | PATCH disable no cambia el estado (conserva motivo de rechazo) |
 | `deshabilitado` → `deshabilitado` | Idempotente éxito |
 
 ### Cheque certificado — `montoDisponible`

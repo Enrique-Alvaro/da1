@@ -19,7 +19,7 @@ import {
 
 /**
  * JWT `sub` = personas.identificador = clientes.identificador.
- * Registro siempre crea fila en clientes; no exigimos admitido='si' para alta de medios (puja se bloquea en Fase 4).
+ * Valida fila en dbo.clientes vía findClienteByPersonId (no exige admitido='si' en Fase 2).
  */
 export async function resolveClienteId(authUser: AuthUserContext): Promise<number> {
   const raw = authUser.id?.trim() ?? "";
@@ -31,15 +31,15 @@ export async function resolveClienteId(authUser: AuthUserContext): Promise<numbe
     throw new UnauthorizedError("No autorizado.", "UNAUTHENTICATED");
   }
 
-  const profile = await usersRepository.findProfileByPersonId(personaId);
-  if (!profile) {
+  const cliente = await usersRepository.findClienteByPersonId(personaId);
+  if (!cliente) {
     throw new ForbiddenError(
       "No se encontró un cliente asociado a este usuario.",
       "CLIENT_NOT_FOUND"
     );
   }
 
-  return personaId;
+  return cliente.identificador;
 }
 
 function mapZodToHttpError(error: z.ZodError): never {
@@ -48,7 +48,7 @@ function mapZodToHttpError(error: z.ZodError): never {
   const message = issue?.message ?? formatZodError(error);
 
   if (pathKey === "cvv" || pathKey === "cvc") {
-    throw new BadRequestError("No se permite enviar CVV.", "PAYMENT_METHOD_FIELD_REQUIRED");
+    throw new BadRequestError("No se permite enviar CVV.", "CVV_NOT_ALLOWED");
   }
   if (
     pathKey === "cardNumber" ||
