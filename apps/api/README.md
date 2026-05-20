@@ -61,7 +61,17 @@ Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
 7. **Foto ajena:** Otro cliente con su token → 404 en foto de otro dueño.
 8. **Concurrencia asignación:** (opcional) dos `PATCH .../auction-assignment` simultáneos → uno 409.
 
-**Endpoints previstos fuera de esta fase:** pujas, pagos, métricas, etc.
+### Medios de pago — Fase 2 (requiere migración `database/migrations/001_medios_pago_subasta_moneda.sql`)
+
+| Método | Ruta | Rol |
+|--------|------|-----|
+| GET | `/api/users/me/payment-methods` | Cliente (`access` + contraseña definitiva) |
+| POST | `/api/users/me/payment-methods` | Cliente — alta en `pendiente` |
+| PATCH | `/api/users/me/payment-methods/:id/disable` | Cliente — `deshabilitado` (idempotente) |
+
+**Notas:** no exige `admitido=si` para registrar medios; la verificación la hace la empresa (Fase 3). No almacenar PAN completo ni CVV.
+
+**Endpoints previstos fuera de esta fase:** verificación admin de medios, pujas con guard, métricas, etc.
 
 ## Auth flow quick check (local)
 

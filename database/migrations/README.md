@@ -1,0 +1,66 @@
+# Migraciones SQL Server (CrownBid)
+
+Scripts **aditivos** posteriores a `database/schema.sql` del profesor. Ejecutar en orden numérico sobre una base ya creada con el esquema académico (+ `cliente_credenciales.sql` si aplica).
+
+| Archivo | Descripción |
+|---------|-------------|
+| `001_medios_pago_subasta_moneda.sql` | Fase 1 — medios de pago, moneda de subasta, índices únicos en `asistentes` |
+
+## Cómo aplicar
+
+```bash
+# Ejemplo (sqlcmd; ajustar servidor y base)
+sqlcmd -S localhost -d CrownBid -i database/migrations/001_medios_pago_subasta_moneda.sql
+```
+
+O ejecutar el archivo desde SSMS / Azure Data Studio contra la misma BD que usa la API.
+
+## Fase 1 — Qué agrega y por qué
+
+### `subastas.moneda`
+
+- Subastas en **ARS** o **USD** (no bimonetarias).
+- Default `ARS` para filas existentes.
+- CHECK `('ARS', 'USD')`.
+
+### `mediosPago`
+
+Tabla auxiliar para garantías de pago del **cliente** (`cliente` → `clientes.identificador`).
+
+- **No** reemplaza `clientes.admitido`: la empresa aprueba al postor (`admitido = 'si'`) y por separado verifica cada medio (`estado = 'verificado'`).
+- Estados: `pendiente`, `verificado`, `rechazado`, `deshabilitado`.
+- Tipos: cuenta/tarjeta nacional o extranjera, cheque certificado.
+
+**Seguridad de datos:** no persistir PAN completo, CVV ni credenciales bancarias sensibles (solo últimos 4 dígitos / alias / CBU parcial según implementación API).
+
+### Índices en `asistentes`
+
+- `UX_asistentes_cliente_subasta`: un cliente no se inscribe dos veces a la misma subasta.
+- `UX_asistentes_subasta_numeroPostor`: un número de postor no se repite en la misma subasta.
+
+Soportan la **Opción A** (inscripción explícita antes de pujar).
+
+## Notas para fases posteriores (no implementadas en Fase 1)
+
+### `PATCH disable` de medios (backend)
+
+| Transición | Comportamiento previsto |
+|------------|-------------------------|
+| `pendiente` → `deshabilitado` | Permitido |
+| `verificado` → `deshabilitado` | Permitido |
+| `rechazado` → `deshabilitado` | Idempotente (ya rechazado; sin cambio necesario) |
+| `deshabilitado` → `deshabilitado` | Idempotente éxito |
+
+### Cheque certificado — `montoDisponible`
+
+- En alta (Fase 2): `montoDisponible = montoGarantia` para `cheque_certificado`.
+- En pujas (Fase 4): validar `importe <= montoDisponible`; **no descontar** saldo al pujar.
+- Descuento de `montoDisponible` solo cuando exista flujo de adjudicación/venta (alcance extendido).
+
+### `personas.estado`
+
+El esquema académico define `CHECK (estado IN ('activo', 'incativo'))`. Antes de bloquear pujas por estado, auditar valores reales en BD. **MVP del guard de pujas:** priorizar `clientes.admitido`, medio verificado, categoría, subasta abierta, asistente y reglas de monto; no asumir bloqueo por `personas.estado` hasta confirmar convención del proyecto.
+
+## Estado del plan
+
+`READY_FOR_PHASE_1_IMPLEMENTATION` → tras aplicar `001_*.sql`: **Phase 1 DB lista** para Fase 2 (API medios de pago).
