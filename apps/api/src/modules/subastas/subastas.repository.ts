@@ -13,6 +13,7 @@ export type SubastaRow = {
   tieneDeposito: string | null;
   seguridadPropia: string | null;
   categoria: string | null;
+  moneda: string | null;
 };
 
 const SELECT_LIST = `
@@ -25,8 +26,12 @@ const SELECT_LIST = `
   capacidadAsistentes,
   tieneDeposito,
   seguridadPropia,
-  categoria
+  categoria,
+  moneda
 `;
+
+/** Valores del esquema académico: abierta = en curso; carrada = cerrada. */
+export const SUBASTA_ESTADO_ABIERTA = "abierta";
 
 export async function listSubastas(): Promise<SubastaRow[]> {
   const pool = await getSqlPool();

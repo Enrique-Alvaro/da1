@@ -87,9 +87,30 @@ Requiere `POST /api/auth/employee/login` → token con `role: empleado` y `emplo
 
 **Carrera con `deshabilitado`:** verify/reject en SQL exigen `estado <> 'deshabilitado'`; si el cliente deshabilita entre lectura y UPDATE, la API responde 409 `PAYMENT_METHOD_DISABLED`.
 
-La habilitación para **pujar** (medio verificado + `admitido=si`) es **Fase 4**.
+### Pujas — Fase 4 (requiere migración 001 + medios verificados)
 
-**Endpoints previstos fuera de esta fase:** pujas con guard, métricas, etc.
+El backend es la fuente de verdad: **sin medio de pago verificado no se puede pujar**. La validación del frontend no alza.
+
+| Método | Ruta | Rol |
+|--------|------|-----|
+| POST | `/api/subastas/:id/asistentes` | Cliente admitido — inscripción como postor (Opción A: obligatoria antes de pujar) |
+| POST | `/api/subastas/:id/pujos` | Cliente admitido + asistente + medio verificado |
+
+**Body `POST .../pujos`:**
+
+```json
+{
+  "itemId": 10,
+  "amount": 15100,
+  "paymentMethodId": 3
+}
+```
+
+**Reglas:** `clientes.admitido = 'si'`; categoría del cliente ≥ categoría de la subasta; subasta `estado = abierta`; `paymentMethodId` del cliente con `estado = verificado` y misma `moneda` que `subastas.moneda`; cheque certificado valida `montoDisponible >= amount` (**no** se descuenta en Fase 4); importe según reglas (+1% / +20% sobre mejor oferta salvo subastas `oro`/`platino`). Campos `cliente`, `asistente`, etc. en el body → **400** `BODY_FIELD_NOT_ALLOWED`.
+
+**Respuesta 201:** `{ id, auctionId, itemId, amount, assistantId, paymentMethodId, winner }`.
+
+**Endpoints previstos fuera de esta fase:** métricas, consumo de saldo de cheque en adjudicación, OpenAPI/Postman final (Fase 5).
 
 ## Auth flow quick check (local)
 
