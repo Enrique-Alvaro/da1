@@ -65,7 +65,7 @@ export default function LoginScreen() {
         router.push('/new-password?mode=initial');
         return;
       }
-      router.push('/explore');
+      router.push('/(tabs)/explore');
     } catch (error: any) {
       setServerError(error?.message || 'Error de autenticación. Revisa tus credenciales.');
     } finally {
