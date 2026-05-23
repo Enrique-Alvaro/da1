@@ -17,7 +17,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /**
- * Cryptographically secure temporary password (≥10 chars, upper, lower, digit).
+ * Contraseña temporal criptográficamente segura (≥10 caracteres, mayúscula, minúscula, dígito).
  */
 export function generateTemporaryPassword(): string {
   const length = 12;

@@ -1,6 +1,8 @@
 import sql from "mssql";
 import { getSqlPool } from "../../db/sqlServer";
+import { NotFoundError } from "../../shared/errors/httpErrors";
 import type { DbPersonaClienteProfileRow } from "../auth/auth.types";
+import type { UserCategory } from "./user.mapper";
 
 /** Fila mínima de dbo.clientes (PK = personas.identificador). */
 export type ClienteIdentityRow = {
@@ -58,4 +60,89 @@ export async function findProfileByPersonId(personId: number): Promise<DbPersona
       WHERE p.identificador = @id
     `);
   return result.recordset[0] ?? null;
+}
+
+export type AdminClientDetailRow = {
+  identificador: number;
+  full_name: string;
+  email: string | null;
+  admitido: string;
+  categoria: string;
+  document_number: string;
+  status: string;
+  country_name: string | null;
+  registered_at: Date | null;
+  payment_method_count: number;
+  verified_payment_method_count: number;
+};
+
+export async function findAdminClientDetail(clienteId: number): Promise<AdminClientDetailRow | null> {
+  const pool = await getSqlPool();
+  const result = await pool.request().input("id", sql.Int, clienteId).query<AdminClientDetailRow>(`
+    SELECT TOP (1)
+      c.identificador,
+      p.nombre AS full_name,
+      cc.email,
+      c.admitido,
+      c.categoria,
+      p.documento AS document_number,
+      p.estado AS status,
+      pa.nombre AS country_name,
+      cc.created_at AS registered_at,
+      (
+        SELECT COUNT_BIG(1)
+        FROM dbo.mediosPago AS mp
+        WHERE mp.cliente = c.identificador
+      ) AS payment_method_count,
+      (
+        SELECT COUNT_BIG(1)
+        FROM dbo.mediosPago AS mp
+        WHERE mp.cliente = c.identificador AND mp.estado = N'verificado'
+      ) AS verified_payment_method_count
+    FROM dbo.clientes AS c
+    INNER JOIN dbo.personas AS p ON p.identificador = c.identificador
+    LEFT JOIN dbo.cliente_credenciales AS cc ON cc.persona_id = c.identificador
+    LEFT JOIN dbo.paises AS pa ON pa.numero = c.numeroPais
+    WHERE c.identificador = @id
+  `);
+  return result.recordset[0] ?? null;
+}
+
+export async function updateClienteAdmission(input: {
+  clienteId: number;
+  admitido: "si" | "no";
+  categoria?: UserCategory;
+}): Promise<ClienteIdentityRow> {
+  const pool = await getSqlPool();
+  const request = pool
+    .request()
+    .input("id", sql.Int, input.clienteId)
+    .input("admitido", sql.NVarChar(2), input.admitido);
+
+  if (input.categoria !== undefined) {
+    request.input("categoria", sql.NVarChar(10), input.categoria);
+    const result = await request.query(`
+      UPDATE dbo.clientes
+      SET admitido = @admitido, categoria = @categoria
+      WHERE identificador = @id
+    `);
+    if ((result.rowsAffected[0] ?? 0) < 1) {
+      throw new NotFoundError("Cliente no encontrado.", "CLIENT_NOT_FOUND");
+    }
+  } else {
+    const result = await request.query(`
+      UPDATE dbo.clientes
+      SET admitido = @admitido
+      WHERE identificador = @id
+    `);
+    if ((result.rowsAffected[0] ?? 0) < 1) {
+      throw new NotFoundError("Cliente no encontrado.", "CLIENT_NOT_FOUND");
+    }
+  }
+
+  const updated = await findClienteByPersonId(input.clienteId);
+  if (!updated) {
+    throw new NotFoundError("Cliente no encontrado.", "CLIENT_NOT_FOUND");
+  }
+  return updated;
 }

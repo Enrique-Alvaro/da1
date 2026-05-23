@@ -1,12 +1,27 @@
 import type { RequestHandler } from "express";
 import { ValidationError } from "../../shared/errors/httpErrors";
 import { asyncHandler } from "../../shared/utils/asyncHandler";
-import { formatZodError, subastasIdParamSchema } from "./subastas.schema";
-import * as subastasRepository from "./subastas.repository";
+import {
+  formatZodError,
+  listSubastasQuerySchema,
+  subastasIdParamSchema,
+} from "./subastas.schema";
+import * as subastasService from "./subastas.service";
 
-export const listSubastas: RequestHandler = asyncHandler(async (_req, res) => {
-  const rows = await subastasRepository.listSubastas();
-  res.status(200).json({ items: rows });
+export const listSubastas: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = listSubastasQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  const result = await subastasService.listAuctions(
+    {
+      featured: parsed.data.featured === "true",
+      status: parsed.data.status,
+      category: parsed.data.category,
+    },
+    req.authUser
+  );
+  res.status(200).json(result);
 });
 
 export const getSubasta: RequestHandler = asyncHandler(async (req, res) => {
@@ -14,6 +29,72 @@ export const getSubasta: RequestHandler = asyncHandler(async (req, res) => {
   if (!parsed.success) {
     throw new ValidationError(formatZodError(parsed.error));
   }
-  const row = await subastasRepository.requireSubastaById(parsed.data.id);
-  res.status(200).json(row);
+  const result = await subastasService.getAuctionDetail(parsed.data.id, req.authUser);
+  res.status(200).json(result);
+});
+
+export const getSubastaItems: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = subastasIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  const result = await subastasService.listAuctionItems(parsed.data.id, req.authUser);
+  res.status(200).json(result);
+});
+
+export const enterLiveSession: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = subastasIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  if (!req.authUser) {
+    throw new ValidationError("Autenticación requerida.");
+  }
+  const result = await subastasService.enterLiveSession(parsed.data.id, req.authUser);
+  res.status(200).json(result);
+});
+
+export const leaveLiveSession: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = subastasIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  if (!req.authUser) {
+    throw new ValidationError("Autenticación requerida.");
+  }
+  const result = await subastasService.leaveLiveSession(parsed.data.id, req.authUser);
+  res.status(200).json(result);
+});
+
+export const getLiveState: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = subastasIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  if (!req.authUser) {
+    throw new ValidationError("Autenticación requerida.");
+  }
+  const result = await subastasService.getLiveAuctionState(parsed.data.id, req.authUser);
+  res.status(200).json(result);
+});
+
+export const getBidHistory: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = subastasIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  if (!req.authUser) {
+    throw new ValidationError("Autenticación requerida.");
+  }
+  const itemIdRaw = req.query.itemId;
+  const itemId =
+    itemIdRaw !== undefined && itemIdRaw !== ""
+      ? Number.parseInt(String(itemIdRaw), 10)
+      : undefined;
+  const result = await subastasService.getBidHistory(
+    parsed.data.id,
+    req.authUser,
+    Number.isFinite(itemId) && itemId! > 0 ? itemId : undefined
+  );
+  res.status(200).json(result);
 });

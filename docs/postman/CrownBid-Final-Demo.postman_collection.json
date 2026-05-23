@@ -1,0 +1,304 @@
+{
+  "info": {
+    "name": "CrownBid — Final Backend Demo",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Phase 5 end-to-end backend demo. Spanish routes preferred.\n\nVariables: baseUrl, accessToken, employeeAccessToken, clientId, paymentMethodId, auctionId, catalogId, catalogItemId, productId, submissionId.\n\nPrerequisites: schema.sql + cliente_credenciales.sql + 001_medios_pago_subasta_moneda.sql; apps/api/.env; open auction in DB.\n\nGuide: docs/demo/backend-final-manual-qa.md"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "employeeAccessToken", "value": "" },
+    { "key": "clientId", "value": "7" },
+    { "key": "paymentMethodId", "value": "" },
+    { "key": "auctionId", "value": "1" },
+    { "key": "catalogId", "value": "" },
+    { "key": "catalogItemId", "value": "1" },
+    { "key": "productId", "value": "" },
+    { "key": "submissionId", "value": "" },
+    { "key": "employeeAdminEmail", "value": "admin@crownbid.local" },
+    { "key": "employeeAdminPassword", "value": "EmpleadoAdmin2026!" }
+  ],
+  "item": [
+    {
+      "name": "01 Health",
+      "item": [
+        {
+          "name": "Health",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/health" }
+        },
+        {
+          "name": "Health DB",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/health/db" }
+        }
+      ]
+    },
+    {
+      "name": "02 Auth & admission",
+      "item": [
+        {
+          "name": "Employee login",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 200) {",
+                "  const b = pm.response.json();",
+                "  pm.collectionVariables.set('employeeAccessToken', b.accessToken || b.token || '');",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employeeAdminEmail}}\",\n  \"password\": \"{{employeeAdminPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/employee/login"
+          }
+        },
+        {
+          "name": "Client login",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 200) {",
+                "  const b = pm.response.json();",
+                "  pm.collectionVariables.set('accessToken', b.accessToken || b.token || '');",
+                "  if (b.user && b.user.id) pm.collectionVariables.set('clientId', String(b.user.id));",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente.demo@example.com\",\n  \"password\": \"ClienteDemo2026!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Admit client",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admitido\": \"si\",\n  \"categoria\": \"comun\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/clientes/{{clientId}}/admitir"
+          }
+        },
+        {
+          "name": "Client status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/users/me/status?auctionId={{auctionId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Payment methods",
+      "item": [
+        {
+          "name": "Create payment method",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 201) {",
+                "  const b = pm.response.json();",
+                "  if (b.id) pm.collectionVariables.set('paymentMethodId', String(b.id));",
+                "}"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"tarjeta_credito\",\n  \"moneda\": \"ARS\",\n  \"titular\": \"Demo Cliente\",\n  \"entidad\": \"Visa\",\n  \"ultimosDigitos\": \"4242\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/me/payment-methods"
+          }
+        },
+        {
+          "name": "Verify payment method",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{baseUrl}}/api/admin/payment-methods/{{paymentMethodId}}/verify"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Auctions live bids",
+      "item": [
+        {
+          "name": "List auctions featured",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/subastas?featured=true"
+          }
+        },
+        {
+          "name": "Auction detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}"
+          }
+        },
+        {
+          "name": "Auction items",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/items"
+          }
+        },
+        {
+          "name": "Register assistant",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/asistentes"
+          }
+        },
+        {
+          "name": "Enter live session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/live/session"
+          }
+        },
+        {
+          "name": "Live state",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/live"
+          }
+        },
+        {
+          "name": "Place bid",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": {{catalogItemId}},\n  \"amount\": 15100,\n  \"paymentMethodId\": {{paymentMethodId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/pujos"
+          }
+        },
+        {
+          "name": "Bid history",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/pujos/history"
+          }
+        },
+        {
+          "name": "Leave live session",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/live/session"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Close result metrics",
+      "item": [
+        {
+          "name": "Close item",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/items/{{catalogItemId}}/cerrar"
+          }
+        },
+        {
+          "name": "Get result",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/subastas/{{auctionId}}/items/{{catalogItemId}}/resultado"
+          }
+        },
+        {
+          "name": "My metrics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/users/me/metrics"
+          }
+        },
+        {
+          "name": "My purchases",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/users/me/purchases"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Item submissions",
+      "item": [
+        {
+          "name": "Admin list submissions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" }],
+            "url": "{{baseUrl}}/api/admin/productos/solicitudes?status=pending"
+          }
+        },
+        {
+          "name": "Reject submission (409 expected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{employeeAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"No cumple requisitos de calidad\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/productos/solicitudes/{{submissionId}}/rechazar"
+          }
+        }
+      ]
+    }
+  ]
+}

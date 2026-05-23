@@ -1,9 +1,5 @@
 import type { AuthUserContext } from "../../shared/types/auth";
-import {
-  categoryMeetsMinimum,
-  isPremiumAuctionCategory,
-  parseCategoryRank,
-} from "../../shared/domain/auction-categories";
+import { categoryMeetsMinimum, parseCategoryRank } from "../../shared/domain/auction-categories";
 import {
   ConflictError,
   ForbiddenError,
@@ -21,6 +17,11 @@ import {
 import { findClienteByPersonId } from "../users/users.repository";
 import type { CreateBidBody } from "./pujos.schema";
 import { assertPaymentMethodForBid } from "./pujos-payment-validation";
+import * as liveSessionStore from "../subastas/live-session.store";
+import { computeBidLimits } from "../subastas/subastas-bid-limits";
+import { pickCurrentItemId } from "../subastas/subastas-current-item";
+import { mapSubastaStatus } from "../subastas/subastas-access.service";
+import { listCatalogItemsBySubasta } from "../subastas/subastas-items.repository";
 import {
   countAsistentesBySubasta,
   findAsistenteByClienteAndSubasta,
@@ -63,7 +64,7 @@ function assertClienteAdmitted(admitido: string): void {
   if (admitido.trim().toLowerCase() !== "si") {
     throw new ForbiddenError(
       "El cliente no está admitido por la empresa para participar en subastas.",
-      "CLIENT_NOT_APPROVED"
+      "USER_NOT_ADMITTED"
     );
   }
 }
@@ -98,7 +99,23 @@ export function assertCategoryAllowed(clientCategory: string, auctionCategory: s
   if (!categoryMeetsMinimum(clientCategory, auctionCategory)) {
     throw new ForbiddenError(
       "La categoría del cliente no permite participar en esta subasta.",
-      "CLIENT_CATEGORY_NOT_ALLOWED"
+      "CATEGORY_NOT_ALLOWED"
+    );
+  }
+}
+
+function assertLiveSessionForBid(clienteId: number, auctionId: number): void {
+  const active = liveSessionStore.getActiveAuctionId(clienteId);
+  if (active === null) {
+    throw new ForbiddenError(
+      "Debés ingresar a la sala en vivo antes de pujar.",
+      "LIVE_SESSION_REQUIRED"
+    );
+  }
+  if (active !== auctionId) {
+    throw new ConflictError(
+      "Tenés una sesión activa en otra subasta.",
+      "LIVE_SESSION_OTHER_AUCTION"
     );
   }
 }
@@ -109,27 +126,32 @@ export function validateBidAmountRules(
   basePrice: number,
   auctionCategory: string
 ): void {
-  if (amount <= currentBest) {
+  const limits = computeBidLimits(currentBest, basePrice, auctionCategory);
+  if (amount <= limits.currentBest) {
     throw new ConflictError(
       "El importe debe superar la mejor oferta actual.",
-      "BID_AMOUNT_TOO_LOW"
+      "BID_TOO_LOW"
     );
   }
-  if (isPremiumAuctionCategory(auctionCategory)) {
+  if (limits.maxNextBid === null) {
+    if (amount < limits.minNextBid) {
+      throw new ConflictError(
+        "El importe está por debajo del mínimo permitido para esta subasta.",
+        "BID_TOO_LOW"
+      );
+    }
     return;
   }
-  const minAllowed = currentBest + basePrice * 0.01;
-  const maxAllowed = currentBest + basePrice * 0.2;
-  if (amount < minAllowed) {
+  if (amount < limits.minNextBid) {
     throw new ConflictError(
       "El importe está por debajo del mínimo permitido para esta subasta.",
-      "BID_AMOUNT_TOO_LOW"
+      "BID_TOO_LOW"
     );
   }
-  if (amount > maxAllowed) {
+  if (amount > limits.maxNextBid) {
     throw new ConflictError(
       "El importe supera el máximo permitido para esta subasta.",
-      "BID_AMOUNT_TOO_HIGH"
+      "BID_TOO_HIGH"
     );
   }
 }
@@ -156,6 +178,7 @@ export async function assertCanBid(params: {
     throw new ForbiddenError("Cliente no encontrado.", "CLIENT_NOT_FOUND");
   }
   assertClienteAdmitted(cliente.admitido);
+  assertLiveSessionForBid(cliente.identificador, params.auctionId);
 
   const subasta = await requireSubastaById(params.auctionId);
   assertSubastaAbierta(subasta);
@@ -173,6 +196,15 @@ export async function assertCanBid(params: {
   const item = await findItemInSubasta(params.itemId, params.auctionId);
   if (!item) {
     throw new NotFoundError("Ítem no encontrado en esta subasta.", "ITEM_NOT_FOUND");
+  }
+
+  const catalogItems = await listCatalogItemsBySubasta(params.auctionId);
+  const currentItemId = pickCurrentItemId(catalogItems, mapSubastaStatus(subasta));
+  if (currentItemId !== null && params.itemId !== currentItemId) {
+    throw new ConflictError(
+      "Solo se puede pujar por el ítem en curso de la subasta.",
+      "ITEM_NOT_CURRENT"
+    );
   }
 
   const medioPagoRow = await findByIdAndCliente(params.paymentMethodId, cliente.identificador);
@@ -262,13 +294,27 @@ export async function createBid(
     validateAmount: validateBidAmountRules,
   });
 
+  const currentBest = Number(row.importe);
+  const limits = computeBidLimits(
+    currentBest,
+    basePrice,
+    ctx.subasta.categoria ?? "comun"
+  );
+
   return {
     id: row.identificador,
     auctionId,
     itemId: row.item,
-    amount: Number(row.importe),
+    userId: ctx.clienteId,
+    amount: currentBest,
     assistantId: row.asistente,
     paymentMethodId: ctx.medioPago.identificador,
+    isWinning: true,
+    currentHighestBid: currentBest,
+    minNextBid: limits.minNextBid,
+    maxNextBid: limits.maxNextBid,
+    percentLimitsApply: limits.percentLimitsApply,
+    serverTime: new Date().toISOString(),
     winner: row.ganador,
   };
 }

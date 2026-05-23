@@ -4,7 +4,20 @@ info:
   version: 1.0.0
   description: |
     REST API for the CrownBid mobile application (UADE DA1 MVP).
-    
+
+    **Phase 5 delivery note:** This OpenAPI file is a partial contract. For the authoritative
+    backend behavior use:
+    - `docs/api/api-docs.md` (Spanish, aligned with implementation)
+    - `docs/demo/backend-final-manual-qa.md` (end-to-end demo)
+    - `audit/phase-5-final-backend-delivery-report.md` (route inventory)
+
+    **Server:** `http://localhost:3000` with prefix `/api` (not `/v1`).
+    **Spanish routes** (`/api/subastas`, `/api/productos/solicitudes`) are source of truth;
+    English aliases mirror the same handlers.
+
+    Known gaps vs running API: forgot/reset password return **501**; live session is in-memory;
+    item rejection returns **409 REJECTION_NOT_SUPPORTED_BY_SCHEMA**.
+
     ## Overview
     This API powers a mobile auction management system where users can:
     - Register and manage their personal profile.
@@ -23,10 +36,10 @@ info:
   contact:
     name: CrownBid Dev Team
 servers:
-  - url: https://api.crownbid.com/v1
-    description: Production Environment
-  - url: http://localhost:8080/v1
-    description: Local Development Environment
+  - url: http://localhost:3000/api
+    description: Local API (authoritative for TP demo)
+  - url: https://api.crownbid.com/api
+    description: Production (example)
 tags:
   - name: Auth
     description: Registration and authentication

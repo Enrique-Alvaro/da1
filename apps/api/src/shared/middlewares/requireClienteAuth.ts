@@ -1,7 +1,7 @@
 import { ForbiddenError, UnauthorizedError } from "../errors/httpErrors";
 import { asyncHandler } from "../utils/asyncHandler";
 
-/** After requireAuth + requireAccessToken: rejects empleado tokens on cliente-only routes. */
+/** Tras requireAuth + requireAccessToken: rechaza tokens de empleado en rutas solo cliente. */
 export const requireClienteAuth = asyncHandler(async (req, _res, next) => {
   if (!req.authUser) {
     throw new UnauthorizedError("No autorizado.");

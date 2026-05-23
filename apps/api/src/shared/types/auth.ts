@@ -7,7 +7,7 @@ export type AuthUserContext = {
   email: string;
   tokenType: AuthTokenType;
   role: AuthRole;
-  /** Present when role is empleado (dbo.empleados.identificador). */
+  /** Presente cuando role es empleado (dbo.empleados.identificador). */
   employeeId?: number;
   jti: string;
   exp: number;

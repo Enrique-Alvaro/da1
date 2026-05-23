@@ -44,7 +44,7 @@ export function assertPaymentMethodForBid(
   if (!isPaymentCurrencyCompatibleWithAuction(medio, auctionCurrency)) {
     throw new ConflictError(
       "La moneda del medio de pago no coincide con la de la subasta.",
-      "PAYMENT_METHOD_CURRENCY_NOT_ALLOWED"
+      "PAYMENT_METHOD_CURRENCY_MISMATCH"
     );
   }
   if (medio.tipo === "cheque_certificado") {
@@ -57,7 +57,7 @@ export function assertPaymentMethodForBid(
     if (Number(medio.montoDisponible) < bidAmount) {
       throw new ConflictError(
         "El monto disponible del cheque certificado es insuficiente para esta puja.",
-        "PAYMENT_METHOD_INSUFFICIENT_FUNDS"
+        "GUARANTEE_LIMIT_EXCEEDED"
       );
     }
   }
