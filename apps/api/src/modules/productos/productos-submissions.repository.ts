@@ -17,6 +17,12 @@ export type ProductSubmissionFlags = {
 
 export type ProductSubmissionRow = ProductoRow & ProductSubmissionFlags & {
   imageCount: number;
+  precioBaseAsignado: number | null;
+  comisionAsignada: number | null;
+  auctionFecha: string | null;
+  auctionHora: string | null;
+  auctionUbicacion: string | null;
+  catalogId: number | null;
 };
 
 const PRODUCT_SELECT = `
@@ -50,12 +56,54 @@ const PRODUCT_SELECT = `
     ORDER BY ic.identificador
   ) AS catalogItemId,
   (
+    SELECT TOP (1) ic.catalogo
+    FROM dbo.itemsCatalogo AS ic
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS catalogId,
+  (
     SELECT TOP (1) c.subasta
     FROM dbo.itemsCatalogo AS ic
     INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
     WHERE ic.producto = p.identificador
     ORDER BY ic.identificador
-  ) AS auctionId
+  ) AS auctionId,
+  (
+    SELECT TOP (1) ic.precioBase
+    FROM dbo.itemsCatalogo AS ic
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS precioBaseAsignado,
+  (
+    SELECT TOP (1) ic.comision
+    FROM dbo.itemsCatalogo AS ic
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS comisionAsignada,
+  (
+    SELECT TOP (1) CONVERT(varchar(10), s.fecha, 23)
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
+    INNER JOIN dbo.subastas AS s ON s.identificador = c.subasta
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS auctionFecha,
+  (
+    SELECT TOP (1) CONVERT(varchar(8), s.hora, 108)
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
+    INNER JOIN dbo.subastas AS s ON s.identificador = c.subasta
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS auctionHora,
+  (
+    SELECT TOP (1) s.ubicacion
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
+    INNER JOIN dbo.subastas AS s ON s.identificador = c.subasta
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS auctionUbicacion
 `;
 
 const PRODUCT_FROM = `FROM dbo.productos AS p`;
@@ -75,7 +123,53 @@ function mapSubmissionRow(row: Record<string, unknown>): ProductSubmissionRow {
     catalogItemId: (row.catalogItemId as number | null) ?? null,
     auctionId: (row.auctionId as number | null) ?? null,
     imageCount: Number(row.imageCount ?? 0),
+    precioBaseAsignado: row.precioBaseAsignado != null ? Number(row.precioBaseAsignado) : null,
+    comisionAsignada: row.comisionAsignada != null ? Number(row.comisionAsignada) : null,
+    auctionFecha: (row.auctionFecha as string | null) ?? null,
+    auctionHora: (row.auctionHora as string | null) ?? null,
+    auctionUbicacion: (row.auctionUbicacion as string | null) ?? null,
+    catalogId: row.catalogId != null ? Number(row.catalogId) : null,
   };
+}
+
+export type ListAdminSubmissionsQuery = {
+  status?: "pending" | "accepted" | "assigned" | "all";
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export async function listAdminSubmissions(
+  query: ListAdminSubmissionsQuery = {}
+): Promise<ProductSubmissionRow[]> {
+  const pool = await getSqlPool();
+  const request = pool.request();
+  const filters: string[] = ["1 = 1"];
+
+  if (query.status === "pending") {
+    filters.push("p.disponible = N'no' AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+  } else if (query.status === "accepted") {
+    filters.push("p.disponible = N'si' AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+  } else if (query.status === "assigned") {
+    filters.push("EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+  }
+
+  if (query.search?.trim()) {
+    request.input("search", sql.NVarChar(200), `%${query.search.trim()}%`);
+    filters.push("p.descripcionCatalogo LIKE @search");
+  }
+
+  const limit = Math.min(query.limit ?? 100, 100);
+  const offset = query.offset ?? 0;
+
+  const result = await request.query(`
+    SELECT ${PRODUCT_SELECT}
+    ${PRODUCT_FROM}
+    WHERE ${filters.join(" AND ")}
+    ORDER BY p.identificador DESC
+    OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+  `);
+  return result.recordset.map((r) => mapSubmissionRow(r));
 }
 
 export async function assertSubastaExists(subastaId: number): Promise<void> {

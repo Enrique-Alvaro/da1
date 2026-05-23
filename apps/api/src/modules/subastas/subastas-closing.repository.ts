@@ -80,7 +80,7 @@ export async function findRegistroByProductoAndSubasta(
   return result.recordset[0] ?? null;
 }
 
-/** Highest bid; on tie, earliest bid (lowest identificador) wins. */
+/** Puja más alta; en empate, gana la puja más antigua (menor identificador). */
 export async function findWinningBidForClose(itemId: number): Promise<WinningBidCloseRow | null> {
   const pool = await getSqlPool();
   const result = await pool.request().input("itemId", sql.Int, itemId).query<WinningBidCloseRow>(`
@@ -201,7 +201,7 @@ export async function persistItemClose(
   }
 }
 
-/** Marks item sold without registroDeSubasta (company purchase when COMPANY_CLIENT_ID is unset). */
+/** Marca ítem vendido sin registroDeSubasta (compra empresa cuando COMPANY_CLIENT_ID no está definido). */
 export async function markItemSoldOnly(itemId: number): Promise<void> {
   const pool = await getSqlPool();
   await pool.request().input("itemId", sql.Int, itemId).query(`

@@ -25,9 +25,29 @@ Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE
 - `POST /api/auth/login` — login + JWT (Phase 3; ver `docs/auth-phase-3-login.md`)
 - `POST /api/auth/change-initial-password` — primera contraseña definitiva + JWT `access` (Phase 4; ver `docs/auth-phase-4-change-initial-password.md`)
 - `GET /api/users/me` — perfil autenticado (**Bearer** tipo `access`; Phase 5; ver `docs/auth-phase-5-users-me.md`)
-- `POST /api/auth/logout` — revoca el JWT actual por `jti` (**Bearer** tipo `access`; Phase 6; ver `docs/auth-phase-6-logout.md`)
-- `POST /api/auth/forgot-password` — solicitud de restablecimiento (**202** genérico; Phase 7; ver `docs/auth-phase-7-password-recovery.md`)
-- `POST /api/auth/reset-password` — nueva contraseña con token de un solo uso (**200** + JWT; Phase 7; mismo doc)
+- `POST /api/auth/logout` — cierre de sesión **en el cliente** (descartar JWT); **200** `{ ok, message }`. No hay revocación server-side en esta versión del TP.
+- `POST /api/auth/forgot-password` — **no implementado** (**501**, código `PASSWORD_RESET_NOT_IMPLEMENTED`)
+- `POST /api/auth/reset-password` — **no implementado** (**501**, código `PASSWORD_RESET_NOT_IMPLEMENTED`)
+
+**Demo backend:** checklist paso a paso — [`docs/demo/backend-demo-checklist.md`](../../docs/demo/backend-demo-checklist.md)
+
+### Admisión de clientes (empleado)
+
+| Método | Ruta | Rol |
+|--------|------|-----|
+| GET | `/api/admin/clientes/:id` | Empleado |
+| PATCH | `/api/admin/clientes/:id/admitir` | Empleado (`admitido`, `categoria` opcional) |
+| PATCH | `/api/admin/clients/:id/admit` | Alias inglés |
+
+### Estado operativo del cliente (pujas)
+
+| Método | Ruta | Rol |
+|--------|------|-----|
+| GET | `/api/users/me/status` | Cliente (`?auctionId=` opcional) |
+| GET | `/api/clientes/me/status` | Alias |
+| GET | `/api/clients/me/status` | Alias inglés |
+
+Respuesta incluye `admitido`, `categoria`, `hasVerifiedPaymentMethod`, `canBid`, `cannotBidReason`.
 
 **Cierre Auth (Phase 8):** QA manual y checklist — `docs/auth-phase-8-manual-qa.md`. Resumen para frontend/mobile — `docs/auth-final-summary.md`.
 
@@ -37,16 +57,31 @@ Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
 
 | Método | Ruta | Rol |
 |--------|------|-----|
-| POST | `/api/productos/submissions` | Cliente (`access` + contraseña definitiva) |
-| GET | `/api/users/me/item-submissions` | Cliente |
+| POST | `/api/productos/solicitudes` | Cliente (contrato TPO; body `nombre`, `descripcion`, `fotos[]`, declaraciones) |
+| POST | `/api/productos/submissions` | Cliente (contrato legacy) |
+| POST | `/api/items/submissions` | Cliente (alias inglés de solicitudes) |
+| GET | `/api/productos/mis-solicitudes` | Cliente |
+| GET | `/api/productos/mis-solicitudes/:id` | Cliente |
+| GET | `/api/items/my-submissions` | Cliente (alias inglés) |
+| POST | `/api/productos/mis-solicitudes/:id/aceptar-condiciones` | Cliente → **409** `TERMS_ACCEPTANCE_NOT_SUPPORTED_BY_SCHEMA` |
+| POST | `/api/productos/mis-solicitudes/:id/rechazar-condiciones` | Cliente → **409** (idem) |
+| GET | `/api/users/me/item-submissions` | Cliente (legacy) |
 | GET | `/api/users/me/item-submissions/:id` | Cliente |
 | DELETE | `/api/users/me/item-submissions/:id` | Cliente (solo `disponible=no`, sin catálogo) |
 | POST | `/api/auth/employee/login` | Empleado (env `EMPLOYEE_ADMIN_*`) |
-| GET | `/api/admin/productos/revision` | Empleado |
+| GET | `/api/admin/productos/solicitudes` | Empleado (`?status`, `search`, `limit`, `offset`) |
+| GET | `/api/admin/productos/solicitudes/:id` | Empleado |
+| POST | `/api/admin/productos/solicitudes/:id/aceptar` | Empleado (`basePrice`, `commissionPercent`) |
+| POST | `/api/admin/productos/solicitudes/:id/rechazar` | Empleado → **409** `REJECTION_NOT_SUPPORTED_BY_SCHEMA` |
+| POST | `/api/admin/productos/solicitudes/:id/asignar-subasta` | Empleado (`auctionId` \| `catalogId`, `basePrice`, `commissionPercent`) |
+| GET | `/api/admin/items/submissions` | Empleado (alias inglés) |
+| GET | `/api/admin/productos/revision` | Empleado (legacy; solo pendientes) |
 | POST | `/api/admin/productos/:id/decision` | Empleado (`approve` \| `reject`) |
 | PATCH | `/api/admin/productos/:id/auction-assignment` | Empleado |
 
-**Limitaciones del esquema fijo:** no hay columna de motivo de rechazo ni historial; `disponible=no` agrupa pendiente y no aprobado; las declaraciones legales se validan pero no se persisten.
+**Estados API (derivados):** `PENDING_REVIEW`, `ACCEPTED`, `ASSIGNED_TO_AUCTION` — ver `audit/item-submission-backend-flow-implementation-report.md`.
+
+**Limitaciones del esquema fijo:** no hay columna de motivo de rechazo ni historial; `disponible=no` agrupa pendiente y no aprobado; las declaraciones legales se validan pero no se persisten; rechazo persistido no soportado (`POST .../rechazar` → 409).
 
 **Foto de envío:** `GET /api/users/me/item-submissions/:id/photos/:photoId` (cliente, binario `application/octet-stream`).
 

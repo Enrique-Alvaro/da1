@@ -7,8 +7,8 @@ function sqlErrorNumber(err: unknown): number | undefined {
 }
 
 /**
- * Persists revocation by JWT `jti` until `expires_at_utc`. Does not store the raw JWT.
- * Idempotent: duplicate `jwt_id` (unique) is ignored.
+ * Persiste revocación por JWT `jti` hasta `expires_at_utc`. No almacena el JWT en claro.
+ * Idempotente: `jwt_id` duplicado (único) se ignora.
  */
 export async function revokeToken(input: {
   tokenJti: string;
@@ -53,7 +53,7 @@ export async function isTokenRevoked(tokenJti: string): Promise<boolean> {
   return n > 0;
 }
 
-/** Deletes expired revocation rows. Safe for occasional cron/maintenance. */
+/** Elimina filas de revocación vencidas. Seguro para cron/mantenimiento ocasional. */
 export async function cleanupExpiredRevokedTokens(): Promise<number> {
   const pool = await getSqlPool();
   const result = await pool.request().query(`

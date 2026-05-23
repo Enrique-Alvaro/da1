@@ -9,6 +9,8 @@ import { auctionsRoutes } from "../modules/auctions/auctions.routes";
 import { itemsRoutes } from "../modules/items/items.routes";
 import { productosRoutes } from "../modules/productos/productos.routes";
 import { adminRoutes } from "../modules/admin/admin.routes";
+import { clientesRoutes } from "../modules/clientes/clientes.routes";
+import { clientsRoutes } from "../modules/clients/clients.routes";
 
 export const apiRouter = Router();
 
@@ -22,3 +24,5 @@ apiRouter.use("/auctions", auctionsRoutes);
 apiRouter.use("/items", itemsRoutes);
 apiRouter.use("/productos", productosRoutes);
 apiRouter.use("/admin", adminRoutes);
+apiRouter.use("/clientes", clientesRoutes);
+apiRouter.use("/clients", clientsRoutes);

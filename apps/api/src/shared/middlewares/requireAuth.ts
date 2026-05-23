@@ -5,7 +5,7 @@ import type { AuthTokenType } from "../types/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 
 /**
- * Validates `Authorization: Bearer`, verifies JWT (stateless), attaches `req.authUser`.
+ * Valida `Authorization: Bearer`, verifica JWT (stateless) y asigna `req.authUser`.
  * No comprobación de revocación en base de datos.
  */
 export const requireAuth = asyncHandler(async (req, _res, next) => {

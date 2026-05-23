@@ -1,7 +1,7 @@
 import { UnauthorizedError } from "../errors/httpErrors";
 
 /**
- * Parses `Authorization: Bearer <token>` only.
+ * Parsea solo `Authorization: Bearer <token>`.
  */
 export function extractBearerToken(authorizationHeader?: string): string {
   const raw = authorizationHeader?.trim();

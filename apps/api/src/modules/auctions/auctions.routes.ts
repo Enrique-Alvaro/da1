@@ -21,7 +21,7 @@ import {
   listSubastas,
 } from "../subastas/subastas.controller";
 
-/** English aliases — same handlers as `/api/subastas`. */
+/** Alias en inglés — mismos handlers que `/api/subastas`. */
 export const auctionsRoutes = Router();
 
 auctionsRoutes.use(normalizeAuctionIdParam);

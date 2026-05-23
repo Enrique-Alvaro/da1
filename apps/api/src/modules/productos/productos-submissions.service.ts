@@ -206,10 +206,10 @@ export function assertEmployeeId(authUser: AuthUserContext): number {
   return id;
 }
 
-/** @internal for tests */
+/** @internal para pruebas */
 export async function resolveDuenioForUser(user: UserPublic): Promise<number> {
   return dueniosRepository.findOrCreateDuenioForPersona(user.id, user.country.id);
 }
 
-/** @internal for tests */
+/** @internal para pruebas */
 export { SUBMISSION_LIMITATIONS, REJECT_DECISION_LIMITATIONS };

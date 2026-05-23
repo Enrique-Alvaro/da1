@@ -242,29 +242,34 @@ describe("auth essentials (Auth-2)", () => {
   });
 
   describe("forgotPassword / resetPassword", () => {
-    it("forgotPassword throws NotImplementedError", async () => {
-      await expect(forgotPassword({ email: "any@example.com" })).rejects.toBeInstanceOf(NotImplementedError);
+    it("forgotPassword throws NotImplementedError with code", async () => {
+      await expect(forgotPassword({ email: "any@example.com" })).rejects.toMatchObject({
+        code: "PASSWORD_RESET_NOT_IMPLEMENTED",
+      });
     });
 
-    it("resetPassword throws NotImplementedError", async () => {
+    it("resetPassword throws NotImplementedError with code", async () => {
       await expect(
         resetPassword({ token: "some-valid-length-token-here", password: "NewStrong789" })
-      ).rejects.toBeInstanceOf(NotImplementedError);
+      ).rejects.toMatchObject({
+        code: "PASSWORD_RESET_NOT_IMPLEMENTED",
+      });
     });
   });
 
   describe("logout", () => {
-    it("resolves without calling DB revocation", async () => {
-      await expect(
-        logout({
-          id: "7",
-          email: "a@b.com",
-          tokenType: "access",
-          jti: "jti-1",
-          exp: 1,
-          expiresAt: new Date(),
-        })
-      ).resolves.toBeUndefined();
+    it("returns client-side discard message without DB revocation", async () => {
+      const result = await logout({
+        id: "7",
+        email: "a@b.com",
+        tokenType: "access",
+        role: "cliente",
+        jti: "jti-1",
+        exp: 1,
+        expiresAt: new Date(),
+      });
+      expect(result.ok).toBe(true);
+      expect(result.message).toContain("Descartar");
     });
   });
 });

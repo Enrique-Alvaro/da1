@@ -1,7 +1,7 @@
 /**
- * In-memory live session tracking (`NO_PERSISTED_LIVE_SESSION`).
- * Not durable across process restarts or horizontal scaling.
- * DB `asistentes` records auction enrollment but not "connected now".
+ * Seguimiento de sesión en vivo en memoria (`NO_PERSISTED_LIVE_SESSION`).
+ * No persiste entre reinicios del proceso ni escalado horizontal.
+ * En BD, `asistentes` registra inscripción a la subasta pero no "conectado ahora".
  */
 
 const activeByCliente = new Map<number, number>();
@@ -31,7 +31,7 @@ export function leaveSession(clienteId: number, auctionId: number): boolean {
   return false;
 }
 
-/** @internal tests */
+/** @internal pruebas */
 export function clearAllLiveSessions(): void {
   activeByCliente.clear();
 }

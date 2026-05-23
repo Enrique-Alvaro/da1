@@ -57,8 +57,8 @@ export class InternalServerError extends AppError {
 }
 
 export class NotImplementedError extends AppError {
-  constructor(message: string) {
-    super("NotImplementedError", message, 501);
+  constructor(message: string, code?: string) {
+    super("NotImplementedError", message, 501, code);
     this.name = "NotImplementedError";
   }
 }

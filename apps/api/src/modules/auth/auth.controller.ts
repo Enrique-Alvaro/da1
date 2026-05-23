@@ -73,12 +73,12 @@ export const resetPassword: RequestHandler = asyncHandler(async (req, res) => {
   res.status(200).json(result);
 });
 
-/** POST /api/auth/logout — Bearer access token only (chain: requireAuth + requireAccessToken). */
+/** POST /api/auth/logout — solo Bearer access token (cadena: requireAuth + requireAccessToken). */
 export const logout: RequestHandler = asyncHandler(async (req, res) => {
   if (!req.authUser) {
     throw new UnauthorizedError("No autorizado.");
   }
 
-  await authService.logout(req.authUser);
-  res.status(204).send();
+  const result = await authService.logout(req.authUser);
+  res.status(200).json(result);
 });

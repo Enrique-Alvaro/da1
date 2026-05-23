@@ -26,8 +26,8 @@ function canShowBasePrice(authUser: AuthUserContext | undefined): boolean {
 }
 
 /**
- * Deterministic current item (`NO_CURRENT_ITEM_FIELD`):
- * first catalog item in the auction with subastado = 'no' and no registroDeSubasta, by identificador ASC.
+ * Ítem actual determinista (`NO_CURRENT_ITEM_FIELD`):
+ * primer ítem del catálogo de la subasta con subastado = 'no' y sin registroDeSubasta, por identificador ASC.
  */
 export function pickCurrentItemId(
   items: itemsRepository.CatalogItemRow[],

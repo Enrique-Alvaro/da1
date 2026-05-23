@@ -4,8 +4,8 @@ import type { AuthTokenType } from "../types/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 
 /**
- * If `Authorization: Bearer` is present and valid, sets `req.authUser`.
- * Invalid or missing token leaves `authUser` undefined (public read paths).
+ * Si `Authorization: Bearer` está presente y es válido, asigna `req.authUser`.
+ * Token inválido o ausente deja `authUser` indefinido (rutas públicas de lectura).
  */
 export const optionalAuth = asyncHandler(async (req, _res, next) => {
   const header = req.headers.authorization;

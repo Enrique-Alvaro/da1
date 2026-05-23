@@ -4,7 +4,7 @@ import { z } from "zod";
 loadDotenv();
 
 /**
- * Phase 1: SQL Server ADO connection string from env (first match wins):
+ * Fase 1: cadena de conexión ADO a SQL Server desde env (primer valor definido gana):
  * SQLSERVER_CONNECTION_STRING → SQL_SERVER_CONNECTION_STRING → DATABASE_URL
  */
 const rawSchema = z.object({
@@ -12,9 +12,9 @@ const rawSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
   SQLSERVER_CONNECTION_STRING: z.string().optional(),
-  /** Same value; common alternate name (underscore before SERVER) */
+  /** Mismo valor; nombre alternativo habitual (guión bajo antes de SERVER) */
   SQL_SERVER_CONNECTION_STRING: z.string().optional(),
-  /** @deprecated Prefer SQLSERVER_CONNECTION_STRING */
+  /** @deprecated Preferir SQLSERVER_CONNECTION_STRING */
   DATABASE_URL: z.string().optional(),
 
   JWT_SECRET: z.string().optional(),
@@ -28,7 +28,7 @@ const rawSchema = z.object({
   SMTP_FROM: z.string().optional(),
 
   FRONTEND_URL: z.string().optional(),
-  /** Password reset link TTL; default 30 in code when unset. */
+  /** TTL del enlace de restablecimiento de contraseña; por defecto 30 en código si no está definido. */
   PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().optional(),
 
   /** Empleado revisor inicial en alta de producto (FK productos.revisor). */
@@ -96,7 +96,7 @@ export function getEnv(): Env {
   return cached;
 }
 
-/** Minutes until password reset token expires (env override or 30). */
+/** Minutos hasta que expire el token de restablecimiento (override en env o 30). */
 export function getPasswordResetTtlMinutes(): number {
   return getEnv().PASSWORD_RESET_TOKEN_TTL_MINUTES ?? 30;
 }

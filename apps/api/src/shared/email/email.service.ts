@@ -20,9 +20,9 @@ function isSmtpConfigured(): boolean {
 }
 
 /**
- * Sends temporary password email via SMTP when configured.
- * Development without SMTP: logs a mock notice (password visible only in non-production).
- * Production without SMTP: fails fast.
+ * Envía correo de contraseña temporal por SMTP si está configurado.
+ * Desarrollo sin SMTP: log simulado (contraseña visible solo fuera de producción).
+ * Producción sin SMTP: falla de inmediato.
  */
 export async function sendTemporaryPasswordEmail(params: SendTemporaryPasswordParams): Promise<void> {
   const env = getEnv();
@@ -82,13 +82,13 @@ export async function sendTemporaryPasswordEmail(params: SendTemporaryPasswordPa
 export type SendPasswordResetEmailParams = {
   to: string;
   firstName: string;
-  /** Full reset URL including query token (never log in production). */
+  /** URL completa de restablecimiento con token en query (no loguear en producción). */
   resetUrl: string;
 };
 
 /**
- * Sends password reset link via SMTP when configured.
- * Dev without SMTP: mock log — reset URL printed only when NODE_ENV !== production.
+ * Envía enlace de restablecimiento por SMTP si está configurado.
+ * Dev sin SMTP: log simulado — URL de reset solo si NODE_ENV !== production.
  */
 export async function sendPasswordResetEmail(params: SendPasswordResetEmailParams): Promise<void> {
   const env = getEnv();

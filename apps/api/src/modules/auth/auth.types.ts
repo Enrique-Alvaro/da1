@@ -1,4 +1,4 @@
-/** Row shape returned from dbo.users (solo usado por password-reset.repository legacy). */
+/** Forma de fila devuelta por dbo.users (solo usado por password-reset.repository legacy). */
 export type DbUserRow = {
   id: string;
   first_name: string;
@@ -18,7 +18,7 @@ export type DbUserRow = {
   account_service_suspended: boolean | Buffer;
 };
 
-/** Login query — includes hash for verification only; never expose to API. */
+/** Consulta de login — incluye hash solo para verificación; nunca exponer en la API. */
 export type DbUserWithPasswordRow = DbUserRow & {
   password_hash: string;
 };
