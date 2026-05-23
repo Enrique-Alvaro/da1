@@ -2,7 +2,14 @@
 
 Guía para demostrar el backend CrownBid **solo con llamadas API** (sin `UPDATE` manual en SQL para admisión).
 
-Ver también: [`apps/api/README.md`](../../apps/api/README.md) y [`audit/backend-dod-architecture-senior-audit.md`](../../audit/backend-dod-architecture-senior-audit.md).
+Ver también:
+
+- [`apps/api/README.md`](../../apps/api/README.md)
+- [`backend-final-manual-qa.md`](backend-final-manual-qa.md) — guía paso a paso para defensa
+- [`backend-final-dod-checklist.md`](backend-final-dod-checklist.md) — Definition of Done
+- [`../../docs/postman/CrownBid-Final-Demo.postman_collection.json`](../postman/CrownBid-Final-Demo.postman_collection.json)
+- [`../../audit/phase-5-final-backend-delivery-report.md`](../../audit/phase-5-final-backend-delivery-report.md)
+- [`../../audit/backend-dod-architecture-senior-audit.md`](../../audit/backend-dod-architecture-senior-audit.md)
 
 ---
 

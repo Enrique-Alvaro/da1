@@ -29,7 +29,13 @@ Ver `.env.example`. **Phase 1** exige `SQLSERVER_CONNECTION_STRING` (o `DATABASE
 - `POST /api/auth/forgot-password` — **no implementado** (**501**, código `PASSWORD_RESET_NOT_IMPLEMENTED`)
 - `POST /api/auth/reset-password` — **no implementado** (**501**, código `PASSWORD_RESET_NOT_IMPLEMENTED`)
 
-**Demo backend:** checklist paso a paso — [`docs/demo/backend-demo-checklist.md`](../../docs/demo/backend-demo-checklist.md)
+**Demo backend (Phase 5 — entrega final):**
+
+- Checklist compacto — [`docs/demo/backend-demo-checklist.md`](../../docs/demo/backend-demo-checklist.md)
+- QA manual completo — [`docs/demo/backend-final-manual-qa.md`](../../docs/demo/backend-final-manual-qa.md)
+- DoD final — [`docs/demo/backend-final-dod-checklist.md`](../../docs/demo/backend-final-dod-checklist.md)
+- Postman demo — [`docs/postman/CrownBid-Final-Demo.postman_collection.json`](../../docs/postman/CrownBid-Final-Demo.postman_collection.json)
+- Informe Phase 5 — [`audit/phase-5-final-backend-delivery-report.md`](../../audit/phase-5-final-backend-delivery-report.md)
 
 ### Admisión de clientes (empleado)
 
