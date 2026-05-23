@@ -38,6 +38,12 @@ const rawSchema = z.object({
   EMPLOYEE_ADMIN_EMAIL: z.string().optional(),
   EMPLOYEE_ADMIN_PASSWORD: z.string().optional(),
   EMPLOYEE_ADMIN_ID: z.coerce.number().int().positive().optional(),
+
+  /**
+   * Cliente (dbo.clientes.identificador = personas.identificador) que representa a la empresa
+   * cuando un ítem se adjudica sin pujas. Requerido para persistir registroDeSubasta en ese caso.
+   */
+  COMPANY_CLIENT_ID: z.coerce.number().int().positive().optional(),
 });
 
 export type Env = z.infer<typeof rawSchema> & {
@@ -101,6 +107,14 @@ export function getDefaultReviewerEmployeeId(): number {
     throw new Error(
       "DEFAULT_REVIEWER_EMPLOYEE_ID is required for product submissions. Set it in apps/api/.env (must exist in dbo.empleados)."
     );
+  }
+  return id;
+}
+
+export function getCompanyClientId(): number | null {
+  const id = getEnv().COMPANY_CLIENT_ID;
+  if (id === undefined || !Number.isSafeInteger(id) || id <= 0) {
+    return null;
   }
   return id;
 }

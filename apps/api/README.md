@@ -61,6 +61,37 @@ Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
 7. **Foto ajena:** Otro cliente con su token → 404 en foto de otro dueño.
 8. **Concurrencia asignación:** (opcional) dos `PATCH .../auction-assignment` simultáneos → uno 409.
 
+### Subasta en vivo (Fase live — sin cambios de esquema SQL)
+
+Alias inglés: `/api/auctions` (misma lógica que `/api/subastas`).
+
+| Método | Path | Auth |
+|--------|------|------|
+| GET | `/api/subastas`, `/api/auctions` | Opcional (`?featured=true`, `status`, `category`) |
+| GET | `/api/subastas/:id`, `/api/auctions/:auctionId` | Opcional |
+| GET | `/api/subastas/:id/items` | Opcional (`basePrice` con JWT cliente) |
+| GET | `/api/items/:id` | Opcional (`id` = `itemsCatalogo.identificador`) |
+| POST/DELETE | `.../live/session` | Cliente operativo |
+| GET | `.../live` | Cliente operativo (polling) |
+| GET | `.../pujos/history` o `.../bids/history` | Cliente operativo |
+| GET | `/api/users/me/metrics` | Bearer access |
+
+**Puja:** requiere `POST .../live/session` antes de `POST .../pujos` (sesión en memoria — ver informe `audit/live-auction-backend-flow-implementation-report.md`).
+
+### Cierre de ítem / adjudicación (sin cambios de esquema SQL)
+
+| Método | Path | Auth |
+|--------|------|------|
+| POST | `/api/subastas/:id/items/:itemId/cerrar` | Empleado |
+| GET | `/api/subastas/:id/items/:itemId/resultado` | Bearer |
+| POST | `/api/auctions/:auctionId/items/:itemId/close` | Empleado (alias) |
+| GET | `/api/auctions/:auctionId/items/:itemId/result` | Bearer (alias) |
+| GET | `/api/users/me/purchases` | Cliente |
+
+Persistencia: `registroDeSubasta`, `itemsCatalogo.subastado`, `pujos.ganador`. Ver `audit/auction-closing-backend-flow-implementation-report.md`.
+
+---
+
 # Medios de pago y autorización de pujas
 
 **Cierre Fase 5:** informe [`../../docs/payment-methods-backend-closure.md`](../../docs/payment-methods-backend-closure.md) · checklist manual [`../../docs/payment-methods-manual-checklist.md`](../../docs/payment-methods-manual-checklist.md) · Postman [`../../docs/postman/CrownBid-Payment-Methods-Bids.postman_collection.json`](../../docs/postman/CrownBid-Payment-Methods-Bids.postman_collection.json) · OpenAPI [`../../docs/swagger.yaml`](../../docs/swagger.yaml).

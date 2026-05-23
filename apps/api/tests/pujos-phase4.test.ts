@@ -12,6 +12,7 @@ import {
 } from "../src/modules/pujos/pujos.service";
 import { assertPaymentMethodForBid } from "../src/modules/pujos/pujos-payment-validation";
 import type { AuthUserContext } from "../src/shared/types/auth";
+import * as liveSessionStore from "../src/modules/subastas/live-session.store";
 import {
   ConflictError,
   ForbiddenError,
@@ -101,6 +102,8 @@ function mockMedio(
 describe("Pujas — Fase 4 assertCanBid", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    liveSessionStore.clearAllLiveSessions();
+    liveSessionStore.enterSession(7, 10);
     vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue(clienteAdmitido);
     vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(subastaAbierta);
     vi.spyOn(pujosRepository, "findAsistenteByClienteAndSubasta").mockResolvedValue(asistente);
@@ -170,7 +173,7 @@ describe("Pujas — Fase 4 assertCanBid", () => {
       ...subastaAbierta,
       categoria: "oro",
     });
-    await expect(callBid()).rejects.toMatchObject({ code: "CLIENT_CATEGORY_NOT_ALLOWED" });
+    await expect(callBid()).rejects.toMatchObject({ code: "CATEGORY_NOT_ALLOWED" });
   });
 
   it("subasta cerrada → AUCTION_NOT_OPEN", async () => {
@@ -215,11 +218,11 @@ describe("Pujas — Fase 4 assertCanBid", () => {
       mockMedio({ moneda: "USD" })
     );
     await expect(callBid()).rejects.toMatchObject({
-      code: "PAYMENT_METHOD_CURRENCY_NOT_ALLOWED",
+      code: "PAYMENT_METHOD_CURRENCY_MISMATCH",
     });
   });
 
-  it("cheque sin fondos → PAYMENT_METHOD_INSUFFICIENT_FUNDS", async () => {
+  it("cheque sin fondos → GUARANTEE_LIMIT_EXCEEDED", async () => {
     vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
       mockMedio({
         tipo: "cheque_certificado",
@@ -227,16 +230,16 @@ describe("Pujas — Fase 4 assertCanBid", () => {
       })
     );
     await expect(callBid(20000)).rejects.toMatchObject({
-      code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+      code: "GUARANTEE_LIMIT_EXCEEDED",
     });
   });
 
-  it("importe bajo → BID_AMOUNT_TOO_LOW", async () => {
-    await expect(callBid(10000)).rejects.toMatchObject({ code: "BID_AMOUNT_TOO_LOW" });
+  it("importe bajo → BID_TOO_LOW", async () => {
+    await expect(callBid(10000)).rejects.toMatchObject({ code: "BID_TOO_LOW" });
   });
 
-  it("importe alto (comun) → BID_AMOUNT_TOO_HIGH", async () => {
-    await expect(callBid(50000)).rejects.toMatchObject({ code: "BID_AMOUNT_TOO_HIGH" });
+  it("importe alto (comun) → BID_TOO_HIGH", async () => {
+    await expect(callBid(50000)).rejects.toMatchObject({ code: "BID_TOO_HIGH" });
   });
 
   it("oro: sin tope 20% pero debe superar mejor oferta", () => {
@@ -312,7 +315,7 @@ describe("Pujas — registro asistente", () => {
       categoria: "oro",
     });
     await expect(registerAsistenteForAuction(authCliente, 10)).rejects.toMatchObject({
-      code: "CLIENT_CATEGORY_NOT_ALLOWED",
+      code: "CATEGORY_NOT_ALLOWED",
     });
     expect(pujosRepository.insertAsistenteInTransaction).not.toHaveBeenCalled();
   });
@@ -334,6 +337,8 @@ describe("Pujas — registro asistente", () => {
 describe("Pujas — createBid pasa revalidación de medio a transacción", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    liveSessionStore.clearAllLiveSessions();
+    liveSessionStore.enterSession(7, 10);
     vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue(clienteAdmitido);
     vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(subastaAbierta);
     vi.spyOn(pujosRepository, "findAsistenteByClienteAndSubasta").mockResolvedValue(asistente);

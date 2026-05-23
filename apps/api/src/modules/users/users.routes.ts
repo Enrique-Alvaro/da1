@@ -9,7 +9,7 @@ import {
   getMySubmissionPhoto,
   listMySubmissions,
 } from "../productos/productos-submissions.controller";
-import { getMe } from "./users.controller";
+import { getMe, getMyMetrics, getMyPurchases } from "./users.controller";
 import {
   createPaymentMethod,
   disablePaymentMethod,
@@ -19,6 +19,8 @@ import {
 export const usersRoutes = Router();
 
 usersRoutes.get("/me", requireAuth, requireAccessToken, getMe);
+usersRoutes.get("/me/metrics", requireAuth, requireAccessToken, getMyMetrics);
+usersRoutes.get("/me/purchases", requireAuth, requireAccessToken, requireClienteAuth, getMyPurchases);
 
 /** Contraseña definitiva (requireOperationalUser); no exige clientes.admitido = 'si'. */
 const clientOperationalChain = [

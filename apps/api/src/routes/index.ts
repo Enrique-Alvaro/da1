@@ -5,6 +5,8 @@ import { paisesRoutes } from "../modules/paises/paises.routes";
 import { sectoresRoutes } from "../modules/sectores/sectores.routes";
 import { empleadosRoutes } from "../modules/empleados/empleados.routes";
 import { subastasRoutes } from "../modules/subastas/subastas.routes";
+import { auctionsRoutes } from "../modules/auctions/auctions.routes";
+import { itemsRoutes } from "../modules/items/items.routes";
 import { productosRoutes } from "../modules/productos/productos.routes";
 import { adminRoutes } from "../modules/admin/admin.routes";
 
@@ -16,5 +18,7 @@ apiRouter.use("/paises", paisesRoutes);
 apiRouter.use("/sectores", sectoresRoutes);
 apiRouter.use("/empleados", empleadosRoutes);
 apiRouter.use("/subastas", subastasRoutes);
+apiRouter.use("/auctions", auctionsRoutes);
+apiRouter.use("/items", itemsRoutes);
 apiRouter.use("/productos", productosRoutes);
 apiRouter.use("/admin", adminRoutes);
