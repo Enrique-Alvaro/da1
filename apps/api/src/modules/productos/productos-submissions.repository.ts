@@ -178,7 +178,7 @@ export async function assertSubastaExists(subastaId: number): Promise<void> {
     SELECT COUNT_BIG(1) AS n FROM dbo.subastas WHERE identificador = @id
   `);
   if ((result.recordset[0]?.n ?? 0) < 1) {
-    throw new NotFoundError("Subasta no encontrada.");
+    throw new NotFoundError("Subasta no encontrada.", "AUCTION_NOT_FOUND");
   }
 }
 
@@ -340,10 +340,13 @@ export async function applyAdminDecision(input: {
 
   const current = await findSubmissionById(input.productId);
   if (!current) {
-    throw new NotFoundError("Producto no encontrado.");
+    throw new NotFoundError("Producto no encontrado.", "PRODUCT_NOT_FOUND");
   }
   if (current.isScheduled) {
-    throw new ConflictError("El producto ya está asignado a un catálogo.");
+    throw new ConflictError(
+      "El producto ya está asignado a un catálogo.",
+      "ITEM_ALREADY_ASSIGNED"
+    );
   }
   if (current.isSold) {
     throw new ConflictError("El producto ya fue vendido.");
@@ -406,10 +409,13 @@ export async function assignProductToAuction(input: {
     `);
     const locked = prodRes.recordset[0];
     if (!locked) {
-      throw new NotFoundError("Producto no encontrado.");
+      throw new NotFoundError("Producto no encontrado.", "PRODUCT_NOT_FOUND");
     }
     if ((locked.disponible ?? "no").toLowerCase() !== "si") {
-      throw new ConflictError("Solo se pueden programar productos aprobados (disponible = si).");
+      throw new ConflictError(
+        "Solo se pueden programar productos aprobados (disponible = si).",
+        "PRODUCT_NOT_APPROVED"
+      );
     }
 
     const lockScheduled = new sql.Request(tx);
@@ -420,7 +426,10 @@ export async function assignProductToAuction(input: {
       WHERE producto = @producto
     `);
     if ((schedRes.recordset[0]?.n ?? 0) > 0) {
-      throw new ConflictError("El producto ya está programado en un catálogo.");
+      throw new ConflictError(
+        "El producto ya está programado en un catálogo.",
+        "ITEM_ALREADY_ASSIGNED"
+      );
     }
 
     const lockSold = new sql.Request(tx);
@@ -452,11 +461,20 @@ export async function assignProductToAuction(input: {
     } else {
       const check = new sql.Request(tx);
       check.input("id", sql.Int, catalogId);
-      const exists = await check.query<{ n: number }>(`
-        SELECT COUNT_BIG(1) AS n FROM dbo.catalogos WHERE identificador = @id
+      const catRow = await check.query<{ subasta: number | null }>(`
+        SELECT subasta FROM dbo.catalogos WHERE identificador = @id
       `);
-      if ((exists.recordset[0]?.n ?? 0) < 1) {
-        throw new NotFoundError("Catálogo no encontrado.");
+      if (!catRow.recordset[0]) {
+        throw new NotFoundError("Catálogo no encontrado.", "CATALOG_NOT_FOUND");
+      }
+      if (
+        input.subastaId !== undefined &&
+        catRow.recordset[0].subasta !== input.subastaId
+      ) {
+        throw new ConflictError(
+          "El catálogo no pertenece a la subasta indicada.",
+          "CATALOG_AUCTION_MISMATCH"
+        );
       }
     }
 

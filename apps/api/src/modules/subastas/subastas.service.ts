@@ -12,6 +12,10 @@ import * as liveRepo from "./subastas-live.repository";
 import * as subastasRepository from "./subastas.repository";
 import type { ListSubastasFilters } from "./subastas.repository";
 import * as liveSessionStore from "./live-session.store";
+import { toPublicAccessDenialCode } from "./access-denial-codes";
+import { pickCurrentItemId } from "./subastas-current-item";
+
+export { pickCurrentItemId } from "./subastas-current-item";
 
 const FEATURED_DEFAULT_LIMIT = 6;
 
@@ -23,24 +27,6 @@ export type ListSubastasQuery = {
 
 function canShowBasePrice(authUser: AuthUserContext | undefined): boolean {
   return Boolean(authUser && authUser.tokenType === "access" && authUser.role !== "empleado");
-}
-
-/**
- * Ítem actual determinista (`NO_CURRENT_ITEM_FIELD`):
- * primer ítem del catálogo de la subasta con subastado = 'no' y sin registroDeSubasta, por identificador ASC.
- */
-export function pickCurrentItemId(
-  items: itemsRepository.CatalogItemRow[],
-  auctionStatus: "scheduled" | "live" | "closed"
-): number | null {
-  if (auctionStatus !== "live") {
-    return null;
-  }
-  const candidate = items.find((it) => {
-    const sub = (it.subastado ?? "no").trim().toLowerCase();
-    return sub !== "si" && it.isSoldInRegistro === 0;
-  });
-  return candidate?.identificador ?? null;
 }
 
 export async function listAuctions(
@@ -56,25 +42,34 @@ export async function listAuctions(
   const rows = await subastasRepository.listSubastas(filters);
   const summaries = await Promise.all(
     rows.map(async (row) => {
-      const [access, currentHighestBid] = await Promise.all([
+      const [access, currentHighestBid, itemCount] = await Promise.all([
         evaluateAuctionAccess({ subasta: row, authUser }),
         liveRepo.getMaxBidForAuction(row.identificador),
+        itemsRepository.countCatalogItemsBySubasta(row.identificador),
       ]);
-      return mapSubastaSummary(row, { access, currentHighestBid });
+      return mapSubastaSummary(row, { access, currentHighestBid, itemCount });
     })
   );
   return {
     items: summaries,
     meta: query.featured
-      ? { featured: true, derived: true, limit: FEATURED_DEFAULT_LIMIT }
+      ? {
+          featured: true,
+          derived: true,
+          limitation: "DERIVED_FEATURED_AUCTIONS",
+          limit: FEATURED_DEFAULT_LIMIT,
+        }
       : undefined,
   };
 }
 
 export async function getAuctionDetail(auctionId: number, authUser?: AuthUserContext) {
   const row = await subastasRepository.requireSubastaDetailById(auctionId);
-  const currentHighestBid = await liveRepo.getMaxBidForAuction(auctionId);
-  return mapSubastaDetail(row, authUser, { currentHighestBid });
+  const [currentHighestBid, itemCount] = await Promise.all([
+    liveRepo.getMaxBidForAuction(auctionId),
+    itemsRepository.countCatalogItemsBySubasta(auctionId),
+  ]);
+  return mapSubastaDetail(row, authUser, { currentHighestBid, itemCount });
 }
 
 export async function listAuctionItems(auctionId: number, authUser?: AuthUserContext) {
@@ -135,8 +130,8 @@ export async function getCatalogItemDetail(itemId: number, authUser?: AuthUserCo
     canAccess: access.canAccess,
     canBid: access.canBid,
     canEnterLive: access.canAccess && auctionStatus === "live",
-    cannotAccessReason: access.cannotAccessReason,
-    cannotBidReason: access.cannotBidReason,
+    cannotAccessReason: toPublicAccessDenialCode(access.cannotAccessReason),
+    cannotBidReason: toPublicAccessDenialCode(access.cannotBidReason),
     highestBidderDisplay: winning
       ? { bidderNumber: winning.numeroPostor, clientId: winning.cliente }
       : null,
@@ -211,10 +206,20 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
 
   const auctionStatus = mapSubastaStatus(subasta);
   const items = await itemsRepository.listCatalogItemsBySubasta(auctionId);
-  const currentItemId = pickCurrentItemId(items, auctionStatus);
-  const currentItem = currentItemId
+  let currentItemId = pickCurrentItemId(items, auctionStatus);
+  let currentItem = currentItemId
     ? items.find((i) => i.identificador === currentItemId) ?? null
     : null;
+
+  if (!currentItem && auctionStatus === "live") {
+    const lastSold = items
+      .filter((it) => (it.subastado ?? "no").trim().toLowerCase() === "si")
+      .sort((a, b) => b.identificador - a.identificador)[0];
+    if (lastSold) {
+      currentItem = lastSold;
+      currentItemId = lastSold.identificador;
+    }
+  }
 
   let currentBid: number | null = null;
   let highestBidderId: number | null = null;
@@ -223,14 +228,19 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
   let maxNextBid: number | null = null;
   let percentLimitsApply = true;
 
+  let winningBidId: number | null = null;
+
   if (currentItem) {
     const winning = await liveRepo.findWinningBidForItem(currentItem.identificador);
     const basePrice = Number(currentItem.precioBase);
-    currentBid = winning?.importe ?? basePrice;
+    const currentBest =
+      winning != null ? Number(winning.importe) : basePrice;
+    currentBid = currentBest;
+    winningBidId = winning?.identificador ?? null;
     highestBidderId = winning?.cliente ?? null;
     highestBidderNumber = winning?.numeroPostor ?? null;
     const limits = computeBidLimits(
-      currentBid,
+      currentBest,
       basePrice,
       subasta.categoria ?? "comun"
     );
@@ -260,6 +270,7 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
   let finalAmount: number | null = null;
   let soldItemId: number | null = null;
   let shouldRedirectToResult = false;
+  let isCurrentUserWinner = false;
 
   if (currentItem) {
     const registro = await closingRepository.findRegistroByProductoAndSubasta(
@@ -278,17 +289,36 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
           companyId !== null && registro.cliente === companyId
             ? "COMPANY_PURCHASED"
             : "BIDDER_WON";
-        winnerDisplayName =
-          resultType === "COMPANY_PURCHASED" ? "Empresa" : `Postor ${highestBidderNumber ?? ""}`;
+        if (resultType === "COMPANY_PURCHASED") {
+          winnerDisplayName = "Empresa";
+        } else {
+          const profile = await usersRepository.findProfileByPersonId(registro.cliente);
+          winnerDisplayName =
+            profile?.full_name?.trim() || `Postor ${highestBidderNumber ?? ""}`;
+          if (cliente != null && cliente.identificador === registro.cliente) {
+            isCurrentUserWinner = true;
+          }
+        }
       } else {
         resultType = "NOT_FINALIZED";
       }
     }
   }
 
+  const schemaLimitations: string[] = ["NO_PERSISTED_LIVE_SESSION"];
+  if (currentItemId === null && auctionStatus === "live") {
+    schemaLimitations.push("NO_CURRENT_ITEM_FIELD");
+  }
+
   return {
     auctionId,
     status: auctionStatus,
+    canAccess: access.canAccess,
+    canBid: isFinalized ? false : bidAccess.canBid,
+    cannotAccessReason: toPublicAccessDenialCode(access.cannotAccessReason),
+    cannotBidReason: isFinalized
+      ? "AUCTION_NOT_OPEN"
+      : toPublicAccessDenialCode(bidAccess.cannotBidReason),
     currentItem: currentItem
       ? {
           id: currentItem.identificador,
@@ -298,6 +328,7 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
         }
       : null,
     currentBid,
+    currentHighestBid: currentBid,
     highestBidderId,
     highestBidderNumber,
     minNextBid,
@@ -309,20 +340,20 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
       itemId: b.item,
       amount: Number(b.importe),
       bidderNumber: b.numeroPostor,
-      isWinning: b.identificador === history[0]?.identificador,
+      bidderDisplay: b.numeroPostor,
+      isWinning: winningBidId !== null && b.identificador === winningBidId,
     })),
     isHighestBidder,
+    isCurrentUserWinner: isFinalized ? isCurrentUserWinner : isHighestBidder,
     liveSessionActive: bidAccess.liveSessionActive,
     serverTime: new Date().toISOString(),
-    limitation: currentItemId === null ? "NO_CURRENT_ITEM_FIELD" : undefined,
+    schemaLimitations,
     isFinalized,
     resultType,
     winnerDisplayName,
     finalAmount,
     soldItemId,
     shouldRedirectToResult,
-    canBid: isFinalized ? false : bidAccess.canBid,
-    cannotBidReason: isFinalized ? "AUCTION_NOT_CLOSABLE" : bidAccess.cannotBidReason,
   };
 }
 
@@ -341,8 +372,18 @@ export async function getBidHistory(
   }
 
   const rows = await liveRepo.listBidHistoryBySubasta(auctionId, itemId);
-  const topAmount =
-    rows.length > 0 ? Math.max(...rows.map((r) => Number(r.importe))) : null;
+  let winningBidId: number | null = null;
+  if (itemId !== undefined) {
+    const winning = await liveRepo.findWinningBidForItem(itemId);
+    winningBidId = winning?.identificador ?? null;
+  } else if (rows.length > 0) {
+    const topAmount = Math.max(...rows.map((r) => Number(r.importe)));
+    const leaders = rows.filter((r) => Number(r.importe) === topAmount);
+    winningBidId = leaders.reduce(
+      (min, r) => (r.identificador < min ? r.identificador : min),
+      leaders[0]!.identificador
+    );
+  }
 
   return {
     totalBids: rows.length,
@@ -353,7 +394,7 @@ export async function getBidHistory(
       amount: Number(b.importe),
       bidderNumber: b.numeroPostor,
       bidderClientId: b.cliente,
-      isWinning: topAmount !== null && Number(b.importe) === topAmount,
+      isWinning: winningBidId !== null && b.identificador === winningBidId,
     })),
   };
 }

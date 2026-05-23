@@ -11,6 +11,7 @@ import * as usersRepository from "../users/users.repository";
 import type { CloseItemBody } from "./subastas-closing.schema";
 import * as closingRepository from "./subastas-closing.repository";
 import type { FinalizationResponse } from "./subastas-closing.types";
+import { toFinalizationApiResponse, type FinalizationApiResponse } from "./subastas-closing-api.mapper";
 import { requireSubastaById } from "./subastas.repository";
 
 const SHIPPING_AMOUNT = 0;
@@ -33,7 +34,10 @@ function buildFinalizationResponse(params: {
   isCurrentUserWinner?: boolean;
   limitations?: string[];
 }): FinalizationResponse {
-  const totalAmount = params.finalAmount + params.commissionAmount + SHIPPING_AMOUNT;
+  const totalAmount =
+    params.finalAmount != null
+      ? params.finalAmount + params.commissionAmount + SHIPPING_AMOUNT
+      : null;
   const sold = params.resultType !== "NOT_FINALIZED";
   return {
     auctionId: params.auctionId,
@@ -95,6 +99,7 @@ function registroToResponse(
     limitations: [
       "NO_PERSISTED_FINALIZATION_TIMESTAMP",
       "NO_SHIPPING_SCHEMA_SUPPORT",
+      "NO_COMMISSION_SCHEMA_SUPPORT",
       "NO_PAYMENT_METHOD_ON_BID",
     ],
   });
@@ -104,7 +109,7 @@ export async function closeAuctionItem(
   auctionId: number,
   itemId: number,
   body: CloseItemBody
-): Promise<FinalizationResponse> {
+): Promise<FinalizationApiResponse> {
   await requireSubastaById(auctionId);
 
   const ctx = await closingRepository.findItemCloseContext(auctionId, itemId);
@@ -117,7 +122,7 @@ export async function closeAuctionItem(
     auctionId
   );
   if (existing) {
-    return registroToResponse(existing, ctx, body.paymentMethodId ?? null);
+    throw new ConflictError("El ítem ya fue finalizado.", "ITEM_ALREADY_FINALIZED");
   }
 
   if ((ctx.subastado ?? "no").trim().toLowerCase() === "si") {
@@ -131,7 +136,7 @@ export async function closeAuctionItem(
 
   const limitations: string[] = [
     "NO_SHIPPING_SCHEMA_SUPPORT",
-    "NO_COMMISSION_PERCENTAGE_SCHEMA",
+    "NO_COMMISSION_SCHEMA_SUPPORT",
   ];
 
   if (winningBid) {
@@ -156,46 +161,43 @@ export async function closeAuctionItem(
       winningPujoId: winningBid.pujoId,
     });
 
-    return buildFinalizationResponse({
-      auctionId,
-      itemId,
-      productId: ctx.productoId,
-      resultType: "BIDDER_WON",
-      winnerUserId: winningBid.clienteId,
-      winnerDisplayName:
-        winningBid.personaNombre?.trim() || `Postor ${winningBid.numeroPostor}`,
-      finalAmount: Number(registro.importe),
-      currency,
-      basePrice,
-      commissionAmount: Number(registro.comision),
-      paymentMethodId: body.paymentMethodId ?? null,
-      registroId: registro.identificador,
-      title: ctx.descripcionCatalogo,
-      limitations,
-    });
+    return toFinalizationApiResponse(
+      buildFinalizationResponse({
+        auctionId,
+        itemId,
+        productId: ctx.productoId,
+        resultType: "BIDDER_WON",
+        winnerUserId: winningBid.clienteId,
+        winnerDisplayName:
+          winningBid.personaNombre?.trim() || `Postor ${winningBid.numeroPostor}`,
+        finalAmount: Number(registro.importe),
+        currency,
+        basePrice,
+        commissionAmount: Number(registro.comision),
+        paymentMethodId: body.paymentMethodId ?? null,
+        registroId: registro.identificador,
+        title: ctx.descripcionCatalogo,
+        limitations,
+      })
+    );
   }
 
   limitations.push("PARTIAL_COMPANY_PURCHASE_SUPPORT");
   const companyClientId = getCompanyClientId();
 
   if (companyClientId === null) {
-    await closingRepository.markItemSoldOnly(itemId);
-    return buildFinalizationResponse({
-      auctionId,
-      itemId,
-      productId: ctx.productoId,
-      resultType: "COMPANY_PURCHASED",
-      winnerUserId: null,
-      winnerDisplayName: "Empresa",
-      finalAmount: basePrice,
-      currency,
-      basePrice,
-      commissionAmount: 0,
-      paymentMethodId: null,
-      registroId: null,
-      title: ctx.descripcionCatalogo,
-      limitations: [...limitations, "NO_PERSISTED_COMPANY_REGISTRO"],
-    });
+    throw new ConflictError(
+      "Cierre sin pujas requiere COMPANY_CLIENT_ID en la configuración del servidor.",
+      "COMPANY_CLIENT_ID_REQUIRED"
+    );
+  }
+
+  const companyCliente = await usersRepository.findClienteByPersonId(companyClientId);
+  if (!companyCliente) {
+    throw new ConflictError(
+      "El cliente empresa configurado no existe en la base de datos.",
+      "COMPANY_CLIENT_NOT_FOUND"
+    );
   }
 
   const registro = await closingRepository.persistItemClose({
@@ -209,29 +211,31 @@ export async function closeAuctionItem(
     winningPujoId: null,
   });
 
-  return buildFinalizationResponse({
-    auctionId,
-    itemId,
-    productId: ctx.productoId,
-    resultType: "COMPANY_PURCHASED",
-    winnerUserId: companyClientId,
-    winnerDisplayName: "Empresa",
-    finalAmount: Number(registro.importe),
-    currency,
-    basePrice,
-    commissionAmount: Number(registro.comision),
-    paymentMethodId: null,
-    registroId: registro.identificador,
-    title: ctx.descripcionCatalogo,
-    limitations,
-  });
+  return toFinalizationApiResponse(
+    buildFinalizationResponse({
+      auctionId,
+      itemId,
+      productId: ctx.productoId,
+      resultType: "COMPANY_PURCHASED",
+      winnerUserId: null,
+      winnerDisplayName: "Empresa",
+      finalAmount: Number(registro.importe),
+      currency,
+      basePrice,
+      commissionAmount: Number(registro.comision),
+      paymentMethodId: null,
+      registroId: registro.identificador,
+      title: ctx.descripcionCatalogo,
+      limitations,
+    })
+  );
 }
 
 export async function getItemFinalizationResult(
   auctionId: number,
   itemId: number,
   authUser?: AuthUserContext
-): Promise<FinalizationResponse> {
+): Promise<FinalizationApiResponse> {
   await requireSubastaById(auctionId);
   const ctx = await closingRepository.findItemCloseContext(auctionId, itemId);
   if (!ctx) {
@@ -244,24 +248,27 @@ export async function getItemFinalizationResult(
   );
 
   if (!registro) {
-    return buildFinalizationResponse({
-      auctionId,
-      itemId,
-      productId: ctx.productoId,
-      resultType: "NOT_FINALIZED",
-      winnerUserId: null,
-      winnerDisplayName: null,
-      finalAmount: 0,
-      currency: (ctx.moneda ?? "ARS").trim().toUpperCase(),
-      basePrice: Number(ctx.precioBase),
-      commissionAmount: 0,
-      paymentMethodId: null,
-      registroId: null,
-      title: ctx.descripcionCatalogo,
-      limitations: (ctx.subastado ?? "").toLowerCase() === "si"
-        ? ["NO_PERSISTED_FINALIZATION_STATUS"]
-        : undefined,
-    });
+    return toFinalizationApiResponse(
+      buildFinalizationResponse({
+        auctionId,
+        itemId,
+        productId: ctx.productoId,
+        resultType: "NOT_FINALIZED",
+        winnerUserId: null,
+        winnerDisplayName: null,
+        finalAmount: 0,
+        currency: (ctx.moneda ?? "ARS").trim().toUpperCase(),
+        basePrice: Number(ctx.precioBase),
+        commissionAmount: 0,
+        paymentMethodId: null,
+        registroId: null,
+        title: ctx.descripcionCatalogo,
+        limitations: (ctx.subastado ?? "").toLowerCase() === "si"
+          ? ["NO_PERSISTED_FINALIZATION_STATUS"]
+          : undefined,
+      }),
+      { omitPaymentMethodId: true }
+    );
   }
 
   const response = registroToResponse(registro, ctx, null, authUser);
@@ -271,7 +278,7 @@ export async function getItemFinalizationResult(
       response.winnerDisplayName = profile.full_name;
     }
   }
-  return response;
+  return toFinalizationApiResponse(response, { omitPaymentMethodId: true });
 }
 
 export function assertEmployeeCanClose(authUser: AuthUserContext): void {

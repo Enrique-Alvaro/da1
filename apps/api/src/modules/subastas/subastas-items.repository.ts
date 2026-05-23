@@ -91,6 +91,17 @@ export async function listBidSummariesForSubasta(subastaId: number): Promise<Ite
   }));
 }
 
+export async function countCatalogItemsBySubasta(subastaId: number): Promise<number> {
+  const pool = await getSqlPool();
+  const result = await pool.request().input("subastaId", sql.Int, subastaId).query<{ total: number }>(`
+    SELECT COUNT(*) AS total
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS cat ON cat.identificador = ic.catalogo
+    WHERE cat.subasta = @subastaId
+  `);
+  return Number(result.recordset[0]?.total ?? 0);
+}
+
 export async function listPhotoIdsByProduct(productId: number): Promise<number[]> {
   const pool = await getSqlPool();
   const result = await pool.request().input("producto", sql.Int, productId).query<{ identificador: number }>(`

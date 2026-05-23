@@ -3,6 +3,7 @@ import * as closingRepository from "../src/modules/subastas/subastas-closing.rep
 import * as paymentMethodsRepository from "../src/modules/payment-methods/payment-methods.repository";
 import * as usersRepository from "../src/modules/users/users.repository";
 import * as subastasRepository from "../src/modules/subastas/subastas.repository";
+import * as envConfig from "../src/config/env";
 import {
   assertEmployeeCanClose,
   closeAuctionItem,
@@ -98,6 +99,7 @@ describe("Auction closing", () => {
 
     const result = await closeAuctionItem(10, 100, {});
     expect(result.resultType).toBe("BIDDER_WON");
+    expect(result.resultStatus).toBe("FINALIZED");
     expect(result.finalAmount).toBe(6000);
     expect(closingRepository.persistItemClose).toHaveBeenCalledWith(
       expect.objectContaining({ winningPujoId: 22, clienteId: 7 })
@@ -113,6 +115,11 @@ describe("Auction closing", () => {
     vi.spyOn(closingRepository, "findItemCloseContext").mockResolvedValue(itemCtx);
     vi.spyOn(closingRepository, "findRegistroByProductoAndSubasta").mockResolvedValue(null);
     vi.spyOn(closingRepository, "findWinningBidForClose").mockResolvedValue(null);
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
+      identificador: 99,
+      admitido: "si",
+      categoria: "comun",
+    });
     vi.spyOn(closingRepository, "persistItemClose").mockResolvedValue({
       ...registroRow,
       cliente: 99,
@@ -159,11 +166,32 @@ describe("Auction closing", () => {
     });
   });
 
+  it("duplicate close when registro exists → ITEM_ALREADY_FINALIZED", async () => {
+    vi.spyOn(closingRepository, "findItemCloseContext").mockResolvedValue(itemCtx);
+    vi.spyOn(closingRepository, "findRegistroByProductoAndSubasta").mockResolvedValue(registroRow);
+    await expect(closeAuctionItem(10, 100, {})).rejects.toMatchObject({
+      code: "ITEM_ALREADY_FINALIZED",
+    });
+  });
+
+  it("no bids without COMPANY_CLIENT_ID → COMPANY_CLIENT_ID_REQUIRED", async () => {
+    vi.spyOn(envConfig, "getCompanyClientId").mockReturnValue(null);
+    vi.spyOn(closingRepository, "findItemCloseContext").mockResolvedValue(itemCtx);
+    vi.spyOn(closingRepository, "findRegistroByProductoAndSubasta").mockResolvedValue(null);
+    vi.spyOn(closingRepository, "findWinningBidForClose").mockResolvedValue(null);
+    await expect(closeAuctionItem(10, 100, {})).rejects.toMatchObject({
+      code: "COMPANY_CLIENT_ID_REQUIRED",
+    });
+  });
+
   it("result NOT_FINALIZED before close", async () => {
     vi.spyOn(closingRepository, "findItemCloseContext").mockResolvedValue(itemCtx);
     vi.spyOn(closingRepository, "findRegistroByProductoAndSubasta").mockResolvedValue(null);
     const result = await getItemFinalizationResult(10, 100, authCliente);
     expect(result.resultType).toBe("NOT_FINALIZED");
+    expect(result.resultStatus).toBe("NOT_FINALIZED");
+    expect(result.finalAmount).toBeNull();
+    expect(result.paymentMethodId).toBeNull();
   });
 
   it("result returns finalized after registro exists", async () => {
@@ -183,7 +211,10 @@ describe("Auction closing", () => {
     });
     const result = await getItemFinalizationResult(10, 100, authCliente);
     expect(result.resultType).toBe("BIDDER_WON");
+    expect(result.resultStatus).toBe("FINALIZED");
+    expect(result.productTitle).toBe("Reloj");
     expect(result.isCurrentUserWinner).toBe(true);
+    expect(result.paymentMethodId).toBeNull();
   });
 
   it("purchases empty for user without cliente", async () => {
@@ -208,6 +239,33 @@ describe("Auction closing", () => {
     const m = await getMyMetrics(authCliente);
     expect(m.totalWins).toBe(1);
     expect(m.totalAmountWon).toBe(6000);
+  });
+
+  it("unverified payment method on close → PAYMENT_METHOD_PENDING_VERIFICATION", async () => {
+    vi.spyOn(closingRepository, "findItemCloseContext").mockResolvedValue(itemCtx);
+    vi.spyOn(closingRepository, "findRegistroByProductoAndSubasta").mockResolvedValue(null);
+    vi.spyOn(closingRepository, "findWinningBidForClose").mockResolvedValue(winningBid);
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue({
+      identificador: 3,
+      cliente: 7,
+      tipo: "tarjeta_credito",
+      estado: "pendiente",
+      moneda: "ARS",
+      titular: "J",
+      entidad: null,
+      ultimosDigitos: "1234",
+      aliasOCbu: null,
+      montoGarantia: null,
+      montoDisponible: null,
+      motivoRechazo: null,
+      verificador: 1,
+      creadoEn: new Date(),
+      actualizadoEn: new Date(),
+      verificadoEn: null,
+    });
+    await expect(closeAuctionItem(10, 100, { paymentMethodId: 3 })).rejects.toMatchObject({
+      code: "PAYMENT_METHOD_PENDING_VERIFICATION",
+    });
   });
 
   it("optional payment method validated on close", async () => {

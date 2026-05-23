@@ -61,6 +61,7 @@ describe("Live auction flow", () => {
       categoria: "plata",
     });
     vi.spyOn(paymentMethodsRepository, "listByCliente").mockResolvedValue([]);
+    vi.spyOn(itemsRepository, "countCatalogItemsBySubasta").mockResolvedValue(2);
 
     const result = await listAuctions({ featured: true }, authCliente);
     expect(subastasRepository.listSubastas).toHaveBeenCalledWith(
@@ -68,6 +69,7 @@ describe("Live auction flow", () => {
     );
     expect(result.items).toHaveLength(1);
     expect(result.meta?.derived).toBe(true);
+    expect(result.meta?.limitation).toBe("DERIVED_FEATURED_AUCTIONS");
   });
 
   it("pickCurrentItemId selects first unsold item", () => {
@@ -197,6 +199,21 @@ describe("Live auction flow", () => {
       verificadoEn: new Date(),
     });
     vi.spyOn(pujosRepository, "getMaxBidForItem").mockResolvedValue(null);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([
+      {
+        identificador: 100,
+        catalogo: 1,
+        producto: 1,
+        precioBase: 10000,
+        comision: 1000,
+        subastado: "no",
+        descripcionCatalogo: "Reloj",
+        descripcionCompleta: "http://x",
+        subastaId: 10,
+        catalogDescription: null,
+        isSoldInRegistro: 0,
+      },
+    ]);
 
     await expect(
       assertCanBid({

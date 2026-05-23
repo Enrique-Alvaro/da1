@@ -3,6 +3,7 @@ import * as usersRepository from "../src/modules/users/users.repository";
 import * as paymentMethodsRepository from "../src/modules/payment-methods/payment-methods.repository";
 import * as subastasRepository from "../src/modules/subastas/subastas.repository";
 import * as pujosRepository from "../src/modules/pujos/pujos.repository";
+import * as itemsRepository from "../src/modules/subastas/subastas-items.repository";
 import {
   assertCanBid,
   assertCategoryAllowed,
@@ -110,6 +111,21 @@ describe("Pujas — Fase 4 assertCanBid", () => {
     vi.spyOn(pujosRepository, "findItemInSubasta").mockResolvedValue(item);
     vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(mockMedio());
     vi.spyOn(pujosRepository, "getMaxBidForItem").mockResolvedValue(null);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([
+      {
+        identificador: 100,
+        catalogo: 1,
+        producto: 1,
+        precioBase: 10000,
+        comision: 1000,
+        subastado: "no",
+        descripcionCatalogo: "Ítem",
+        descripcionCompleta: "http://x",
+        subastaId: 10,
+        catalogDescription: null,
+        isSoldInRegistro: 0,
+      },
+    ]);
   });
 
   async function callBid(amount = 10100, paymentMethodId = 3) {
@@ -151,12 +167,12 @@ describe("Pujas — Fase 4 assertCanBid", () => {
     await expect(callBid()).rejects.toMatchObject({ code: "CLIENT_NOT_FOUND" });
   });
 
-  it("admitido != si → CLIENT_NOT_APPROVED", async () => {
+  it("admitido != si → USER_NOT_ADMITTED", async () => {
     vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
       ...clienteAdmitido,
       admitido: "no",
     });
-    await expect(callBid()).rejects.toMatchObject({ code: "CLIENT_NOT_APPROVED" });
+    await expect(callBid()).rejects.toMatchObject({ code: "USER_NOT_ADMITTED" });
   });
 
   it("sin asistente → AUCTION_ATTENDANCE_REQUIRED", async () => {
@@ -345,6 +361,21 @@ describe("Pujas — createBid pasa revalidación de medio a transacción", () =>
     vi.spyOn(pujosRepository, "findItemInSubasta").mockResolvedValue(item);
     vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(mockMedio());
     vi.spyOn(pujosRepository, "getMaxBidForItem").mockResolvedValue(null);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([
+      {
+        identificador: 100,
+        catalogo: 1,
+        producto: 1,
+        precioBase: 10000,
+        comision: 1000,
+        subastado: "no",
+        descripcionCatalogo: "Ítem",
+        descripcionCompleta: "http://x",
+        subastaId: 10,
+        catalogDescription: null,
+        isSoldInRegistro: 0,
+      },
+    ]);
     vi.spyOn(pujosRepository, "insertBidInTransaction").mockResolvedValue({
       identificador: 1,
       asistente: 50,

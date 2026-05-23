@@ -1,6 +1,7 @@
 import {
   BadRequestError,
   ConflictError,
+  ForbiddenError,
   NotFoundError,
 } from "../../shared/errors/httpErrors";
 import type { AuthUserContext } from "../../shared/types/auth";
@@ -56,6 +57,12 @@ export async function createSolicitud(
   authUser: AuthUserContext,
   body: CreateProductSubmissionBody
 ): Promise<CreateSolicitudResponse> {
+  if (authUser.role === "empleado") {
+    throw new ForbiddenError(
+      "Los empleados no pueden crear solicitudes de cliente.",
+      "CLIENT_AUTH_REQUIRED"
+    );
+  }
   const detail = await submissionsService.createSubmission(authUser, body);
   return {
     submissionId: detail.id,
@@ -126,6 +133,12 @@ export async function acceptSolicitudApi(
   if (!row) {
     throw new NotFoundError("Solicitud no encontrada.", "SUBMISSION_NOT_FOUND");
   }
+  if (row.isScheduled) {
+    throw new ConflictError(
+      "El producto ya está asignado a una subasta.",
+      "ITEM_ALREADY_ASSIGNED"
+    );
+  }
   const photoCount = await submissionsRepository.countPhotosByProduct(productId);
   if (photoCount < MIN_PRODUCT_IMAGES) {
     throw new BadRequestError(
@@ -176,6 +189,17 @@ export async function assignSolicitudApi(
   productId: number,
   body: AssignSolicitudBody
 ) {
+  const existing = await submissionsRepository.findSubmissionById(productId);
+  if (!existing) {
+    throw new NotFoundError("Solicitud no encontrada.", "SUBMISSION_NOT_FOUND");
+  }
+  if (existing.isScheduled) {
+    throw new ConflictError(
+      "El producto ya está asignado a un catálogo.",
+      "ITEM_ALREADY_ASSIGNED"
+    );
+  }
+
   await submissionsService.assignToAuction(employeeId, productId, body);
   const row = await submissionsRepository.findSubmissionById(productId);
   if (!row) {

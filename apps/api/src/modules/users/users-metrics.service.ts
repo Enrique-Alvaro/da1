@@ -21,6 +21,7 @@ export async function getMyMetrics(authUser: AuthUserContext) {
       totalAmountOffered: 0,
       totalAmountWon: 0,
       activeLiveAuctionId: null,
+      limitations: ["WINS_FROM_REGISTRO_ONLY"],
     };
   }
 
@@ -40,5 +41,9 @@ export async function getMyMetrics(authUser: AuthUserContext) {
     totalAmountWon: wonAmount,
     activeLiveAuctionId: liveSessionStore.getActiveAuctionId(cliente.identificador),
     derived: true,
+    limitations: [
+      "WINS_FROM_REGISTRO_ONLY",
+      "NO_PERSISTED_FINALIZATION_TIMESTAMP",
+    ],
   };
 }

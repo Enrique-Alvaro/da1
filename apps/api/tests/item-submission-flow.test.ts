@@ -208,7 +208,29 @@ describe("Item submission API service", () => {
     });
   });
 
+  it("assignSolicitud blocks when already scheduled", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById").mockResolvedValue({
+      ...sampleRow,
+      isScheduled: true,
+      catalogItemId: 20,
+    });
+    await expect(
+      assignSolicitudApi(2, 100, { catalogId: 2, precioBase: 500, comision: 50 })
+    ).rejects.toMatchObject({ code: "ITEM_ALREADY_ASSIGNED" });
+  });
+
   it("assignSolicitud returns ASSIGNED_TO_AUCTION", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById")
+      .mockResolvedValueOnce({ ...sampleRow, disponible: "si" })
+      .mockResolvedValueOnce({
+        ...sampleRow,
+        disponible: "si",
+        isScheduled: true,
+        catalogItemId: 20,
+        auctionId: 1,
+        catalogId: 2,
+        precioBaseAsignado: 500,
+      });
     vi.spyOn(submissionsService, "assignToAuction").mockResolvedValue({
       id: 100,
       catalogDescription: "Rolex",

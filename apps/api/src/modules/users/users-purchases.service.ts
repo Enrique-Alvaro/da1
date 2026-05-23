@@ -29,15 +29,22 @@ export async function listMyPurchases(authUser: AuthUserContext) {
         itemId: r.itemId,
         productId: r.productoId,
         title: r.title,
+        productTitle: r.title,
         finalAmount,
         commissionAmount: commission,
         shippingAmount: SHIPPING_AMOUNT,
         totalAmount: finalAmount + commission + SHIPPING_AMOUNT,
         currency: r.currency ?? "ARS",
+        finalizedAt: null,
         status: "unknown" as const,
         paymentMethodSummary: null,
       };
     }),
-    limitations: ["NO_PURCHASE_STATUS_SUPPORT", "NO_SHIPPING_SCHEMA_SUPPORT"],
+    limitations: [
+      "NO_PURCHASE_STATUS_SUPPORT",
+      "NO_SHIPPING_SCHEMA_SUPPORT",
+      "NO_PERSISTED_FINALIZATION_TIMESTAMP",
+      "NO_PAYMENT_METHOD_ON_BID",
+    ],
   };
 }

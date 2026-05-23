@@ -1,5 +1,6 @@
 import type { AuthUserContext } from "../../shared/types/auth";
 import type { CatalogItemRow } from "./subastas-items.repository";
+import { toPublicAccessDenialCode } from "./access-denial-codes";
 import { evaluateAuctionAccess, mapSubastaStatus } from "./subastas-access.service";
 import { computeBidLimits } from "./subastas-bid-limits";
 import type { SubastaDetailRow, SubastaRow } from "./subastas.repository";
@@ -49,6 +50,7 @@ export function mapSubastaSummary(
   row: SubastaRow,
   extras?: {
     currentHighestBid?: number | null;
+    itemCount?: number | null;
     access?: Awaited<ReturnType<typeof evaluateAuctionAccess>>;
   }
 ) {
@@ -65,21 +67,26 @@ export function mapSubastaSummary(
     hasDeposit: row.tieneDeposito,
     hasOwnSecurity: row.seguridadPropia,
     currentHighestBid: extras?.currentHighestBid ?? null,
+    itemCount: extras?.itemCount ?? null,
     canAccess: extras?.access?.canAccess ?? false,
     canBid: extras?.access?.canBid ?? false,
-    cannotAccessReason: extras?.access?.cannotAccessReason ?? null,
-    cannotBidReason: extras?.access?.cannotBidReason ?? null,
+    cannotAccessReason: toPublicAccessDenialCode(extras?.access?.cannotAccessReason ?? null),
+    cannotBidReason: toPublicAccessDenialCode(extras?.access?.cannotBidReason ?? null),
   };
 }
 
 export async function mapSubastaDetail(
   row: SubastaDetailRow,
   authUser: AuthUserContext | undefined,
-  extras?: { currentHighestBid?: number | null }
+  extras?: { currentHighestBid?: number | null; itemCount?: number }
 ) {
   const access = await evaluateAuctionAccess({ subasta: row, authUser });
   return {
-    ...mapSubastaSummary(row, { currentHighestBid: extras?.currentHighestBid, access }),
+    ...mapSubastaSummary(row, {
+      currentHighestBid: extras?.currentHighestBid,
+      itemCount: extras?.itemCount ?? null,
+      access,
+    }),
     auctioneer: row.subastador
       ? {
           id: row.subastador,

@@ -56,7 +56,7 @@ async function requireOwnedSubmission(
 ): Promise<import("./productos-submissions.repository").ProductSubmissionRow> {
   const row = await submissionsRepository.findSubmissionById(productId);
   if (!row || row.duenio !== duenioId) {
-    throw new NotFoundError("Envío no encontrado.");
+    throw new NotFoundError("Envío no encontrado.", "SUBMISSION_NOT_FOUND");
   }
   return row;
 }

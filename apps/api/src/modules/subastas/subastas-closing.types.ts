@@ -8,12 +8,12 @@ export type FinalizationResponse = {
   resultType: FinalizationResultType;
   winnerUserId: number | null;
   winnerDisplayName: string | null;
-  finalAmount: number;
+  finalAmount: number | null;
   currency: string;
   basePrice: number;
   commissionAmount: number;
   shippingAmount: number;
-  totalAmount: number;
+  totalAmount: number | null;
   paymentMethodId: number | null;
   registroId: number | null;
   finalizedAt: string | null;

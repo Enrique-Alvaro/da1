@@ -79,7 +79,9 @@ Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
 | POST | `/api/admin/productos/:id/decision` | Empleado (`approve` \| `reject`) |
 | PATCH | `/api/admin/productos/:id/auction-assignment` | Empleado |
 
-**Estados API (derivados):** `PENDING_REVIEW`, `ACCEPTED`, `ASSIGNED_TO_AUCTION` — ver `audit/item-submission-backend-flow-implementation-report.md`.
+**Estados API (derivados):** `PENDING_REVIEW`, `ACCEPTED`, `ASSIGNED_TO_AUCTION` — ver `audit/phase-4-item-submission-review-hardening-report.md`.
+
+**Fase 4 hardening:** mínimo 6 fotos; empleado no crea solicitudes; aceptar/asignar bloquean duplicados (`ITEM_ALREADY_ASSIGNED`); rechazo honesto `REJECTION_NOT_SUPPORTED_BY_SCHEMA`; `productId` = `itemsCatalogo` tras asignar.
 
 **Limitaciones del esquema fijo:** no hay columna de motivo de rechazo ni historial; `disponible=no` agrupa pendiente y no aprobado; las declaraciones legales se validan pero no se persisten; rechazo persistido no soportado (`POST .../rechazar` → 409).
 
@@ -96,9 +98,19 @@ Requiere `DEFAULT_REVIEWER_EMPLOYEE_ID` en `.env` (FK `productos.revisor`).
 7. **Foto ajena:** Otro cliente con su token → 404 en foto de otro dueño.
 8. **Concurrencia asignación:** (opcional) dos `PATCH .../auction-assignment` simultáneos → uno 409.
 
-### Subasta en vivo (Fase live — sin cambios de esquema SQL)
+### Subasta en vivo (Fase 2 hardening — sin cambios de esquema SQL)
 
 Alias inglés: `/api/auctions` (misma lógica que `/api/subastas`).
+
+**Contrato de elegibilidad** (`canAccess`, `canBid`, `cannotBidReason`): calculado en backend. Códigos públicos incluyen `USER_NOT_AUTHENTICATED` (anónimo), `USER_NOT_ADMITTED`, `CATEGORY_NOT_ALLOWED`, `PAYMENT_METHOD_*`, `AUCTION_NOT_OPEN`, `LIVE_SESSION_REQUIRED`.
+
+**Featured** (`?featured=true`): subconjunto derivado de subastas abiertas/próximas (`DERIVED_FEATURED_AUCTIONS`), sin columna `featured` en BD.
+
+**Ítem en curso** (`NO_CURRENT_ITEM_FIELD`): primer `itemsCatalogo` no vendido por `identificador ASC`; `/live` y `POST .../pujos` usan la misma regla. Puja sobre otro ítem → `409 ITEM_NOT_CURRENT`.
+
+**Límites de puja:** `minNextBid` / `maxNextBid` en `GET .../live` coinciden con validación de `POST .../pujos` (redondeo a 2 decimales; oro/platino sin tope máximo).
+
+Ver informe: `audit/phase-2-auction-live-bidding-hardening-report.md`.
 
 | Método | Path | Auth |
 |--------|------|------|
@@ -113,7 +125,7 @@ Alias inglés: `/api/auctions` (misma lógica que `/api/subastas`).
 
 **Puja:** requiere `POST .../live/session` antes de `POST .../pujos` (sesión en memoria — ver informe `audit/live-auction-backend-flow-implementation-report.md`).
 
-### Cierre de ítem / adjudicación (sin cambios de esquema SQL)
+### Cierre de ítem / adjudicación — Fase 3 (sin cambios de esquema SQL)
 
 | Método | Path | Auth |
 |--------|------|------|
@@ -121,9 +133,12 @@ Alias inglés: `/api/auctions` (misma lógica que `/api/subastas`).
 | GET | `/api/subastas/:id/items/:itemId/resultado` | Bearer |
 | POST | `/api/auctions/:auctionId/items/:itemId/close` | Empleado (alias) |
 | GET | `/api/auctions/:auctionId/items/:itemId/result` | Bearer (alias) |
-| GET | `/api/users/me/purchases` | Cliente |
+| GET | `/api/users/me/metrics` | Cliente |
+| GET | `/api/users/me/purchases` | Cliente operativo |
 
-Persistencia: `registroDeSubasta`, `itemsCatalogo.subastado`, `pujos.ganador`. Ver `audit/auction-closing-backend-flow-implementation-report.md`.
+Ganador desde `pujos` (empate: menor `identificador`). Sin pujas → `COMPANY_CLIENT_ID` en `.env`. Re-cierre → `409 ITEM_ALREADY_FINALIZED`. Respuesta: `resultStatus`, `productTitle`; GET resultado sin `paymentMethodId`.
+
+Persistencia: `registroDeSubasta`, `itemsCatalogo.subastado`, `pujos.ganador`. Ver `audit/phase-3-auction-closing-result-hardening-report.md`.
 
 ---
 
@@ -152,7 +167,7 @@ Requiere migración `database/migrations/001_medios_pago_subasta_moneda.sql`.
 | GET | `/api/users/me/payment-methods` | — | `{ items: PaymentMethodPublic[] }` | 401 |
 | POST | `/api/users/me/payment-methods` | ver abajo | `{ id, type, status, message }` | 400 `CVV_*`, `FULL_CARD_*`, 403 `CLIENT_NOT_FOUND` |
 | PATCH | `/api/users/me/payment-methods/:id/disable` | — | `{ id, status }` | 404 `PAYMENT_METHOD_NOT_FOUND` |
-| POST | `/api/subastas/:id/asistentes` | — | `{ id, auctionId, clientId, bidderNumber }` | 403 `CLIENT_NOT_APPROVED`, `CLIENT_CATEGORY_NOT_ALLOWED` |
+| POST | `/api/subastas/:id/asistentes` | — | `{ id, auctionId, clientId, bidderNumber }` | 403 `USER_NOT_ADMITTED`, `CATEGORY_NOT_ALLOWED` |
 | POST | `/api/subastas/:id/pujos` | `itemId`, `amount`, `paymentMethodId` | ver abajo | 403/404/409 (ver informe) |
 
 **POST medio de pago (campos en español):**

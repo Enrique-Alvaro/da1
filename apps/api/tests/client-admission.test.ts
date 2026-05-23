@@ -174,6 +174,23 @@ describe("admission enables bidding guard", () => {
     });
     vi.spyOn(pujosRepo, "getMaxBidForItem").mockResolvedValue(null);
 
+    const itemsRepo = await import("../src/modules/subastas/subastas-items.repository");
+    vi.spyOn(itemsRepo, "listCatalogItemsBySubasta").mockResolvedValue([
+      {
+        identificador: 20,
+        catalogo: 1,
+        producto: 1,
+        precioBase: 1000,
+        comision: 100,
+        subastado: "no",
+        descripcionCatalogo: "Ítem",
+        descripcionCompleta: "http://x",
+        subastaId: 10,
+        catalogDescription: null,
+        isSoldInRegistro: 0,
+      },
+    ]);
+
     const liveSessionStore = await import("../src/modules/subastas/live-session.store");
     liveSessionStore.enterSession(7, 10);
 

@@ -7,24 +7,30 @@ export type BidLimits = {
   percentLimitsApply: boolean;
 };
 
+export function roundMoney(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
 export function computeBidLimits(
   currentBest: number,
   basePrice: number,
   auctionCategory: string
 ): BidLimits {
+  const best = roundMoney(currentBest);
+  const base = roundMoney(basePrice);
   const premium = isPremiumAuctionCategory(auctionCategory);
   if (premium) {
     return {
-      currentBest,
-      minNextBid: currentBest + 0.01,
+      currentBest: best,
+      minNextBid: roundMoney(best + 0.01),
       maxNextBid: null,
       percentLimitsApply: false,
     };
   }
   return {
-    currentBest,
-    minNextBid: currentBest + basePrice * 0.01,
-    maxNextBid: currentBest + basePrice * 0.2,
+    currentBest: best,
+    minNextBid: roundMoney(best + base * 0.01),
+    maxNextBid: roundMoney(best + base * 0.2),
     percentLimitsApply: true,
   };
 }
