@@ -41,18 +41,28 @@ export default function RegisterScreen() {
     try {
       let result: ImagePicker.ImagePickerResult;
       if (fromCamera) {
-        result = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: false });
+        result = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true });
       } else {
-        result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: false });
+        result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true });
       }
       if (!(result as any).canceled) {
-        const uri = (result as any).uri ?? (result as any).assets?.[0]?.uri;
-        if (forWhat === 'front') setFrontImage(uri);
-        else setBackImage(uri);
+        const asset = (result as any).assets?.[0] ?? result;
+        const base64 = asset?.base64;
+        if (typeof base64 === 'string' && base64.trim().length > 0) {
+          if (forWhat === 'front') setFrontImage(base64);
+          else setBackImage(base64);
+        } else {
+          Alert.alert('Error', 'No se pudo leer la imagen en Base64. Intenta otra imagen.');
+        }
       }
     } catch (e) {
       console.warn('Image pick error', e);
     }
+  }
+
+  function getPreviewUri(base64: string | null) {
+    if (!base64) return undefined;
+    return base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
   }
 
   async function onSubmit() {
@@ -62,17 +72,26 @@ export default function RegisterScreen() {
       return;
     }
 
+    const countryCodeToId: Record<string, number> = {
+      AR: 1,
+      US: 2,
+      ES: 3,
+      CO: 4,
+      BR: 5,
+    };
+    const countryId = countryCodeToId[country] ?? 1;
+
     setLoading(true);
     try {
       await registerUser({
         firstName,
         lastName,
         email,
-        documentId,
+        documentNumber: documentId,
         address,
-        country,
-        documentFrontImageUrl: frontImage,
-        documentBackImageUrl: backImage,
+        countryId,
+        documentFrontImageBase64: frontImage,
+        documentBackImageBase64: backImage,
       });
       router.push('/register-confirmation');
     } catch (error: any) {
@@ -118,7 +137,7 @@ export default function RegisterScreen() {
               <View style={{ flex: 1 }}>
                 <Pressable style={styles.uploadBox} onPress={() => pickImage('front', false)}>
                   {frontImage ? (
-                    <Image source={{ uri: frontImage }} style={styles.preview} />
+                    <Image source={{ uri: getPreviewUri(frontImage) }} style={styles.preview} />
                   ) : (
                     <ThemedText>Subir imagen del frente del ID</ThemedText>
                   )}
@@ -136,7 +155,7 @@ export default function RegisterScreen() {
               <View style={{ flex: 1 }}>
                 <Pressable style={styles.uploadBox} onPress={() => pickImage('back', false)}>
                   {backImage ? (
-                    <Image source={{ uri: backImage }} style={styles.preview} />
+                    <Image source={{ uri: getPreviewUri(backImage) }} style={styles.preview} />
                   ) : (
                     <ThemedText>Subir imagen del dorso del ID</ThemedText>
                   )}

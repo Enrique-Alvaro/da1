@@ -1,6 +1,11 @@
+import Constants from 'expo-constants';
 import { ApiError, AuthResponse, UserProfile } from './types';
 
-const API_BASE_URL = 'https://api.crownbid.example.com';
+const API_BASE_URL = (() => {
+  const url = Constants.expoConfig?.extra?.apiBaseUrl;
+  return typeof url === 'string' && url.trim() ? url : 'http://localhost:3000/api';
+})();
+
 let authToken: string | null = null;
 
 function persistToken(token: string | null) {
@@ -74,11 +79,12 @@ export async function registerUser(payload: {
   firstName: string;
   lastName: string;
   email: string;
-  documentId: string;
+  documentNumber: string;
   address: string;
-  country: string;
-  documentFrontImageUrl: string;
-  documentBackImageUrl: string;
+  countryId: number;
+  documentFrontImageBase64: string;
+  documentBackImageBase64: string;
+  photoBase64?: string | null;
 }): Promise<{ message: string; emailSentTo?: string }> {
   return request('/auth/register', {
     method: 'POST',
