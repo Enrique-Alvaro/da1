@@ -1,212 +1,104 @@
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import React from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { ExternalLink } from '@/components/external-link';
+import { CustomNavBar } from '@/components/CustomNavBar';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useRouter } from 'expo-router'; // Importamos el router
+import React from 'react';
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
-  const router = useRouter();
+// Base de datos simulada para la pestaña explorar
+// Asignamos IDs específicos para mapearlos luego en catalog.tsx
+const MOCK_ALL_AUCTIONS = [
+  { id: '3', title: 'Set de Monedas Raras', category: 'Coleccionables', rank: 'Común', price: '$420', time: 'Termina en 1 día' },
+  { id: '4', title: 'Cartera de Diseñador', category: 'Moda', rank: 'Común', price: '$680', time: 'Termina en 3 días' },
+  { id: '5', title: 'Muebles Antiguos', category: 'Hogar', rank: 'Común', price: '$1500', time: 'Termina en 6 horas' },
+];
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+export default function ExploreScreen() {
+  const router = useRouter(); // Inicializamos el router
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <ThemedText type="title" style={styles.title}>Todas las Subastas</ThemedText>
+        <View style={styles.searchContainer}>
+          <ThemedText style={styles.searchIcon}>🔍</ThemedText>
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Buscar subastas..."
+            placeholderTextColor="#888"
+          />
+        </View>
+      </View>
 
-          <Pressable style={[styles.primaryButton, { backgroundColor: theme.primary }]} onPress={() => router.push('/post-article')}>
-            <ThemedText type="default" style={styles.primaryButtonText}>
-              Postular Artículo
-            </ThemedText>
+      <CustomNavBar />
+
+<FlatList
+        data={MOCK_ALL_AUCTIONS}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        renderItem={({ item }) => (
+          <Pressable 
+            style={styles.card}
+            onPress={() => {
+              // Ahora cualquier catálogo de la lista pasa dinámicamente sus datos
+              router.push({ 
+                pathname: '/catalog', 
+                params: { catalogId: item.id, catalogTitle: item.title, catalogTime: item.time } 
+              });
+            }}
+          >
+            <View style={styles.imagePlaceholder}>
+              <ThemedText style={styles.icon}>📦</ThemedText>
+            </View>
+            <View style={styles.cardContent}>
+              <ThemedText style={styles.cardTitle}>{item.title}</ThemedText>
+              <View style={styles.categoryBadgeRow}>
+                <ThemedText style={styles.cardCategory}>{item.category}</ThemedText>
+                <View style={[styles.badge, { backgroundColor: '#E2E8F0' }]}>
+                  <ThemedText style={[styles.badgeText, { color: '#475569' }]}>{item.rank}</ThemedText>
+                </View>
+              </View>
+              
+              <View style={styles.priceTimeRow}>
+                <View>
+                  <ThemedText style={styles.label}>Puja Actual</ThemedText>
+                  <ThemedText style={styles.price}>{item.price}</ThemedText>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <ThemedText style={styles.label}>Estado</ThemedText>
+                  <ThemedText style={styles.time}>{item.time.replace('Termina en ', '')}</ThemedText>
+                </View>
+              </View>
+            </View>
           </Pressable>
-
-          <Pressable style={[styles.secondaryButton, { borderColor: theme.backgroundSelected }]} onPress={() => router.push('/payment-methods')}>
-            <ThemedText>Métodos de Pago</ThemedText>
-          </Pressable>
-
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
-
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
-
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
+        )}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-  },
-  titleContainer: {
-    gap: Spacing.three,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
-  },
-  centerText: {
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  primaryButton: {
-    marginTop: Spacing.four,
-    paddingVertical: 14,
-    paddingHorizontal: Spacing.four,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-  },
-  secondaryButton: {
-    marginTop: Spacing.two,
-    width: '100%',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
-  },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: { padding: 20, paddingTop: 50, borderBottomWidth: 1, borderBottomColor: '#EEE', backgroundColor: '#FFF' },
+  title: { fontSize: 26, fontWeight: 'bold', color: '#002855', marginBottom: 15 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderRadius: 10, borderWidth: 1, borderColor: '#E6E9EB', paddingHorizontal: 15 },
+  searchIcon: { fontSize: 18, marginRight: 10, opacity: 0.5 },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 16, color: '#333' },
+  
+  listContainer: { padding: 15, paddingBottom: 30 },
+  card: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: '#E6E9EB', padding: 15, marginBottom: 15 },
+  imagePlaceholder: { width: 80, height: 80, backgroundColor: '#D0D4DC', borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  icon: { fontSize: 30 },
+  cardContent: { flex: 1 },
+  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#002855' },
+  categoryBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, marginBottom: 10, gap: 10 },
+  cardCategory: { fontSize: 14, color: '#666' },
+  
+  // Estilos para el badge de rango
+  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  badgeText: { fontSize: 11, fontWeight: 'bold' },
+
+  priceTimeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label: { fontSize: 12, color: '#888' },
+  price: { fontSize: 18, fontWeight: 'bold', color: '#D35400' },
+  time: { fontSize: 14, fontWeight: 'bold', color: '#002855' },
 });
