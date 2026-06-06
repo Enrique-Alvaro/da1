@@ -47,7 +47,7 @@ export async function findResetTokenByHash(
 }
 
 /**
- * Updates password and invalidates all pending reset tokens for the user (transaction).
+ * Actualiza contraseña e invalida todos los tokens de reset pendientes del usuario (transacción).
  */
 export async function completePasswordReset(params: {
   userId: string;

@@ -229,20 +229,30 @@ export async function changeInitialPassword(input: {
   };
 }
 
-/** Logout stateless: el cliente descarta el token; no hay revocación en servidor. */
-export async function logout(_ctx: AuthUserContext): Promise<void> {
-  return;
+export type LogoutResult = {
+  ok: true;
+  message: string;
+};
+
+/** Logout stateless: el cliente debe descartar el JWT; no hay lista de revocación en esta versión del TP. */
+export async function logout(_ctx: AuthUserContext): Promise<LogoutResult> {
+  return {
+    ok: true,
+    message: "Sesión cerrada localmente. Descartar el token en el cliente.",
+  };
 }
 
 export async function forgotPassword(_input: ForgotPasswordBodyInput): Promise<{ message: string }> {
   throw new NotImplementedError(
-    "El restablecimiento de contraseña por correo no está disponible en esta versión."
+    "El restablecimiento de contraseña por correo no está implementado en el alcance actual del TP.",
+    "PASSWORD_RESET_NOT_IMPLEMENTED"
   );
 }
 
 export async function resetPassword(_input: ResetPasswordBodyInput): Promise<LoginResult> {
   throw new NotImplementedError(
-    "El restablecimiento de contraseña por token no está disponible en esta versión."
+    "El restablecimiento de contraseña por token no está implementado en el alcance actual del TP.",
+    "PASSWORD_RESET_NOT_IMPLEMENTED"
   );
 }
 

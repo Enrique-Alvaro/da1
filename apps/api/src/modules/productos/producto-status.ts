@@ -29,7 +29,7 @@ export function deriveProductStatus(flags: ProductAvailabilityFlags): DerivedPro
   return "pending_review";
 }
 
-/** UI label when rejection cannot be distinguished from pending. */
+/** Etiqueta UI cuando el rechazo no se puede distinguir de pendiente. */
 export function derivedStatusLabel(status: DerivedProductStatus): string {
   switch (status) {
     case "pending_review":

@@ -17,6 +17,12 @@ export type ProductSubmissionFlags = {
 
 export type ProductSubmissionRow = ProductoRow & ProductSubmissionFlags & {
   imageCount: number;
+  precioBaseAsignado: number | null;
+  comisionAsignada: number | null;
+  auctionFecha: string | null;
+  auctionHora: string | null;
+  auctionUbicacion: string | null;
+  catalogId: number | null;
 };
 
 const PRODUCT_SELECT = `
@@ -50,12 +56,54 @@ const PRODUCT_SELECT = `
     ORDER BY ic.identificador
   ) AS catalogItemId,
   (
+    SELECT TOP (1) ic.catalogo
+    FROM dbo.itemsCatalogo AS ic
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS catalogId,
+  (
     SELECT TOP (1) c.subasta
     FROM dbo.itemsCatalogo AS ic
     INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
     WHERE ic.producto = p.identificador
     ORDER BY ic.identificador
-  ) AS auctionId
+  ) AS auctionId,
+  (
+    SELECT TOP (1) ic.precioBase
+    FROM dbo.itemsCatalogo AS ic
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS precioBaseAsignado,
+  (
+    SELECT TOP (1) ic.comision
+    FROM dbo.itemsCatalogo AS ic
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS comisionAsignada,
+  (
+    SELECT TOP (1) CONVERT(varchar(10), s.fecha, 23)
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
+    INNER JOIN dbo.subastas AS s ON s.identificador = c.subasta
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS auctionFecha,
+  (
+    SELECT TOP (1) CONVERT(varchar(8), s.hora, 108)
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
+    INNER JOIN dbo.subastas AS s ON s.identificador = c.subasta
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS auctionHora,
+  (
+    SELECT TOP (1) s.ubicacion
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS c ON c.identificador = ic.catalogo
+    INNER JOIN dbo.subastas AS s ON s.identificador = c.subasta
+    WHERE ic.producto = p.identificador
+    ORDER BY ic.identificador
+  ) AS auctionUbicacion
 `;
 
 const PRODUCT_FROM = `FROM dbo.productos AS p`;
@@ -75,7 +123,53 @@ function mapSubmissionRow(row: Record<string, unknown>): ProductSubmissionRow {
     catalogItemId: (row.catalogItemId as number | null) ?? null,
     auctionId: (row.auctionId as number | null) ?? null,
     imageCount: Number(row.imageCount ?? 0),
+    precioBaseAsignado: row.precioBaseAsignado != null ? Number(row.precioBaseAsignado) : null,
+    comisionAsignada: row.comisionAsignada != null ? Number(row.comisionAsignada) : null,
+    auctionFecha: (row.auctionFecha as string | null) ?? null,
+    auctionHora: (row.auctionHora as string | null) ?? null,
+    auctionUbicacion: (row.auctionUbicacion as string | null) ?? null,
+    catalogId: row.catalogId != null ? Number(row.catalogId) : null,
   };
+}
+
+export type ListAdminSubmissionsQuery = {
+  status?: "pending" | "accepted" | "assigned" | "all";
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export async function listAdminSubmissions(
+  query: ListAdminSubmissionsQuery = {}
+): Promise<ProductSubmissionRow[]> {
+  const pool = await getSqlPool();
+  const request = pool.request();
+  const filters: string[] = ["1 = 1"];
+
+  if (query.status === "pending") {
+    filters.push("p.disponible = N'no' AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+  } else if (query.status === "accepted") {
+    filters.push("p.disponible = N'si' AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+  } else if (query.status === "assigned") {
+    filters.push("EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+  }
+
+  if (query.search?.trim()) {
+    request.input("search", sql.NVarChar(200), `%${query.search.trim()}%`);
+    filters.push("p.descripcionCatalogo LIKE @search");
+  }
+
+  const limit = Math.min(query.limit ?? 100, 100);
+  const offset = query.offset ?? 0;
+
+  const result = await request.query(`
+    SELECT ${PRODUCT_SELECT}
+    ${PRODUCT_FROM}
+    WHERE ${filters.join(" AND ")}
+    ORDER BY p.identificador DESC
+    OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+  `);
+  return result.recordset.map((r) => mapSubmissionRow(r));
 }
 
 export async function assertSubastaExists(subastaId: number): Promise<void> {
@@ -84,7 +178,7 @@ export async function assertSubastaExists(subastaId: number): Promise<void> {
     SELECT COUNT_BIG(1) AS n FROM dbo.subastas WHERE identificador = @id
   `);
   if ((result.recordset[0]?.n ?? 0) < 1) {
-    throw new NotFoundError("Subasta no encontrada.");
+    throw new NotFoundError("Subasta no encontrada.", "AUCTION_NOT_FOUND");
   }
 }
 
@@ -246,10 +340,13 @@ export async function applyAdminDecision(input: {
 
   const current = await findSubmissionById(input.productId);
   if (!current) {
-    throw new NotFoundError("Producto no encontrado.");
+    throw new NotFoundError("Producto no encontrado.", "PRODUCT_NOT_FOUND");
   }
   if (current.isScheduled) {
-    throw new ConflictError("El producto ya está asignado a un catálogo.");
+    throw new ConflictError(
+      "El producto ya está asignado a un catálogo.",
+      "ITEM_ALREADY_ASSIGNED"
+    );
   }
   if (current.isSold) {
     throw new ConflictError("El producto ya fue vendido.");
@@ -312,10 +409,13 @@ export async function assignProductToAuction(input: {
     `);
     const locked = prodRes.recordset[0];
     if (!locked) {
-      throw new NotFoundError("Producto no encontrado.");
+      throw new NotFoundError("Producto no encontrado.", "PRODUCT_NOT_FOUND");
     }
     if ((locked.disponible ?? "no").toLowerCase() !== "si") {
-      throw new ConflictError("Solo se pueden programar productos aprobados (disponible = si).");
+      throw new ConflictError(
+        "Solo se pueden programar productos aprobados (disponible = si).",
+        "PRODUCT_NOT_APPROVED"
+      );
     }
 
     const lockScheduled = new sql.Request(tx);
@@ -326,7 +426,10 @@ export async function assignProductToAuction(input: {
       WHERE producto = @producto
     `);
     if ((schedRes.recordset[0]?.n ?? 0) > 0) {
-      throw new ConflictError("El producto ya está programado en un catálogo.");
+      throw new ConflictError(
+        "El producto ya está programado en un catálogo.",
+        "ITEM_ALREADY_ASSIGNED"
+      );
     }
 
     const lockSold = new sql.Request(tx);
@@ -358,11 +461,20 @@ export async function assignProductToAuction(input: {
     } else {
       const check = new sql.Request(tx);
       check.input("id", sql.Int, catalogId);
-      const exists = await check.query<{ n: number }>(`
-        SELECT COUNT_BIG(1) AS n FROM dbo.catalogos WHERE identificador = @id
+      const catRow = await check.query<{ subasta: number | null }>(`
+        SELECT subasta FROM dbo.catalogos WHERE identificador = @id
       `);
-      if ((exists.recordset[0]?.n ?? 0) < 1) {
-        throw new NotFoundError("Catálogo no encontrado.");
+      if (!catRow.recordset[0]) {
+        throw new NotFoundError("Catálogo no encontrado.", "CATALOG_NOT_FOUND");
+      }
+      if (
+        input.subastaId !== undefined &&
+        catRow.recordset[0].subasta !== input.subastaId
+      ) {
+        throw new ConflictError(
+          "El catálogo no pertenece a la subasta indicada.",
+          "CATALOG_AUCTION_MISMATCH"
+        );
       }
     }
 

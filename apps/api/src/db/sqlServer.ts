@@ -4,7 +4,7 @@ import { getEnv } from "../config/env";
 let poolPromise: Promise<sql.ConnectionPool> | null = null;
 
 /**
- * Singleton connection pool for SQL Server (mssql driver).
+ * Pool de conexiones singleton para SQL Server (driver mssql).
  */
 export async function getSqlPool(): Promise<sql.ConnectionPool> {
   if (!poolPromise) {
@@ -29,7 +29,7 @@ export async function closeSqlPool(): Promise<void> {
   }
 }
 
-/** Read-only connectivity check for health probes */
+/** Comprobación de conectividad de solo lectura para health probes */
 export async function testSqlConnection(): Promise<{ ok: true }> {
   const pool = await getSqlPool();
   const result = await pool.request().query("SELECT 1 AS ok");

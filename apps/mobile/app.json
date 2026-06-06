@@ -44,6 +44,7 @@
       "reactCompiler": true
     },
     "extra": {
+      "apiBaseUrl": "http://localhost:3000/api",
       "router": {},
       "eas": {
         "projectId": "0bb0e307-ff43-49d7-a154-d8e9fb6e3939"

@@ -1,5 +1,5 @@
 /**
- * Runs before any application imports so `loadEnv()` / JWT / bcrypt see test values.
+ * Se ejecuta antes de importar la aplicación para que `loadEnv()` / JWT / bcrypt usen valores de test.
  */
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = "test-jwt-secret-key-minimum-32-characters-long!!";

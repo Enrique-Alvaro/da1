@@ -7,7 +7,7 @@ type AsyncRequestHandler = (
 ) => void | Promise<void>;
 
 /**
- * Wraps an async Express handler so rejections are passed to `next()`.
+ * Envuelve un handler async de Express para que los rechazos pasen a `next()`.
  */
 export function asyncHandler(fn: AsyncRequestHandler): RequestHandler {
   return (req, res, next) => {

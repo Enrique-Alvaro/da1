@@ -6,7 +6,7 @@ import { InternalServerError, UnauthorizedError } from "../errors/httpErrors";
 
 export type LoginTokenType = "initial_password_change" | "access";
 
-/** Minimal JWT claims for login — no profile secrets. */
+/** Claims JWT mínimos para login — sin secretos de perfil. */
 export type LoginAccessPayload = {
   sub: string;
   email: string;
@@ -16,7 +16,7 @@ export type LoginAccessPayload = {
   jti: string;
 };
 
-/** Verified access token (includes `exp` / expiry from JWT). */
+/** Access token verificado (incluye `exp` / vencimiento del JWT). */
 export type JwtAuthPayload = LoginAccessPayload & {
   exp: number;
   expiresAt: Date;
