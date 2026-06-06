@@ -14,7 +14,7 @@ create table personas(
 	nombre varchar(150) not null,
 	direccion varchar(250),
 	estado varchar(15) constraint chkEstado check (estado in ('activo', 'incativo')),
-	foto varbinary(max)
+	foto varbinary(max),
 	constraint pk_personas primary key (identificador)
 )
 go
@@ -37,7 +37,7 @@ create table sectores(
 go
 
 create table seguros(
-	nroPoliza varchar(30) not null.
+	nroPoliza varchar(30) not null,
 	compania varchar(150) not null,
 	polizaCombinada varchar(2) constraint chkpolizaCombinada check(polizaCombinada in ('si','no')),
 	importe decimal(18,2) not null constraint chkImporte check (importe > 0),
@@ -61,10 +61,10 @@ go
 create table duenios(
 	identificador int not null,
 	numeroPais int,
-	verificaci�nFinanciera varchar(2) constraint chkVF check(verificaci�nFinanciera in ('si','no')),
-	verificaci�nJudicial varchar(2) constraint chkVJ check(verificaci�nJudicial in ('si','no')),
+	verificacionFinanciera varchar(2) constraint chkVF check(verificacionFinanciera in ('si','no')),
+	verificacionJudicial varchar(2) constraint chkVJ check(verificacionJudicial in ('si','no')),
 	calificacionRiesgo int constraint chkCR check(calificacionRiesgo in (1,2,3,4,5,6)),
-	verificador int not null
+	verificador int not null,
 	constraint pk_duenios primary key (identificador),
 	constraint fk_duenios_personas foreign key (identificador) references personas,
 	constraint fk_duenios_empleados foreign key (verificador) references empleados (identificador)
@@ -131,7 +131,7 @@ create table catalogos(
 	responsable int not null,
 	constraint pk_catalogos primary key (identificador),
 	constraint fk_catalogos_empleados foreign key (responsable) references empleados(identificador),
-	constraint fk_catalogos_subastas foreign key (subasta) references subastas(identificador),
+	constraint fk_catalogos_subastas foreign key (subasta) references subastas(identificador)
 )
 go
 
@@ -152,7 +152,7 @@ create table asistentes(
 	identificador int not null identity,
 	numeroPostor int not null,
 	cliente int not null,
-	subasta int not null
+	subasta int not null,
 	constraint pk_asistentes primary key (identificador),
 	constraint fk_asistentes_clientes foreign key (cliente) references clientes,
 	constraint fk_asistentes_subasta foreign key (subasta) references subastas

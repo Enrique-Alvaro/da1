@@ -9,7 +9,7 @@ import {
   getMySubmissionPhoto,
   listMySubmissions,
 } from "../productos/productos-submissions.controller";
-import { getMe, getMyMetrics, getMyOperationalStatus, getMyPurchases } from "./users.controller";
+import { getMe, getMyMetrics, getMyOperationalStatus, getMyPurchases, updateMe } from "./users.controller";
 import {
   createPaymentMethod,
   disablePaymentMethod,
@@ -27,6 +27,7 @@ const clientOperationalChain = [
 ] as const;
 
 usersRoutes.get("/me", requireAuth, requireAccessToken, getMe);
+usersRoutes.patch("/me", requireAuth, requireAccessToken, updateMe);
 usersRoutes.get("/me/status", ...clientOperationalChain, getMyOperationalStatus);
 usersRoutes.get("/me/metrics", requireAuth, requireAccessToken, getMyMetrics);
 usersRoutes.get("/me/purchases", requireAuth, requireAccessToken, requireClienteAuth, getMyPurchases);

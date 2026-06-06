@@ -1,61 +1,69 @@
-import { ThemedText } from '@/components/themed-text';
+import { fetchBidHistory } from '@/services/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-// Historial inicial simulado (Como en tu Figma)
-const INITIAL_HISTORY = [
-  { id: '1', user: 'user_789', amount: 1250, time: 'hace 2 minutos' },
-  { id: '2', user: 'user_456', amount: 1200, time: 'hace 5 minutos' },
-  { id: '3', user: 'user_123', amount: 1150, time: 'hace 8 minutos' },
-  { id: '4', user: 'user_789', amount: 1100, time: 'hace 12 minutos' },
-  { id: '5', user: 'user_234', amount: 1050, time: 'hace 18 minutos' },
-  { id: '6', user: 'user_567', amount: 1000, time: 'hace 25 minutos' },
-];
+type Bid = {
+  id: number;
+  itemId: number;
+  amount: number;
+  bidderNumber: number;
+  isWinning: boolean;
+};
 
 export default function BidHistoryScreen() {
   const router = useRouter();
-  const { newBid } = useLocalSearchParams(); // Atrapamos el parámetro de la otra pantalla
-  
-  const [history, setHistory] = useState(INITIAL_HISTORY);
+  const { auctionId, itemId, currency, title } = useLocalSearchParams<{
+    auctionId: string; itemId: string; currency: string; title: string;
+  }>();
 
-  // Efecto para insertar la puja nueva si existe
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const displayCurrency = currency || 'ARS';
+
   useEffect(() => {
-    if (newBid) {
-      const myNewBid = {
-        id: '0', 
-        user: 'John Doe', 
-        amount: Number(newBid), 
-        time: 'Justo ahora'
-      };
-      setHistory([myNewBid, ...INITIAL_HISTORY]);
+    async function load() {
+      if (!auctionId) { setError('Subasta inválida.'); setLoading(false); return; }
+      try {
+        const result = await (fetchBidHistory(
+          Number(auctionId),
+          itemId ? Number(itemId) : undefined
+        ) as Promise<{ totalBids: number; bids: Bid[] }>);
+        setBids(result?.bids ?? []);
+        setTotal(result?.totalBids ?? 0);
+      } catch (e: any) {
+        setError(e?.message || 'No se pudo cargar el historial.');
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [newBid]);
+    load();
+  }, [auctionId, itemId]);
 
-  // El líder siempre será el primer elemento de la lista
-  const currentLeader = history[0];
+  const leader = bids[0] ?? null;
 
-  const renderBidRow = ({ item, index }: { item: any, index: number }) => {
-    const isWinner = index === 0;
-
+  const renderBid = ({ item, index }: { item: Bid; index: number }) => {
+    const isTop = index === 0;
     return (
-      <View style={[styles.bidRow, isWinner && styles.winnerRow]}>
-        <View style={styles.bidderInfo}>
-          <View style={[styles.iconBox, isWinner ? styles.iconBoxWinner : styles.iconBoxNormal]}>
-            <ThemedText style={[styles.trendIcon, isWinner ? styles.trendIconWinner : styles.trendIconNormal]}>
-              {isWinner ? '↗' : '↘'}
-            </ThemedText>
+      <View style={[styles.bidRow, isTop && styles.bidRowTop]}>
+        <View style={styles.bidLeft}>
+          <View style={[styles.bidIcon, isTop ? styles.bidIconTop : styles.bidIconNormal]}>
+            <Text style={[styles.bidIconText, isTop ? styles.bidIconTextTop : styles.bidIconTextNormal]}>
+              {isTop ? '↗' : '↘'}
+            </Text>
           </View>
           <View>
-            <ThemedText style={styles.bidderName}>{item.user}</ThemedText>
-            <ThemedText style={styles.bidTime}>{item.time}</ThemedText>
+            <Text style={styles.bidderName}>Postor #{item.bidderNumber}</Text>
+            <Text style={styles.bidMeta}>Ítem #{item.itemId}</Text>
           </View>
         </View>
-        <View style={styles.amountInfo}>
-          <ThemedText style={[styles.bidAmount, isWinner && styles.bidAmountWinner]}>
-            ${item.amount}
-          </ThemedText>
-          {isWinner && <ThemedText style={styles.ganandoText}>Ganando</ThemedText>}
+        <View style={styles.bidRight}>
+          <Text style={[styles.bidAmount, isTop && styles.bidAmountTop]}>
+            {displayCurrency} {item.amount.toLocaleString('es-AR')}
+          </Text>
+          {isTop && <Text style={styles.winningLabel}>Ganando</Text>}
         </View>
       </View>
     );
@@ -63,70 +71,106 @@ export default function BidHistoryScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Cabecera superior */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ThemedText style={styles.backIcon}>←</ThemedText>
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backBtn}>
+          <Text style={styles.backText}>←</Text>
         </Pressable>
-        <View>
-          <ThemedText type="title" style={styles.title}>Historial de Pujas</ThemedText>
-          <ThemedText style={styles.subtitle}>Artículo #3</ThemedText>
+        <View style={styles.topBarCenter}>
+          <Text style={styles.topBarTitle}>Historial de Pujas</Text>
+          {title ? <Text style={styles.topBarSub} numberOfLines={1}>{title}</Text> : null}
         </View>
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Banner del Líder Actual */}
-      <View style={styles.leaderBanner}>
-        <View>
-          <ThemedText style={styles.leaderLabel}>Líder Actual</ThemedText>
-          <ThemedText style={styles.leaderUser}>{currentLeader.user}</ThemedText>
+      {loading ? (
+        <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.retryBtn}>
+            <Text style={styles.retryBtnText}>← Volver</Text>
+          </Pressable>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <ThemedText style={styles.leaderLabel}>Puja Más Alta</ThemedText>
-          <ThemedText style={styles.leaderAmount}>${currentLeader.amount}</ThemedText>
-        </View>
-      </View>
+      ) : (
+        <>
+          {leader && (
+            <View style={styles.leaderBanner}>
+              <View>
+                <Text style={styles.leaderLabel}>Líder actual</Text>
+                <Text style={styles.leaderName}>Postor #{leader.bidderNumber}</Text>
+              </View>
+              <View style={styles.leaderRight}>
+                <Text style={styles.leaderLabel}>Mejor oferta</Text>
+                <Text style={styles.leaderAmount}>
+                  {displayCurrency} {leader.amount.toLocaleString('es-AR')}
+                </Text>
+              </View>
+            </View>
+          )}
 
-      {/* Lista del Historial */}
-      <FlatList
-        data={history}
-        keyExtractor={(item) => item.id}
-        renderItem={renderBidRow}
-        showsVerticalScrollIndicator={false}
-      />
+          <View style={styles.totalRow}>
+            <Text style={styles.totalText}>
+              {total} {total === 1 ? 'puja' : 'pujas'} registradas
+            </Text>
+          </View>
+
+          {bids.length === 0 ? (
+            <View style={styles.centered}>
+              <Text style={styles.emptyText}>Todavía no hay pujas para este ítem.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={bids}
+              keyExtractor={b => String(b.id)}
+              renderItem={renderBid}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  
-  header: { flexDirection: 'row', padding: 20, paddingTop: 50, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#EEE', alignItems: 'flex-start' },
-  backButton: { marginRight: 15, marginTop: 5 },
-  backIcon: { fontSize: 24, color: '#002855' },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#002855' },
-  subtitle: { fontSize: 16, color: '#666', marginTop: 2 },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  leaderBanner: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, backgroundColor: '#FDF8ED', borderBottomWidth: 1, borderBottomColor: '#F0E6D2' },
-  leaderLabel: { fontSize: 14, color: '#666', marginBottom: 5 },
-  leaderUser: { fontSize: 20, fontWeight: 'bold', color: '#002855' },
-  leaderAmount: { fontSize: 26, fontWeight: 'bold', color: '#D35400' },
+  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 14, backgroundColor: '#002855' },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backText: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  topBarCenter: { flex: 1, alignItems: 'center' },
+  topBarTitle: { color: '#FFF', fontSize: 17, fontWeight: '700' },
+  topBarSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 },
 
-  bidRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  winnerRow: { backgroundColor: '#FFFBE6' }, // Fondo amarillo claro
-  
-  bidderInfo: { flexDirection: 'row', alignItems: 'center' },
-  iconBox: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  iconBoxWinner: { backgroundColor: '#FDE68A' },
-  iconBoxNormal: { backgroundColor: '#E2E8F0' },
-  trendIcon: { fontSize: 18, fontWeight: 'bold' },
-  trendIconWinner: { color: '#92400E' },
-  trendIconNormal: { color: '#64748B' },
-  
-  bidderName: { fontSize: 16, fontWeight: 'bold', color: '#002855' },
-  bidTime: { fontSize: 13, color: '#888', marginTop: 2 },
+  loader: { marginTop: 60 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  errorText: { color: '#EF4444', fontSize: 15, textAlign: 'center', marginBottom: 20 },
+  retryBtn: { backgroundColor: '#D35400', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8 },
+  retryBtnText: { color: '#FFF', fontWeight: 'bold' },
+  emptyText: { color: '#64748B', fontSize: 15 },
 
-  amountInfo: { alignItems: 'flex-end', justifyContent: 'center' },
-  bidAmount: { fontSize: 18, fontWeight: 'bold', color: '#002855' },
-  bidAmountWinner: { color: '#D35400' }, // Naranja
-  ganandoText: { color: '#D35400', fontSize: 12, fontWeight: 'bold', marginTop: 2 },
+  leaderBanner: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, backgroundColor: '#FDF8ED', borderBottomWidth: 1, borderBottomColor: '#FDE68A' },
+  leaderLabel: { fontSize: 12, color: '#92400E', fontWeight: '600', marginBottom: 4 },
+  leaderName: { fontSize: 18, fontWeight: '700', color: '#002855' },
+  leaderRight: { alignItems: 'flex-end' },
+  leaderAmount: { fontSize: 24, fontWeight: '700', color: '#D35400' },
+
+  totalRow: { paddingHorizontal: 20, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#FFF' },
+  totalText: { fontSize: 13, color: '#64748B' },
+
+  bidRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#FFF' },
+  bidRowTop: { backgroundColor: '#FFFBEB' },
+  bidLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  bidIcon: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  bidIconTop: { backgroundColor: '#FDE68A' },
+  bidIconNormal: { backgroundColor: '#E2E8F0' },
+  bidIconText: { fontSize: 16, fontWeight: 'bold' },
+  bidIconTextTop: { color: '#92400E' },
+  bidIconTextNormal: { color: '#475569' },
+  bidderName: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
+  bidMeta: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+  bidRight: { alignItems: 'flex-end' },
+  bidAmount: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  bidAmountTop: { color: '#D35400' },
+  winningLabel: { fontSize: 11, color: '#D35400', fontWeight: '600', marginTop: 2 },
 });

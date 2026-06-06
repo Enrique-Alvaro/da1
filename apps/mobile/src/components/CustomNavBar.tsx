@@ -8,7 +8,7 @@ export function CustomNavBar() {
   const pathname = usePathname();
 
   const navItems = [
-    { label: 'Explorar', path: '/explore' },
+    { label: 'Inicio', path: '/home' },
     { label: 'Mis Artículos', path: '/mis-articulos' },
     { label: 'Perfil', path: '/perfil' },
     { label: 'Vender', path: '/post-article' }, // Esto vincula directo al archivo que ya tenías

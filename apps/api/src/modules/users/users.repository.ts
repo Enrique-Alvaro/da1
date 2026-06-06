@@ -108,6 +108,28 @@ export async function findAdminClientDetail(clienteId: number): Promise<AdminCli
   return result.recordset[0] ?? null;
 }
 
+export async function updatePersonaProfile(input: {
+  personId: number;
+  address?: string | null;
+  email?: string;
+}): Promise<void> {
+  const pool = await getSqlPool();
+  if (input.address !== undefined) {
+    await pool
+      .request()
+      .input("personId", sql.Int, input.personId)
+      .input("address", sql.NVarChar(300), input.address ?? null)
+      .query(`UPDATE dbo.personas SET direccion = @address WHERE identificador = @personId`);
+  }
+  if (input.email !== undefined) {
+    await pool
+      .request()
+      .input("personId", sql.Int, input.personId)
+      .input("email", sql.NVarChar(200), input.email)
+      .query(`UPDATE dbo.cliente_credenciales SET email = @email WHERE persona_id = @personId`);
+  }
+}
+
 export async function updateClienteAdmission(input: {
   clienteId: number;
   admitido: "si" | "no";

@@ -1,38 +1,47 @@
-export type CountryCode = string;
-
-export type UserCategory = 'common' | 'special' | 'silver' | 'gold' | 'platinum';
-
-export type UserStatus =
-  | 'pending_verification'
-  | 'active'
-  | 'blocked'
-  | 'delinquent'
-  | 'suspended';
+export type UserCategory = 'comun' | 'especial' | 'plata' | 'oro' | 'platino';
 
 export interface UserProfile {
-  id: string;
-  firstName: string;
-  lastName: string;
+  id: number;
+  documentNumber: string;
+  fullName: string;
   email: string;
-  documentId: string;
-  address: string;
-  country: CountryCode;
-  photoUrl?: string;
-  documentFrontImageUrl?: string;
-  documentBackImageUrl?: string;
-  category?: UserCategory;
-  status?: UserStatus;
-  biddingBlockedUntilResolved?: boolean;
-  delinquentWinId?: string;
-  accountServiceSuspended?: boolean;
-  requiresPasswordChange?: boolean;
+  address: string | null;
+  status: string;
+  country: { id: number; name: string };
+  admitted: 'si' | 'no';
+  category: UserCategory;
+}
+
+export interface UserMetrics {
+  totalAuctionsAttended: number;
+  totalWins: number;
+  totalBidsPlaced: number;
+  totalAmountOffered: number;
+  totalAmountWon: number;
+  activeLiveAuctionId: number | null;
+}
+
+export interface PaymentMethod {
+  id: number;
+  type: string;
+  status: string;
+  currency: string;
+  holder: string;
+  entity: string | null;
+  lastDigits: string | null;
+  aliasOrCbu: string | null;
+  guaranteeAmount: number | null;
+  availableAmount: number | null;
+  rejectionReason: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthResponse {
   accessToken: string;
   mustChangePassword?: boolean;
   isFirstLogin?: boolean;
-  user?: UserProfile;
   emailSentTo?: string;
 }
 

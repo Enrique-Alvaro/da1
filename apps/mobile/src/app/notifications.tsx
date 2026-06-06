@@ -1,68 +1,60 @@
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+const NOTIFICATIONS = [
+  { id: '1', title: '¡Ganaste la subasta!', desc: 'Eres el ganador. El equipo se pondrá en contacto para coordinar el pago y envío.', time: 'hace 5 min', icon: '🏆', bg: '#FFFBEB', border: '#FDE68A' },
+  { id: '2', title: 'Sos el mejor postor', desc: 'Tu oferta está ganando. Seguí participando para mantener la delantera.', time: 'hace 15 min', icon: '📈', bg: '#F0FDF4', border: '#A7F3D0' },
+  { id: '3', title: 'Te superaron', desc: 'Otro usuario hizo una oferta mayor. ¡Podés volver a pujar!', time: 'hace 1h', icon: '📉', bg: '#FFF7ED', border: '#FED7AA' },
+  { id: '4', title: 'Subasta por comenzar', desc: 'Una subasta de tu categoría comienza en 1 hora. Revisá tu medio de pago.', time: 'hace 2h', icon: '🕐', bg: '#EFF6FF', border: '#BFDBFE' },
+  { id: '5', title: 'Artículo aceptado', desc: 'Uno de tus artículos fue aprobado y será incluido en una próxima subasta.', time: 'hace 3h', icon: '✓', bg: '#F0FDF4', border: '#A7F3D0' },
+];
 
 export default function NotificationsScreen() {
   const router = useRouter();
 
-  // Datos simulados de las notificaciones del Figma
-  const notifications = [
-    { id: '1', title: '¡Felicitaciones! Ganaste la subasta', desc: 'Eres el ganador de "Rolex Submariner Vintage"', time: 'hace 5 minutos', icon: '🏆', color: '#FFF9E6', border: '#FDE68A', iconColor: '#B45309' },
-    { id: '2', title: 'Eres el mejor postor actualmente', desc: 'Tu puja de $1.250 está ganando en "Obra de Arte Moderna"', time: 'hace 15 minutos', icon: '📈', color: '#F0FDF4', border: '#BBF7D0', iconColor: '#15803D' },
-    { id: '3', title: 'Te han superado', desc: 'Otro usuario hizo una puja mayor en "Collar de Diamantes"', time: 'hace 1 hora', icon: '📉', color: '#FFF7ED', border: '#FFEDD5', iconColor: '#C2410C' },
-    { id: '4', title: 'Pago fallido', desc: 'No pudimos cobrar tu método de pago para "Jarrón Antiguo"', time: 'hace 2 horas', icon: '❌', color: '#FEF2F2', border: '#FECACA', iconColor: '#B91C1C' },
-    { id: '5', title: 'Subasta comenzando pronto', desc: 'La subasta de Relojes de Lujo comienza en 1 hora', time: 'hace 3 horas', icon: '🕒', color: '#EFF6FF', border: '#DBEAFE', iconColor: '#1D4ED8' },
-  ];
-
   return (
-    <ThemedView style={styles.container}>
-      {/* Barra Superior */}
+    <View style={styles.container}>
       <View style={styles.topBar}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ThemedText style={styles.backIcon}>←</ThemedText>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backBtn}>
+          <Text style={styles.backText}>←</Text>
         </Pressable>
-        <ThemedText style={styles.topBarTitle}>Notificaciones</ThemedText>
-        <View style={{ width: 40 }} />
+        <Text style={styles.topBarTitle}>Notificaciones</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <ThemedText style={styles.headerSubtitle}>Mantente al día con tus subastas</ThemedText>
-
-        {notifications.map((notif) => (
-          <View key={notif.id} style={[styles.notifCard, { backgroundColor: notif.color, borderColor: notif.border }]}>
-            <View style={styles.notifHeader}>
-              <View style={[styles.iconContainer, { backgroundColor: '#FFF' }]}>
-                <ThemedText style={[styles.notifIcon, { color: notif.iconColor }]}>{notif.icon}</ThemedText>
-              </View>
-              <View style={styles.textContainer}>
-                <ThemedText style={styles.notifTitle}>{notif.title}</ThemedText>
-                <ThemedText style={styles.notifDesc}>{notif.desc}</ThemedText>
-                <ThemedText style={styles.notifTime}>{notif.time}</ThemedText>
-              </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.subtitle}>Tus últimas actividades</Text>
+        {NOTIFICATIONS.map(n => (
+          <View key={n.id} style={[styles.card, { backgroundColor: n.bg, borderColor: n.border }]}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.iconText}>{n.icon}</Text>
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>{n.title}</Text>
+              <Text style={styles.cardDesc}>{n.desc}</Text>
+              <Text style={styles.cardTime}>{n.time}</Text>
             </View>
           </View>
         ))}
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingTop: 50, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  backButton: { padding: 5 },
-  backIcon: { fontSize: 24, color: '#002855' },
-  topBarTitle: { fontSize: 24, fontWeight: 'bold', color: '#002855' },
-  scrollContent: { padding: 20 },
-  headerSubtitle: { fontSize: 16, color: '#666', marginBottom: 25 },
-  notifCard: { padding: 20, borderRadius: 16, borderWidth: 1, marginBottom: 15 },
-  notifHeader: { flexDirection: 'row', alignItems: 'flex-start' },
-  iconContainer: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginRight: 15, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  notifIcon: { fontSize: 22 },
-  textContainer: { flex: 1 },
-  notifTitle: { fontSize: 17, fontWeight: 'bold', color: '#002855', marginBottom: 5 },
-  notifDesc: { fontSize: 14, color: '#444', lineHeight: 20 },
-  notifTime: { fontSize: 12, color: '#888', marginTop: 10 },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 14, backgroundColor: '#002855' },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backText: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  topBarTitle: { flex: 1, textAlign: 'center', color: '#FFF', fontSize: 17, fontWeight: '700' },
+  content: { padding: 20, paddingBottom: 40 },
+  subtitle: { fontSize: 14, color: '#64748B', marginBottom: 20 },
+  card: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, padding: 16, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
+  iconCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  iconText: { fontSize: 20 },
+  cardContent: { flex: 1 },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
+  cardDesc: { fontSize: 13, color: '#374151', lineHeight: 18, marginBottom: 6 },
+  cardTime: { fontSize: 12, color: '#9CA3AF' },
 });

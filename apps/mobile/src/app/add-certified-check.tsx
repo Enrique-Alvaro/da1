@@ -1,23 +1,56 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-
-const currencies = ['USD', 'EUR', 'MXN'];
+import { createPaymentMethod } from '@/services/api';
 
 export default function AddCertifiedCheckScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const [issuerBank, setIssuerBank] = useState('Banco Nacional');
-  const [checkNumber, setCheckNumber] = useState('987654321');
-  const [amount, setAmount] = useState('100,000');
-  const [currency, setCurrency] = useState('USD');
-  const [issueDate, setIssueDate] = useState('');
+
+  const [issuerBank, setIssuerBank] = useState('');
+  const [holder, setHolder] = useState('');
+  const [checkNumber, setCheckNumber] = useState('');
+  const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState<'ARS' | 'USD'>('USD');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    setError(null);
+    const parsedAmount = parseFloat(amount.replace(/,/g, '.'));
+
+    if (!issuerBank.trim() || !holder.trim()) {
+      setError('Completá banco emisor y titular.');
+      return;
+    }
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setError('Ingresá un monto mayor a 0.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await createPaymentMethod({
+        tipo: 'cheque_certificado',
+        moneda: currency,
+        titular: holder.trim(),
+        entidad: issuerBank.trim(),
+        aliasOCbu: checkNumber.trim() || null,
+        montoGarantia: parsedAmount,
+      });
+      router.replace('/payment-methods');
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message ?? 'Ocurrió un error al registrar el cheque.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -34,7 +67,16 @@ export default function AddCertifiedCheckScreen() {
               style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
               value={issuerBank}
               onChangeText={setIssuerBank}
-              placeholder="Banco Nacional"
+              placeholder="Nombre del banco"
+              placeholderTextColor="#9AA0A6"
+            />
+
+            <ThemedText style={styles.label}>Titular</ThemedText>
+            <TextInput
+              style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
+              value={holder}
+              onChangeText={setHolder}
+              placeholder="Nombre completo del titular"
               placeholderTextColor="#9AA0A6"
             />
 
@@ -43,7 +85,7 @@ export default function AddCertifiedCheckScreen() {
               style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
               value={checkNumber}
               onChangeText={setCheckNumber}
-              placeholder="987654321"
+              placeholder="Opcional"
               placeholderTextColor="#9AA0A6"
               keyboardType="numeric"
             />
@@ -55,40 +97,45 @@ export default function AddCertifiedCheckScreen() {
                   style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
                   value={amount}
                   onChangeText={setAmount}
-                  placeholder="100,000"
+                  placeholder="100000"
                   placeholderTextColor="#9AA0A6"
                   keyboardType="numeric"
                 />
               </View>
               <View style={styles.rowItem}>
                 <ThemedText style={styles.label}>Moneda</ThemedText>
-                <Pressable
-                  style={[styles.selectBox, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
-                  onPress={() => {
-                    const next = currencies[(currencies.indexOf(currency) + 1) % currencies.length] || currencies[0];
-                    setCurrency(next);
-                  }}
-                >
-                  <ThemedText>{currency}</ThemedText>
-                </Pressable>
+                <View style={[styles.toggle, { borderColor: theme.backgroundSelected }]}>
+                  <Pressable
+                    style={[styles.toggleOption, currency === 'ARS' && { backgroundColor: theme.primary }]}
+                    onPress={() => setCurrency('ARS')}
+                  >
+                    <ThemedText style={currency === 'ARS' ? styles.toggleTextActive : undefined}>ARS</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.toggleOption, currency === 'USD' && { backgroundColor: theme.primary }]}
+                    onPress={() => setCurrency('USD')}
+                  >
+                    <ThemedText style={currency === 'USD' ? styles.toggleTextActive : undefined}>USD</ThemedText>
+                  </Pressable>
+                </View>
               </View>
             </View>
-
-            <ThemedText style={styles.label}>Fecha de Emisión</ThemedText>
-            <TextInput
-              style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
-              value={issueDate}
-              onChangeText={setIssueDate}
-              placeholder="mm/dd/yyyy"
-              placeholderTextColor="#9AA0A6"
-            />
           </View>
 
+          {error && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{error}</Text>
+            </View>
+          )}
+
           <Pressable
-            style={[styles.primaryButton, { backgroundColor: theme.primary }]}
-            onPress={() => router.push('/payment-method-verify')}
+            style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: submitting ? 0.6 : 1 }]}
+            onPress={handleSubmit}
+            disabled={submitting}
           >
-            <ThemedText type="default" style={styles.primaryButtonText}>Continuar</ThemedText>
+            <ThemedText type="default" style={styles.primaryButtonText}>
+              {submitting ? 'Guardando...' : 'Continuar'}
+            </ThemedText>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -123,13 +170,6 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#DADADA',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-  },
-  selectBox: {
-    borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 14,
@@ -140,6 +180,33 @@ const styles = StyleSheet.create({
   },
   rowItem: {
     flex: 1,
+  },
+  toggle: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    height: 50,
+  },
+  toggleOption: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toggleTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  errorBanner: {
+    backgroundColor: '#FFECEC',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E74C3C',
+  },
+  errorBannerText: {
+    color: '#7B241C',
+    fontSize: 14,
   },
   primaryButton: {
     paddingVertical: 16,
