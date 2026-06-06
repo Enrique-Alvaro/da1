@@ -1,31 +1,54 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { registerUser } from '@/services/api';
+
+const COUNTRIES = [
+  { code: 'AR', name: 'Argentina',       id: 32  },
+  { code: 'US', name: 'Estados Unidos',  id: 840 },
+  { code: 'ES', name: 'España',          id: 724 },
+  { code: 'CO', name: 'Colombia',        id: 170 },
+  { code: 'BR', name: 'Brasil',          id: 76  },
+];
 
 export default function RegisterScreen() {
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
   const [address, setAddress] = useState('');
-  
-  // Estado para controlar el menú desplegable de países
-  const [country, setCountry] = useState('Selecciona un país');
-  const [showDropdown, setShowDropdown] = useState(false);
-  
+  const [countryCode, setCountryCode] = useState('AR');
+  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [frontImage, setFrontImage] = useState<string | null>(null);
+  const [frontImageBase64, setFrontImageBase64] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
+  const [backImageBase64, setBackImageBase64] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const countries = ['Argentina', 'Estados Unidos', 'España', 'Colombia', 'Brasil'];
+  const selectedCountry = COUNTRIES.find(c => c.code === countryCode) ?? COUNTRIES[0];
 
-  // Función simplificada para abrir la galería directo (ideal para web y móvil)
-  async function pickImage(side: 'front' | 'back') {
+  async function requestPermissions() {
+    const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+    const mediaStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (cameraStatus.status !== 'granted' || mediaStatus.status !== 'granted') {
+      Alert.alert('Permisos necesarios', 'Por favor permite el acceso a cámara y galería en la configuración.');
+      return false;
+    }
+    return true;
+  }
+
+  async function pickImage(forWhat: 'front' | 'back', fromCamera = false) {
+    const ok = await requestPermissions();
+    if (!ok) return;
+
     try {
       let result: ImagePicker.ImagePickerResult;
       if (fromCamera) {
@@ -34,40 +57,23 @@ export default function RegisterScreen() {
         result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true });
       }
       if (!(result as any).canceled) {
-        const asset = (result as any).assets?.[0] ?? result;
-        const base64 = asset?.base64;
-        if (typeof base64 === 'string' && base64.trim().length > 0) {
-          if (forWhat === 'front') setFrontImage(base64);
-          else setBackImage(base64);
-        } else {
-          Alert.alert('Error', 'No se pudo leer la imagen en Base64. Intenta otra imagen.');
-        }
+        const asset = (result as any).assets?.[0];
+        const uri = asset?.uri ?? (result as any).uri;
+        const base64 = asset?.base64 ?? null;
+        if (forWhat === 'front') { setFrontImage(uri); setFrontImageBase64(base64); }
+        else { setBackImage(uri); setBackImageBase64(base64); }
       }
     } catch (e) {
-      console.warn('Error al seleccionar imagen', e);
+      console.warn('Image pick error', e);
     }
-  }
-
-  function getPreviewUri(base64: string | null) {
-    if (!base64) return undefined;
-    return base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
   }
 
   async function onSubmit() {
     setServerError(null);
-    if (!firstName || !lastName || !email || !address || country === 'Selecciona un país' || !frontImage || !backImage) {
-      setServerError('Completa todos los campos obligatorios y sube ambas imágenes del DNI.');
+    if (!firstName || !lastName || !email || !documentNumber || !address || !frontImage || !backImage || !countryCode) {
+      setServerError('Completa todos los campos obligatorios y sube ambas imágenes del documento.');
       return;
     }
-
-    const countryCodeToId: Record<string, number> = {
-      AR: 1,
-      US: 2,
-      ES: 3,
-      CO: 4,
-      BR: 5,
-    };
-    const countryId = countryCodeToId[country] ?? 1;
 
     setLoading(true);
     try {
@@ -75,11 +81,11 @@ export default function RegisterScreen() {
         firstName,
         lastName,
         email,
-        documentNumber: documentId,
+        documentNumber,
         address,
-        countryId,
-        documentFrontImageBase64: frontImage,
-        documentBackImageBase64: backImage,
+        countryId: selectedCountry.id,
+        documentFrontImageBase64: frontImageBase64,
+        documentBackImageBase64: backImageBase64,
       });
       router.push('/register-confirmation');
     } catch (error: any) {
@@ -90,137 +96,124 @@ export default function RegisterScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
-        </Pressable>
-      </View>
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView style={{ width: '100%' }} contentContainerStyle={{ alignItems: 'center', gap: Spacing.three }}>
+          <ThemedText type="title">Crear Cuenta</ThemedText>
+          <ThemedText type="small">Únete a CrownBid hoy</ThemedText>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        <View style={styles.headerContainer}>
-          <Text style={styles.title}>Crear Cuenta</Text>
-          <Text style={styles.subtitle}>Únete a CrownBid hoy</Text>
-        </View>
+          <View style={{ width: '100%', marginTop: Spacing.four }}>
+            <ThemedText style={styles.label}>Nombre</ThemedText>
+            <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
 
-        <View style={styles.formContainer}>
-          <Text style={styles.label}>Nombre</Text>
-          <TextInput style={styles.input} placeholder="Juan" placeholderTextColor="#999" value={firstName} onChangeText={setFirstName} />
+            <ThemedText style={styles.label}>Apellido</ThemedText>
+            <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
 
-          <Text style={styles.label}>Apellido</Text>
-          <TextInput style={styles.input} placeholder="Pérez" placeholderTextColor="#999" value={lastName} onChangeText={setLastName} />
+            <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
+            <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
 
-          <Text style={styles.label}>Correo Electrónico</Text>
-          {/* Cambiado a @gmail.com como pediste */}
-          <TextInput style={styles.input} placeholder="tu@gmail.com" placeholderTextColor="#999" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            <ThemedText style={styles.label}>Documento</ThemedText>
+            <TextInput style={styles.input} value={documentNumber} onChangeText={setDocumentNumber} placeholder="DNI / Pasaporte" />
 
-          <Text style={styles.label}>Dirección</Text>
-          {/* Cambiado el placeholder para que sea solo la calle y número */}
-          <TextInput style={styles.input} placeholder="Av. Corrientes 1234" placeholderTextColor="#999" value={address} onChangeText={setAddress} />
+            <ThemedText style={styles.label}>Dirección</ThemedText>
+            <TextInput style={styles.input} value={address} onChangeText={setAddress} />
 
-          <Text style={styles.label}>País</Text>
-          {/* Implementación del Menú Desplegable */}
-          <View style={{ position: 'relative', zIndex: 10, marginBottom: 20 }}>
-            <Pressable style={[styles.input, styles.selectInput, { marginBottom: 0 }]} onPress={() => setShowDropdown(!showDropdown)}>
-              <Text style={{ color: country === 'Selecciona un país' ? '#999' : '#333', fontSize: 16 }}>{country}</Text>
-              <Text style={{ color: '#002855', fontWeight: 'bold' }}>{showDropdown ? '⌃' : '⌄'}</Text>
-            </Pressable>
-            
-            {showDropdown && (
-              <View style={styles.dropdownMenu}>
-                {countries.map((c) => (
-                  <Pressable 
-                    key={c} 
-                    style={styles.dropdownItem} 
-                    onPress={() => { setCountry(c); setShowDropdown(false); }}
-                  >
-                    <Text style={styles.dropdownItemText}>{c}</Text>
-                  </Pressable>
+            <ThemedText style={styles.label}>País</ThemedText>
+            {Platform.OS === 'web' ? (
+              <select
+                value={countryCode}
+                onChange={e => setCountryCode((e.target as HTMLSelectElement).value)}
+                style={{ borderWidth: 1, borderColor: '#E6E9EB', padding: 12, borderRadius: 10, backgroundColor: '#FFF', marginBottom: Spacing.three, fontSize: 15, width: '100%', color: '#1A1A1A' } as any}
+              >
+                {COUNTRIES.map(c => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
+              </select>
+            ) : (
+              <Pressable style={[styles.input, styles.selectInput]} onPress={() => setCountryDropdownOpen(true)}>
+                <Text style={styles.selectText}>{selectedCountry.name}</Text>
+                <Text style={styles.selectChevron}>▾</Text>
+              </Pressable>
+            )}
+
+            <ThemedText style={styles.label}>Verificación de Identidad</ThemedText>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Pressable style={styles.uploadBox} onPress={() => pickImage('front', false)}>
+                  {frontImage ? (
+                    <Image source={{ uri: frontImage }} style={styles.preview} />
+                  ) : (
+                    <ThemedText>Subir imagen del frente del ID</ThemedText>
+                  )}
+                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <Pressable style={styles.smallButton} onPress={() => pickImage('front', true)}>
+                    <Text style={styles.smallButtonText}>Tomar Foto</Text>
+                  </Pressable>
+                  <Pressable style={styles.smallButton} onPress={() => pickImage('front', false)}>
+                    <Text style={styles.smallButtonText}>Elegir de Galería</Text>
+                  </Pressable>
+                </View>
               </View>
-            )}
-          </View>
 
-          {/* Sección de Documentos con DNI en vez de ID */}
-          <Text style={styles.sectionLabel}>Verificación de Identidad</Text>
-          
-          <Text style={styles.label}>Frente del DNI</Text>
-          <Pressable style={styles.dashedBox} onPress={() => pickImage('front')}>
-            {frontImage ? (
-              <Image source={{ uri: frontImage }} style={styles.preview} />
-            ) : (
-              <>
-                <Text style={styles.uploadIcon}>↑</Text>
-                <Text style={styles.uploadText}>Subir imagen del frente del DNI</Text>
-              </>
-            )}
-          </Pressable>
-
-          <Text style={styles.label}>Dorso del DNI</Text>
-          <Pressable style={styles.dashedBox} onPress={() => pickImage('back')}>
-            {backImage ? (
-              <Image source={{ uri: backImage }} style={styles.preview} />
-            ) : (
-              <>
-                <Text style={styles.uploadIcon}>↑</Text>
-                <Text style={styles.uploadText}>Subir imagen del dorso del DNI</Text>
-              </>
-            )}
-          </Pressable>
-
-          {serverError && (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerTitle}>Error</Text>
-              <Text style={{ color: '#333' }}>{serverError}</Text>
+              <View style={{ flex: 1 }}>
+                <Pressable style={styles.uploadBox} onPress={() => pickImage('back', false)}>
+                  {backImage ? (
+                    <Image source={{ uri: backImage }} style={styles.preview} />
+                  ) : (
+                    <ThemedText>Subir imagen del dorso del ID</ThemedText>
+                  )}
+                </Pressable>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <Pressable style={styles.smallButton} onPress={() => pickImage('back', true)}>
+                    <Text style={styles.smallButtonText}>Tomar Foto</Text>
+                  </Pressable>
+                  <Pressable style={styles.smallButton} onPress={() => pickImage('back', false)}>
+                    <Text style={styles.smallButtonText}>Elegir de Galería</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
-          )}
 
-          <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
-            <Text style={styles.primaryButtonText}>
-              {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
-            </Text>
-          </Pressable>
-        </View>
-
-      </ScrollView>
-    </SafeAreaView>
+            {serverError ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerTitle}>Error</Text>
+                <Text style={styles.errorBannerText}>{serverError}</Text>
+              </View>
+            ) : null}
+            <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
+              <ThemedText type="default" style={styles.primaryButtonText}>
+                {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
+              </ThemedText>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  topBar: { paddingHorizontal: 20, paddingTop: 10 },
-  backButton: { padding: 5, width: 40 },
-  backIcon: { fontSize: 24, color: '#002855' },
-  
-  scrollContent: { paddingHorizontal: 25, paddingBottom: 40 },
-  
-  headerContainer: { alignItems: 'center', marginBottom: 30 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#002855' },
-  subtitle: { fontSize: 16, color: '#666', marginTop: 5 },
-  
-  formContainer: { width: '100%' },
-  
-  label: { fontSize: 14, fontWeight: 'bold', color: '#002855', marginBottom: 8 },
-  sectionLabel: { fontSize: 16, fontWeight: 'bold', color: '#002855', marginTop: 10, marginBottom: 15 },
-  
-  input: { borderWidth: 1, borderColor: '#E6E9EB', borderRadius: 10, padding: 15, fontSize: 16, color: '#333', backgroundColor: '#FFF', marginBottom: 20 },
-  selectInput: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  
-  /* Estilos del Menú Desplegable (Dropdown) */
-  dropdownMenu: { position: 'absolute', top: 55, left: 0, right: 0, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E6E9EB', borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5, zIndex: 100 },
-  dropdownItem: { paddingVertical: 12, paddingHorizontal: 15, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
-  dropdownItemText: { fontSize: 16, color: '#333' },
-
-  dashedBox: { borderWidth: 1, borderColor: '#B0B5BE', borderStyle: 'dashed', borderRadius: 10, padding: 30, alignItems: 'center', backgroundColor: '#F8F9FA', marginBottom: 20 },
-  uploadIcon: { fontSize: 24, color: '#888', marginBottom: 10 },
-  uploadText: { color: '#002855', fontSize: 14 },
-  preview: { width: '100%', height: 150, borderRadius: 8, resizeMode: 'cover' },
-  
-  errorBanner: { backgroundColor: '#FFECEC', borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: '#E74C3C', marginBottom: 20 },
-  errorBannerTitle: { fontWeight: 'bold', marginBottom: 6, color: '#C0392B' },
-  
-  primaryButton: { backgroundColor: '#D35400', paddingVertical: 15, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  primaryButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  container: { flex: 1, justifyContent: 'center', flexDirection: 'row' },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.four, alignItems: 'center', gap: Spacing.three, paddingBottom: BottomTabInset + Spacing.three, maxWidth: MaxContentWidth, width: '100%' },
+  label: { marginTop: Spacing.two, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: '#E6E9EB', padding: 12, borderRadius: 10, backgroundColor: '#FFF', marginBottom: Spacing.three, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  uploadBox: { borderWidth: 1, borderColor: '#E6E9EB', padding: 16, borderRadius: 8, marginBottom: Spacing.three, alignItems: 'center' },
+  selectInput: { backgroundColor: '#F7F7F8' },
+  selectText: { color: '#1A1A1A', fontSize: 15 },
+  selectChevron: { color: '#888', fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
+  dropdownList: { backgroundColor: '#FFF', borderRadius: 12, width: 280, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  dropdownItem: { paddingVertical: 14, paddingHorizontal: 20 },
+  dropdownItemActive: { backgroundColor: '#FFF3EA' },
+  dropdownItemText: { fontSize: 15, color: '#1A1A1A' },
+  dropdownItemTextActive: { color: '#F47B1F', fontWeight: '700' },
+  errorBanner: { backgroundColor: '#FFECEC', borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: '#E74C3C', marginBottom: Spacing.three },
+  errorBannerTitle: { fontWeight: '700', marginBottom: 6, color: '#C0392B' },
+  errorBannerText: { color: '#7B241C', fontSize: 14 },
+  primaryButton: { backgroundColor: '#F47B1F', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: Spacing.two },
+  primaryButtonText: { color: '#fff' },
+  preview: { width: '100%', height: 120, borderRadius: 8 },
+  smallButton: { backgroundColor: '#F6F6F6', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, alignItems: 'center' },
+  smallButtonText: { color: '#1A1A1A', fontSize: 13 },
 });

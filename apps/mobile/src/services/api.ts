@@ -1,11 +1,6 @@
-import Constants from 'expo-constants';
-import { ApiError, AuthResponse, UserProfile } from './types';
+import { ApiError, AuthResponse, PaymentMethod, UserMetrics, UserProfile } from './types';
 
-const API_BASE_URL = (() => {
-  const url = Constants.expoConfig?.extra?.apiBaseUrl;
-  return typeof url === 'string' && url.trim() ? url : 'http://localhost:3000/api';
-})();
-
+const API_BASE_URL = 'http://localhost:3000/api';
 let authToken: string | null = null;
 
 function persistToken(token: string | null) {
@@ -82,9 +77,8 @@ export async function registerUser(payload: {
   documentNumber: string;
   address: string;
   countryId: number;
-  documentFrontImageBase64: string;
-  documentBackImageBase64: string;
-  photoBase64?: string | null;
+  documentFrontImageBase64?: string | null;
+  documentBackImageBase64?: string | null;
 }): Promise<{ message: string; emailSentTo?: string }> {
   return request('/auth/register', {
     method: 'POST',
@@ -150,6 +144,24 @@ export async function getCurrentUser(): Promise<UserProfile> {
   });
 }
 
+export async function updateProfile(fields: {
+  address?: string | null;
+  email?: string;
+}): Promise<UserProfile> {
+  return request('/users/me', {
+    method: 'PATCH',
+    headers: buildHeaders(),
+    body: JSON.stringify(fields),
+  });
+}
+
+export async function getMyMetrics(): Promise<UserMetrics> {
+  return request('/users/me/metrics', {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
 export async function logout(): Promise<void> {
   await request('/auth/logout', {
     method: 'POST',
@@ -158,8 +170,107 @@ export async function logout(): Promise<void> {
   setAuthToken(null);
 }
 
-export async function fetchPaymentMethods() {
+export async function fetchPaymentMethods(): Promise<{ items: PaymentMethod[] }> {
   return request('/users/me/payment-methods', {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function disablePaymentMethod(id: number): Promise<{ id: number; status: string }> {
+  return request(`/users/me/payment-methods/${id}/disable`, {
+    method: 'PATCH',
+    headers: buildHeaders(),
+  });
+}
+
+export async function createPaymentMethod(payload: {
+  tipo: string;
+  moneda: string;
+  titular: string;
+  entidad: string;
+  ultimosDigitos?: string | null;
+  aliasOCbu?: string | null;
+  montoGarantia?: number | null;
+}): Promise<{ id: number; type: string; status: string; message: string }> {
+  return request('/users/me/payment-methods', {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function registerAsistente(auctionId: number) {
+  return request(`/subastas/${auctionId}/asistentes`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function enterLiveSession(auctionId: number) {
+  return request(`/subastas/${auctionId}/live/session`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function leaveLiveSession(auctionId: number) {
+  return request(`/subastas/${auctionId}/live/session`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  });
+}
+
+export async function placeBid(auctionId: number, body: {
+  itemId: number;
+  amount: number;
+  paymentMethodId: number;
+}) {
+  return request(`/subastas/${auctionId}/pujos`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchBidHistory(auctionId: number, itemId?: number) {
+  const query = itemId ? `?itemId=${itemId}` : '';
+  return request(`/subastas/${auctionId}/bids/history${query}`, {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchItem(itemId: number) {
+  return request(`/items/${itemId}`, {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchAuctionDetail(id: number) {
+  return request(`/subastas/${id}`, {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchAuctionItems(id: number) {
+  return request(`/subastas/${id}/items`, {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchAuctions(params?: { featured?: boolean; status?: string; category?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.featured !== undefined) qs.set('featured', String(params.featured));
+  if (params?.status) qs.set('status', params.status);
+  if (params?.category) qs.set('category', params.category);
+  const query = qs.toString() ? `?${qs.toString()}` : '';
+  return request(`/subastas${query}`, {
     method: 'GET',
     headers: buildHeaders(),
   });
@@ -168,6 +279,35 @@ export async function fetchPaymentMethods() {
 export async function fetchSellerPayoutAccount() {
   return request('/users/me/seller/payout-account', {
     method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function createSubmission(payload: {
+  nombre: string;
+  descripcion: string;
+  declaracionPropiedad: true;
+  declaracionSinImpedimentos: true;
+  origenLicitoDeclarado: true;
+  fotos: { filename: string; mimeType: string; base64: string }[];
+}) {
+  return request('/items/submissions', {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchMySubmissions() {
+  return request('/items/my-submissions', {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function cancelSubmission(id: number): Promise<void> {
+  return request(`/users/me/item-submissions/${id}`, {
+    method: 'DELETE',
     headers: buildHeaders(),
   });
 }

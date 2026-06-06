@@ -1,69 +1,64 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
 export default function PostArticleSuccessScreen() {
   const router = useRouter();
-  const theme = useTheme();
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.card, { backgroundColor: theme.surface }]}> 
-          <ThemedText type="title">Artículo Enviado Exitosamente</ThemedText>
-          <ThemedText type="small" style={styles.message}>
-            Tu artículo ha sido enviado con éxito y está actualmente en revisión. Te notificaremos cuando sea aprobado para subasta.
-          </ThemedText>
-          <Pressable style={[styles.primaryButton, { backgroundColor: theme.primary }]} onPress={() => router.push('/explore')}>
-            <ThemedText type="default" style={styles.primaryButtonText}>
-              Volver al Inicio
-            </ThemedText>
-          </Pressable>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.content}>
+        <View style={styles.iconCircle}>
+          <Text style={styles.iconText}>📦</Text>
         </View>
-      </SafeAreaView>
-    </ThemedView>
+        <Text style={styles.title}>¡Artículo enviado!</Text>
+        <Text style={styles.message}>
+          Tu artículo fue enviado correctamente y está en revisión.
+          Te notificaremos cuando sea aceptado.
+        </Text>
+
+        <View style={styles.stepsCard}>
+          <Text style={styles.stepsTitle}>¿Qué sigue?</Text>
+          <View style={styles.stepRow}>
+            <View style={[styles.stepDot, { backgroundColor: '#10B981' }]} />
+            <Text style={styles.stepText}>Artículo enviado ✓</Text>
+          </View>
+          <View style={styles.stepRow}>
+            <View style={[styles.stepDot, { backgroundColor: '#F59E0B' }]} />
+            <Text style={styles.stepText}>Revisión por el equipo CrownBid</Text>
+          </View>
+          <View style={styles.stepRow}>
+            <View style={[styles.stepDot, { backgroundColor: '#E2E8F0' }]} />
+            <Text style={[styles.stepText, { color: '#9CA3AF' }]}>Asignación a subasta</Text>
+          </View>
+        </View>
+
+        <Pressable style={styles.primaryBtn} onPress={() => router.replace('/mis-articulos')}>
+          <Text style={styles.primaryBtnText}>Ver mis artículos</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryBtn} onPress={() => router.replace('/home')}>
+          <Text style={styles.secondaryBtnText}>Volver al inicio</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', flexDirection: 'row' },
-  safeArea: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-    width: '100%',
-  },
-  card: {
-    width: '100%',
-    gap: Spacing.four,
-    padding: Spacing.four,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  message: {
-    marginTop: Spacing.two,
-    marginBottom: Spacing.four,
-  },
-  primaryButton: {
-    backgroundColor: '#F47B1F',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 20 },
+  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFF7ED', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  iconText: { fontSize: 36 },
+  title: { fontSize: 26, fontWeight: '700', color: '#002855', textAlign: 'center' },
+  message: { fontSize: 15, color: '#475569', textAlign: 'center', lineHeight: 22 },
+  stepsCard: { backgroundColor: '#FFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', padding: 16, width: '100%', gap: 12 },
+  stepsTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepDot: { width: 10, height: 10, borderRadius: 5 },
+  stepText: { fontSize: 14, color: '#374151' },
+  primaryBtn: { backgroundColor: '#D35400', paddingVertical: 15, borderRadius: 12, alignItems: 'center', width: '100%' },
+  primaryBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  secondaryBtn: { paddingVertical: 12, alignItems: 'center', width: '100%' },
+  secondaryBtnText: { color: '#64748B', fontSize: 14 },
 });

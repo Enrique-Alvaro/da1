@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -48,8 +48,8 @@ export default function RecoverScreen() {
 
           {serverError ? (
             <View style={styles.errorBanner}>
-              <ThemedText style={styles.errorBannerTitle}>Error</ThemedText>
-              <ThemedText>{serverError}</ThemedText>
+              <Text style={styles.errorBannerTitle}>Error</Text>
+              <Text style={styles.errorBannerText}>{serverError}</Text>
             </View>
           ) : null}
           <Pressable style={styles.primaryButton} onPress={onSend} disabled={loading}>
@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
   infoBox: { backgroundColor: '#EAF3FF', padding: 12, borderRadius: 8, marginBottom: Spacing.three },
   errorBanner: { backgroundColor: '#FFECEC', borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: '#E74C3C', marginBottom: Spacing.three },
   errorBannerTitle: { fontWeight: '700', marginBottom: 6, color: '#C0392B' },
+  errorBannerText: { color: '#7B241C', fontSize: 14 },
   label: { marginTop: Spacing.two, marginBottom: 6 },
   input: { borderWidth: 1, borderColor: '#E6E9EB', padding: 12, borderRadius: 10, backgroundColor: '#FFF', marginBottom: Spacing.three },
   primaryButton: { backgroundColor: '#F47B1F', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginBottom: Spacing.two },

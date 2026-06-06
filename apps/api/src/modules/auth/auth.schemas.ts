@@ -36,8 +36,8 @@ function refineBase64Optional(path: string, value: string | null | undefined, ct
 /** Contrato pantalla registro (Figma): nombre, apellido, email, documento, dirección, país, frente/dorso ID. */
 export const registerBodySchema = z
   .object({
-    firstName: z.string().trim().min(1, "El nombre es obligatorio").max(75),
-    lastName: z.string().trim().min(1, "El apellido es obligatorio").max(75),
+    firstName: z.string().trim().min(1, "El nombre es obligatorio").max(75).regex(/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s'-]+$/, "El nombre solo puede contener letras"),
+    lastName: z.string().trim().min(1, "El apellido es obligatorio").max(75).regex(/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s'-]+$/, "El apellido solo puede contener letras"),
     /** Compatibilidad api-docs / clientes antiguos; si viene, se ignora si ya hay firstName + lastName. */
     fullName: z.string().trim().min(1).max(150).optional(),
     email: z
@@ -45,7 +45,7 @@ export const registerBodySchema = z
       .trim()
       .email("Email inválido")
       .transform((s) => s.toLowerCase()),
-    documentNumber: z.string().trim().min(1, "El documento es obligatorio").max(20),
+    documentNumber: z.string().trim().min(1, "El documento es obligatorio").max(20).regex(/^\d+$/, "El documento debe contener solo números"),
     address: z.union([z.string(), z.null()]).optional(),
     countryId: z.coerce
       .number()

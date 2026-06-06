@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "DesarrolloDeApis1TP",
-    "slug": "desarrollodeapis1tp",
+  "name": "DesarrolloDeApis1TP",
+  "slug": "desarrollodeapis1tp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "desarrollodeapis1tp",
+  "scheme": "desarrollodeapis1tp",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -34,17 +34,13 @@
             "imageWidth": 76
           }
         }
-      ],
-      "expo-font",
-      "expo-image",
-      "expo-web-browser"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-      "apiBaseUrl": "http://localhost:3000/api",
       "router": {},
       "eas": {
         "projectId": "0bb0e307-ff43-49d7-a154-d8e9fb6e3939"

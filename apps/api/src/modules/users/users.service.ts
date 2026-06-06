@@ -24,3 +24,17 @@ export async function getCurrentUser(authUser: AuthUserContext) {
   }
   return mapPersonaClienteToUserPublic(row);
 }
+
+/** PATCH /users/me — actualiza dirección y/o email del usuario. */
+export async function updateCurrentUser(
+  authUser: AuthUserContext,
+  fields: { address?: string | null; email?: string }
+) {
+  const personId = parsePersonIdFromAuth(authUser);
+  await usersRepository.updatePersonaProfile({ personId, ...fields });
+  const row = await usersRepository.findProfileByPersonId(personId);
+  if (!row) {
+    throw new UnauthorizedError("No autorizado.");
+  }
+  return mapPersonaClienteToUserPublic(row);
+}
