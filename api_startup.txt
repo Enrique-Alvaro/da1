@@ -1,0 +1,77 @@
+
+> crownbid-monorepo@1.0.0 dev:api
+> npm --workspace @crownbid/api run dev
+
+
+> @crownbid/api@0.0.1 dev
+> tsx watch src/server.ts
+
+[startup] DB warmup: connected
+node:events:496
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1907:16)
+    at listenInCluster (node:net:1964:12)
+    at Server.listen (node:net:2066:7)
+    at Function.listen (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\express\lib\application.js:635:24)
+    at bootstrap (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\apps\api\src\server.ts:31:22)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1943:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v22.11.0
+19:08:25 [tsx] Return key Rerunning...
+c[startup] DB warmup: connected
+node:events:496
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1907:16)
+    at listenInCluster (node:net:1964:12)
+    at Server.listen (node:net:2066:7)
+    at Function.listen (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\express\lib\application.js:635:24)
+    at bootstrap (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\apps\api\src\server.ts:31:22)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1943:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v22.11.0
+19:09:07 [tsx] Return key Rerunning...
+c[startup] DB warmup: connected
+node:events:496
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1907:16)
+    at listenInCluster (node:net:1964:12)
+    at Server.listen (node:net:2066:7)
+    at Function.listen (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\express\lib\application.js:635:24)
+    at bootstrap (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\apps\api\src\server.ts:31:22)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1943:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v22.11.0
+^C^C

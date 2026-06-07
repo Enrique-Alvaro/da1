@@ -133,6 +133,18 @@ export default function LoginScreen() {
           <Pressable
             style={styles.secondaryButton}
             onPress={() => {
+              console.log('press: registrate');
+              setClickedRegister(true);
+              setTimeout(() => setClickedRegister(false), 700);
+              navigateTo('/register');
+            }}
+          >
+            <ThemedText style={styles.secondaryButtonText}>{clickedRegister ? '...' : 'Crear Cuenta'}</ThemedText>
+          </Pressable>
+
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => {
               console.log('press: continuar como invitado');
               setClickedGuest(true);
               setTimeout(() => setClickedGuest(false), 700);
@@ -152,20 +164,6 @@ export default function LoginScreen() {
           >
             <ThemedText style={styles.forgot}>{clickedRecover ? '...' : '¿Olvidaste tu contraseña?'}</ThemedText>
           </Pressable>
-
-          <View style={styles.registerRow}>
-            <ThemedText>¿No tienes una cuenta? </ThemedText>
-            <Pressable
-              onPress={() => {
-                console.log('press: registrate');
-                setClickedRegister(true);
-                setTimeout(() => setClickedRegister(false), 700);
-                navigateTo('/register');
-              }}
-            >
-              <ThemedText style={styles.registerLink}>{clickedRegister ? '...' : 'Regístrate'}</ThemedText>
-            </Pressable>
-          </View>
 
         </View>
 

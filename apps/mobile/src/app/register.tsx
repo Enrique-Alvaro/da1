@@ -10,7 +10,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { registerUser } from '@/services/api';
 
 const COUNTRIES = [
-  { code: 'AR', name: 'Argentina',       id: 32  },
+  { code: 'AR', name: 'Argentina',       id: 1   },
   { code: 'US', name: 'Estados Unidos',  id: 840 },
   { code: 'ES', name: 'España',          id: 724 },
   { code: 'CO', name: 'Colombia',        id: 170 },

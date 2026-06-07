@@ -1,0 +1,33 @@
+
+> @crownbid/api@0.0.1 db:test
+> tsx scripts/test-db-connection.ts
+
+Intentando conectar…
+No se pudo abrir el pool de conexión: ConnectionError: Login failed for user 'sa'.
+    at c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\mssql\lib\tedious\connection-pool.js:85:17
+    at err (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\mssql\node_modules\tedious\src\connection.ts:1784:9)
+    at Object.onceWrapper (node:events:633:26)
+    at Connection.emit (node:events:518:28)
+    at emit (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\mssql\node_modules\tedious\src\connection.ts:1927:18)
+    at <anonymous> (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\mssql\node_modules\tedious\src\connection.ts:3434:18)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  code: 'ELOGIN',
+  originalError: ConnectionError: Login failed for user 'sa'.
+      at onErrorMessage (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\mssql\node_modules\tedious\src\token\handler.ts:266:19)
+      at token (c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\node_modules\mssql\node_modules\tedious\src\token\token-stream-parser.ts:23:55)
+      at Readable.emit (node:events:518:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushObjectMode (node:internal/streams/readable:538:3)
+      at Readable.push (node:internal/streams/readable:393:5)
+      at nextAsync (node:internal/streams/from:194:22)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+    code: 'ELOGIN'
+  }
+}
+npm error Lifecycle script `db:test` failed with error:
+npm error code 1
+npm error path c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\apps\api
+npm error workspace @crownbid/api@0.0.1
+npm error location c:\uni\2026 cuatrimestre 1\Desarrollo de aplicacion 1\da1\apps\api
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c tsx scripts/test-db-connection.ts
