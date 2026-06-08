@@ -3,10 +3,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import { disablePaymentMethod, fetchPaymentMethods } from '@/services/api';
 import type { PaymentMethod } from '@/services/types';
 
@@ -34,7 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function getSubtitle(method: PaymentMethod): string {
-  if (method.lastDigits) return `.... ${method.lastDigits}`;
+  if (method.lastDigits) return `•••• ${method.lastDigits}`;
   if (method.aliasOrCbu) return method.aliasOrCbu;
   if (method.entity) return method.entity;
   return method.holder;
@@ -42,13 +40,13 @@ function getSubtitle(method: PaymentMethod): string {
 
 function formatAmount(amount: number | null, currency: string): string {
   if (amount === null || amount === undefined) return '—';
-  return `${currency} ${amount.toLocaleString('es-AR')}`;
+  return `${currency} $${amount.toLocaleString('es-AR')}`;
 }
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
-  const theme = useTheme();
 
+  // La lista arranca vacía, como pediste, esperando los datos de la API
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,15 +82,22 @@ export default function PaymentMethodsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={{ width: '100%' }} contentContainerStyle={styles.content}>
-          <ThemedText type="title">Métodos de Pago</ThemedText>
-          <ThemedText type="small" style={styles.subtitle}>
-            Administra tus garantías de pago.
-          </ThemedText>
+        <ScrollView 
+          style={{ width: '100%' }} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+        >
+          
+          <View style={styles.headerContainer}>
+            <Text style={styles.title}>Métodos de Pago</Text>
+            <Text style={styles.subtitle}>
+              Administra tus garantías de pago
+            </Text>
+          </View>
 
           {loading && (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={theme.primary} />
+              <ActivityIndicator size="large" color="#E67E22" />
             </View>
           )}
 
@@ -109,77 +114,85 @@ export default function PaymentMethodsScreen() {
           )}
 
           {!loading && !error && methods.length === 0 && (
-            <ThemedText themeColor="textSecondary" style={styles.emptyText}>
-              No tenés métodos de pago registrados.
-            </ThemedText>
+            <Text style={styles.emptyText}>
+              Aún no tienes métodos de pago registrados.
+            </Text>
           )}
 
+          {/* Si se agregan métodos desde la API, se renderizarán con el nuevo diseño */}
           {!loading && !error && methods.map((method) => {
             const statusLabel = STATUS_LABELS[method.status] ?? method.status;
             const isVerified = method.status === 'verificado';
-            const statusColor = isVerified ? theme.success : theme.primaryDark;
+            
+            // Colores dinámicos para los estados (Verde para verificado, Naranja para pendiente)
+            const statusColor = isVerified ? '#10B981' : '#E67E22';
+            const statusBgColor = isVerified ? '#D1FAE5' : '#FEF3C7';
+            
+            // Color de la caja del ícono (Azul para tarjeta, Verde para cheque, etc.)
+            const iconBgColor = method.type.includes('tarjeta') ? '#2563EB' : '#059669';
+            
             const reservedAmount = method.availableAmount ?? method.guaranteeAmount;
             const isConfirming = confirmingId === method.id;
 
             return (
-              <View
-                key={method.id}
-                style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.backgroundSelected }]}
-              >
+              <View key={method.id} style={styles.card}>
                 <View style={styles.methodHeader}>
-                  <View style={[styles.iconCircle, { backgroundColor: theme.backgroundElement }]}>
-                    <ThemedText>{TYPE_ICONS[method.type] ?? '💳'}</ThemedText>
+                  <View style={[styles.iconBox, { backgroundColor: iconBgColor }]}>
+                    <Text style={styles.iconText}>{TYPE_ICONS[method.type] ?? '💳'}</Text>
                   </View>
-                  <View style={styles.methodText}>
-                    <ThemedText type="subtitle">{TYPE_LABELS[method.type] ?? method.type}</ThemedText>
-                    <ThemedText themeColor="textSecondary">{getSubtitle(method)}</ThemedText>
+                  <View style={styles.methodTextContainer}>
+                    <Text style={styles.methodTitle}>{TYPE_LABELS[method.type] ?? method.type}</Text>
+                    <Text style={styles.methodSubtitle}>{getSubtitle(method)}</Text>
                   </View>
-                  <View style={[styles.statusBadge, { borderColor: statusColor }]}>
-                    <ThemedText style={[styles.statusText, { color: statusColor }]}>{statusLabel}</ThemedText>
+                  <View style={[styles.statusBadge, { backgroundColor: statusBgColor }]}>
+                    {/* Un pequeño ícono dinámico junto al texto del estado */}
+                    <Text style={[styles.statusText, { color: statusColor }]}>
+                      {isVerified ? '⊙ ' : '◷ '}{statusLabel}
+                    </Text>
                   </View>
                 </View>
 
-                <View style={styles.methodBody}>
-                  <ThemedText type="small" themeColor="textSecondary">Monto Reservado</ThemedText>
-                  <ThemedText>{formatAmount(reservedAmount, method.currency)}</ThemedText>
+                <View style={styles.reservedBox}>
+                  <Text style={styles.reservedLabel}>Monto Reservado</Text>
+                  <Text style={styles.reservedAmount}>{formatAmount(reservedAmount, method.currency)}</Text>
                 </View>
 
                 {method.rejectionReason && (
-                  <View style={styles.methodBody}>
-                    <ThemedText type="small" themeColor="textSecondary">Motivo de rechazo</ThemedText>
-                    <ThemedText>{method.rejectionReason}</ThemedText>
+                  <View style={[styles.reservedBox, { backgroundColor: '#FEE2E2', marginTop: 8 }]}>
+                    <Text style={[styles.reservedLabel, { color: '#991B1B' }]}>Motivo de rechazo</Text>
+                    <Text style={{ color: '#991B1B', fontWeight: '500' }}>{method.rejectionReason}</Text>
                   </View>
                 )}
 
                 {isConfirming ? (
                   <View style={styles.confirmRow}>
-                    <ThemedText type="small">¿Eliminar este método?</ThemedText>
+                    <Text style={styles.confirmTitle}>¿Eliminar este método?</Text>
                     <View style={styles.confirmButtons}>
                       <Pressable
-                        style={[styles.confirmBtn, { borderColor: theme.error }]}
+                        style={[styles.confirmBtn, { borderColor: '#E74C3C' }]}
                         onPress={() => confirmDisable(method.id)}
                         disabled={disabling === method.id}
                       >
-                        <Text style={[styles.confirmBtnText, { color: theme.error }]}>
+                        <Text style={[styles.confirmBtnText, { color: '#E74C3C' }]}>
                           {disabling === method.id ? 'Eliminando...' : 'Sí, eliminar'}
                         </Text>
                       </Pressable>
                       <Pressable
-                        style={[styles.confirmBtn, { borderColor: theme.backgroundSelected }]}
+                        style={[styles.confirmBtn, { borderColor: '#D1D5DB' }]}
                         onPress={() => setConfirmingId(null)}
                         disabled={disabling === method.id}
                       >
-                        <ThemedText style={styles.confirmBtnText}>Cancelar</ThemedText>
+                        <Text style={[styles.confirmBtnText, { color: '#4B5563' }]}>Cancelar</Text>
                       </Pressable>
                     </View>
                   </View>
                 ) : (
                   <View style={styles.cardActions}>
                     <Pressable onPress={() => router.push('/payment-method-verify')}>
-                      <ThemedText style={[styles.linkText, { color: theme.text }]}>Ver Detalles</ThemedText>
+                      <Text style={styles.linkText}>Ver Detalles</Text>
                     </Pressable>
                     <Pressable onPress={() => { setDisableError(null); setConfirmingId(method.id); }}>
-                      <ThemedText style={[styles.deleteText, { color: theme.error }]}>Eliminar</ThemedText>
+                      <Text style={styles.deleteText}>Eliminar</Text>
                     </Pressable>
                   </View>
                 )}
@@ -187,19 +200,22 @@ export default function PaymentMethodsScreen() {
             );
           })}
 
+          {/* Botón de Agregar (Borde Punteado) */}
           <Pressable
-            style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+            style={styles.dashedButton}
             onPress={() => router.push('/select-payment-method')}
           >
-            <ThemedText type="default" style={styles.primaryButtonText}>Agregar método</ThemedText>
+            <Text style={styles.dashedButtonText}>+  Agregar Método de Pago</Text>
           </Pressable>
 
+          {/* Botón Principal de Confirmación (Naranja) */}
           <Pressable
-            style={[styles.secondaryButton, { borderColor: theme.backgroundSelected }]}
+            style={styles.primaryButton}
             onPress={() => router.push('/reserve-funds')}
           >
-            <ThemedText>Reservar Fondos</ThemedText>
+            <Text style={styles.primaryButtonText}>Completar</Text>
           </Pressable>
+
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -207,23 +223,36 @@ export default function PaymentMethodsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', flexDirection: 'row' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFFFF',
+  },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: 28,
     alignItems: 'center',
     paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
+    alignSelf: 'center',
+    paddingTop: 24,
   },
   content: {
     width: '100%',
-    gap: Spacing.four,
     paddingBottom: Spacing.six,
   },
+  headerContainer: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#0A1E3F', // Azul marino oscuro
+    marginBottom: 4,
+  },
   subtitle: {
-    marginTop: Spacing.one,
-    marginBottom: Spacing.two,
+    fontSize: 16,
+    color: '#6B7280', // Gris
   },
   centered: {
     paddingVertical: Spacing.six,
@@ -235,6 +264,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderLeftWidth: 4,
     borderLeftColor: '#E74C3C',
+    marginBottom: 16,
   },
   errorBannerText: {
     color: '#7B241C',
@@ -242,84 +272,137 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    paddingVertical: Spacing.four,
+    paddingVertical: 32,
+    color: '#6B7280',
+    fontSize: 15,
   },
   card: {
     width: '100%',
-    borderRadius: 20,
-    padding: Spacing.four,
-    gap: Spacing.three,
+    borderRadius: 12,
+    padding: 20,
     borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 16,
   },
   methodHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.four,
+    marginBottom: 16,
   },
-  iconCircle: {
+  iconBox: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
   },
-  methodText: {
+  iconText: {
+    fontSize: 24,
+    color: '#FFFFFF',
+  },
+  methodTextContainer: {
     flex: 1,
-    gap: 4,
+  },
+  methodTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0A1E3F',
+  },
+  methodSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
   },
   statusBadge: {
-    borderWidth: 1,
-    borderRadius: 999,
     paddingVertical: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
+    borderRadius: 16,
   },
   statusText: {
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 12,
   },
-  methodBody: {
-    gap: 4,
+  reservedBox: {
+    backgroundColor: '#F9FAFB', // Gris muy claro
+    borderRadius: 8,
+    padding: 12,
+  },
+  reservedLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  reservedAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
   },
   cardActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 20,
+    paddingHorizontal: 4,
   },
   linkText: {
     fontWeight: '600',
+    color: '#2563EB', // Azul para el enlace
+    fontSize: 15,
   },
   deleteText: {
     fontWeight: '600',
+    color: '#DC2626', // Rojo para eliminar
+    fontSize: 15,
   },
   confirmRow: {
-    gap: Spacing.two,
+    marginTop: 16,
+  },
+  confirmTitle: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 12,
+    fontWeight: '600',
   },
   confirmButtons: {
     flexDirection: 'row',
-    gap: Spacing.three,
+    gap: 12,
   },
   confirmBtn: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
   },
   confirmBtnText: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dashedButton: {
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB', // Gris claro
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  dashedButtonText: {
+    color: '#4B5563', // Gris oscuro
+    fontSize: 16,
     fontWeight: '600',
   },
   primaryButton: {
+    backgroundColor: '#E67E22', // Naranja
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#fff',
-  },
-  secondaryButton: {
-    width: '100%',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

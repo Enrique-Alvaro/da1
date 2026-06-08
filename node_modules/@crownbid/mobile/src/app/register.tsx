@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { registerUser } from '@/services/api';
@@ -98,33 +97,42 @@ export default function RegisterScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={{ width: '100%' }} contentContainerStyle={{ alignItems: 'center', gap: Spacing.three }}>
-          <ThemedText type="title">Crear Cuenta</ThemedText>
-          <ThemedText type="small">Únete a CrownBid hoy</ThemedText>
+        <ScrollView 
+          style={{ width: '100%' }} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          
+          <View style={styles.headerContainer}>
+            <Text style={styles.title}>Crear Cuenta</Text>
+            <Text style={styles.subtitle}>Únete a CrownBid hoy</Text>
+          </View>
 
-          <View style={{ width: '100%', marginTop: Spacing.four }}>
-            <ThemedText style={styles.label}>Nombre</ThemedText>
-            <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
+          <View style={styles.form}>
+            <Text style={styles.label}>Nombre</Text>
+            <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholder="Juan" placeholderTextColor="#9AA0A6" />
 
-            <ThemedText style={styles.label}>Apellido</ThemedText>
-            <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
+            <Text style={styles.label}>Apellido</Text>
+            <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Pérez" placeholderTextColor="#9AA0A6" />
 
-            <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
-            <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            <Text style={styles.label}>Correo Electrónico</Text>
+            <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="tu@email.com" placeholderTextColor="#9AA0A6" />
 
-            <ThemedText style={styles.label}>Documento</ThemedText>
-            <TextInput style={styles.input} value={documentNumber} onChangeText={setDocumentNumber} placeholder="DNI / Pasaporte" />
+            {/* El documento no está en las imágenes pero es requerido por tu backend */}
+            <Text style={styles.label}>Documento</Text>
+            <TextInput style={styles.input} value={documentNumber} onChangeText={setDocumentNumber} placeholder="DNI / Pasaporte" placeholderTextColor="#9AA0A6" />
 
-            <ThemedText style={styles.label}>Dirección</ThemedText>
-            <TextInput style={styles.input} value={address} onChangeText={setAddress} />
+            <Text style={styles.label}>Dirección</Text>
+            <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Calle Principal 123, Apto 4B" placeholderTextColor="#9AA0A6" />
 
-            <ThemedText style={styles.label}>País</ThemedText>
+            <Text style={styles.label}>País</Text>
             {Platform.OS === 'web' ? (
               <select
                 value={countryCode}
                 onChange={e => setCountryCode((e.target as HTMLSelectElement).value)}
-                style={{ borderWidth: 1, borderColor: '#E6E9EB', padding: 12, borderRadius: 10, backgroundColor: '#FFF', marginBottom: Spacing.three, fontSize: 15, width: '100%', color: '#1A1A1A' } as any}
+                style={{ borderWidth: 1, borderColor: '#D1D5DB', padding: 14, borderRadius: 8, backgroundColor: '#FFFFFF', marginBottom: 20, fontSize: 16, width: '100%', color: '#1F2937' } as any}
               >
+                <option value="" disabled>Selecciona un país</option>
                 {COUNTRIES.map(c => (
                   <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
@@ -136,44 +144,33 @@ export default function RegisterScreen() {
               </Pressable>
             )}
 
-            <ThemedText style={styles.label}>Verificación de Identidad</ThemedText>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Pressable style={styles.uploadBox} onPress={() => pickImage('front', false)}>
-                  {frontImage ? (
-                    <Image source={{ uri: frontImage }} style={styles.preview} />
-                  ) : (
-                    <ThemedText>Subir imagen del frente del ID</ThemedText>
-                  )}
-                </Pressable>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <Pressable style={styles.smallButton} onPress={() => pickImage('front', true)}>
-                    <Text style={styles.smallButtonText}>Tomar Foto</Text>
-                  </Pressable>
-                  <Pressable style={styles.smallButton} onPress={() => pickImage('front', false)}>
-                    <Text style={styles.smallButtonText}>Elegir de Galería</Text>
-                  </Pressable>
-                </View>
-              </View>
+            <View style={styles.separator} />
 
-              <View style={{ flex: 1 }}>
-                <Pressable style={styles.uploadBox} onPress={() => pickImage('back', false)}>
-                  {backImage ? (
-                    <Image source={{ uri: backImage }} style={styles.preview} />
-                  ) : (
-                    <ThemedText>Subir imagen del dorso del ID</ThemedText>
-                  )}
-                </Pressable>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <Pressable style={styles.smallButton} onPress={() => pickImage('back', true)}>
-                    <Text style={styles.smallButtonText}>Tomar Foto</Text>
-                  </Pressable>
-                  <Pressable style={styles.smallButton} onPress={() => pickImage('back', false)}>
-                    <Text style={styles.smallButtonText}>Elegir de Galería</Text>
-                  </Pressable>
+            <Text style={styles.sectionTitle}>Verificación de Identidad</Text>
+
+            <Text style={styles.labelLight}>Frente del ID</Text>
+            <Pressable style={styles.uploadBox} onPress={() => pickImage('front', false)}>
+              {frontImage ? (
+                <Image source={{ uri: frontImage }} style={styles.preview} />
+              ) : (
+                <View style={styles.uploadContent}>
+                  <Text style={styles.uploadIcon}>⇧</Text>
+                  <Text style={styles.uploadText}>Subir imagen del frente del ID</Text>
                 </View>
-              </View>
-            </View>
+              )}
+            </Pressable>
+
+            <Text style={styles.labelLight}>Dorso del ID</Text>
+            <Pressable style={styles.uploadBox} onPress={() => pickImage('back', false)}>
+              {backImage ? (
+                <Image source={{ uri: backImage }} style={styles.preview} />
+              ) : (
+                <View style={styles.uploadContent}>
+                  <Text style={styles.uploadIcon}>⇧</Text>
+                  <Text style={styles.uploadText}>Subir imagen del dorso del ID</Text>
+                </View>
+              )}
+            </Pressable>
 
             {serverError ? (
               <View style={styles.errorBanner}>
@@ -181,10 +178,11 @@ export default function RegisterScreen() {
                 <Text style={styles.errorBannerText}>{serverError}</Text>
               </View>
             ) : null}
+
             <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
-              <ThemedText type="default" style={styles.primaryButtonText}>
+              <Text style={styles.primaryButtonText}>
                 {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
-              </ThemedText>
+              </Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -194,26 +192,143 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', flexDirection: 'row' },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four, alignItems: 'center', gap: Spacing.three, paddingBottom: BottomTabInset + Spacing.three, maxWidth: MaxContentWidth, width: '100%' },
-  label: { marginTop: Spacing.two, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#E6E9EB', padding: 12, borderRadius: 10, backgroundColor: '#FFF', marginBottom: Spacing.three, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  uploadBox: { borderWidth: 1, borderColor: '#E6E9EB', padding: 16, borderRadius: 8, marginBottom: Spacing.three, alignItems: 'center' },
-  selectInput: { backgroundColor: '#F7F7F8' },
-  selectText: { color: '#1A1A1A', fontSize: 15 },
-  selectChevron: { color: '#888', fontSize: 14 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
-  dropdownList: { backgroundColor: '#FFF', borderRadius: 12, width: 280, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
-  dropdownItem: { paddingVertical: 14, paddingHorizontal: 20 },
-  dropdownItemActive: { backgroundColor: '#FFF3EA' },
-  dropdownItemText: { fontSize: 15, color: '#1A1A1A' },
-  dropdownItemTextActive: { color: '#F47B1F', fontWeight: '700' },
-  errorBanner: { backgroundColor: '#FFECEC', borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: '#E74C3C', marginBottom: Spacing.three },
-  errorBannerTitle: { fontWeight: '700', marginBottom: 6, color: '#C0392B' },
-  errorBannerText: { color: '#7B241C', fontSize: 14 },
-  primaryButton: { backgroundColor: '#F47B1F', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: Spacing.two },
-  primaryButtonText: { color: '#fff' },
-  preview: { width: '100%', height: 120, borderRadius: 8 },
-  smallButton: { backgroundColor: '#F6F6F6', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, alignItems: 'center' },
-  smallButtonText: { color: '#1A1A1A', fontSize: 13 },
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  safeArea: {
+    flex: 1,
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  scrollContent: {
+    paddingHorizontal: 28,
+    paddingBottom: BottomTabInset + Spacing.four,
+    paddingTop: Spacing.four,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+    marginTop: 16,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#0A1E3F',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  form: {
+    width: '100%',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0A1E3F',
+    marginBottom: 8,
+  },
+  labelLight: {
+    fontSize: 14,
+    color: '#0A1E3F',
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0A1E3F',
+    marginBottom: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectInput: {
+    backgroundColor: '#FFFFFF',
+  },
+  selectText: {
+    color: '#1F2937',
+    fontSize: 16,
+  },
+  selectChevron: {
+    color: '#1F2937',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+    marginBottom: 24,
+  },
+  uploadBox: {
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  uploadContent: {
+    alignItems: 'center',
+  },
+  uploadIcon: {
+    fontSize: 24,
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  uploadText: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  preview: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+  },
+  errorBanner: {
+    backgroundColor: '#FFECEC',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E74C3C',
+    marginBottom: 20,
+  },
+  errorBannerTitle: {
+    fontWeight: '700',
+    marginBottom: 6,
+    color: '#C0392B',
+  },
+  errorBannerText: {
+    color: '#7B241C',
+    fontSize: 14,
+  },
+  primaryButton: {
+    backgroundColor: '#E67E22',
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });

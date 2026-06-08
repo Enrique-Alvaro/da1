@@ -16,7 +16,6 @@ function isValidEmail(email: string) {
 export default function LoginScreen() {
   const router = useRouter();
   const [clickedRegister, setClickedRegister] = useState(false);
-  const [clickedRecover, setClickedRecover] = useState(false);
   const [clickedGuest, setClickedGuest] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,14 +27,12 @@ export default function LoginScreen() {
   const emailError = emailTouched || submitAttempted ? !isValidEmail(email) && email.length > 0 : false;
   const showTopError = submitAttempted && (!email || !isValidEmail(email));
 
-  // robust navigation helper: try router.push, then if path doesn't change on web, force full navigation
+  // robust navigation helper
   async function navigateTo(path: string) {
     try {
       const before = Platform.OS === 'web' ? (window as any).location.pathname : null;
       console.log('navigateTo before', path, before);
-      // attempt normal router navigation
       router.push(path as any);
-      // wait a bit to let router change
       await new Promise((r) => setTimeout(r, 300));
       const after = Platform.OS === 'web' ? (window as any).location.pathname : null;
       console.log('navigateTo after', path, after);
@@ -76,21 +73,24 @@ export default function LoginScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        
+        {/* Avatar restaurado */}
         <View style={styles.avatarWrap}>
           <View style={styles.avatarCircle}>
-            <ThemedText>👑</ThemedText>
+            <Text style={styles.emoji}>👑</Text>
           </View>
         </View>
 
-        <ThemedText type="title">CrownBid</ThemedText>
-        <ThemedText type="subtitle" style={styles.subtitle}>
-          Iniciar Sesión
-        </ThemedText>
+        {/* Título actualizado */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.title}>CrownBid</Text>
+          <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+        </View>
 
         {showTopError && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorBannerTitle}>Formato de email inválido</Text>
-            <Text style={styles.errorBannerText}>Por favor ingresa un email válido (ej: usuario@ejemplo.com)</Text>
+            <Text style={styles.errorBannerText}>Por favor ingresa un email válido (ej: tu@email.com)</Text>
           </View>
         )}
         {serverError && (
@@ -101,45 +101,33 @@ export default function LoginScreen() {
         )}
 
         <View style={styles.form}>
-          <ThemedText style={styles.label}>Email</ThemedText>
+          <Text style={styles.label}>Correo Electrónico</Text>
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="usuario@ejemplo.com"
+            placeholder="tu@email.com"
             keyboardType="email-address"
             autoCapitalize="none"
             style={[styles.input, emailError ? styles.inputError : undefined]}
             placeholderTextColor="#9AA0A6"
             onBlur={() => setEmailTouched(true)}
           />
-          {emailError && <ThemedText style={styles.fieldError}>Email inválido</ThemedText>}
+          {emailError && <Text style={styles.fieldError}>Email inválido</Text>}
 
-          <ThemedText style={styles.label}>Contraseña</ThemedText>
+          <Text style={styles.label}>Contraseña</Text>
           <TextInput
             value={password}
             onChangeText={setPassword}
-            placeholder=""
+            placeholder="••••••••"
             secureTextEntry
             style={styles.input}
             placeholderTextColor="#9AA0A6"
           />
 
           <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
-            <ThemedText type="default" style={styles.primaryButtonText}>
-              {loading ? 'Cargando...' : 'Iniciar Sesión'}
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => {
-              console.log('press: registrate');
-              setClickedRegister(true);
-              setTimeout(() => setClickedRegister(false), 700);
-              navigateTo('/register');
-            }}
-          >
-            <ThemedText style={styles.secondaryButtonText}>{clickedRegister ? '...' : 'Crear Cuenta'}</ThemedText>
+            <Text style={styles.primaryButtonText}>
+              {loading ? 'Cargando...' : 'Entrar'}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -151,20 +139,22 @@ export default function LoginScreen() {
               navigateTo('/home');
             }}
           >
-            <ThemedText style={styles.secondaryButtonText}>{clickedGuest ? '...' : 'Continuar como Invitado'}</ThemedText>
+            <Text style={styles.secondaryButtonText}>{clickedGuest ? '...' : 'Continuar como Invitado'}</Text>
           </Pressable>
+        </View>
 
+        <View style={styles.registerRow}>
+          <Text style={styles.registerText}>¿No tienes una cuenta? </Text>
           <Pressable
             onPress={() => {
-              console.log('press: olvidaste contraseña');
-              setClickedRecover(true);
-              setTimeout(() => setClickedRecover(false), 700);
-              navigateTo('/recover');
+              console.log('press: registrate');
+              setClickedRegister(true);
+              setTimeout(() => setClickedRegister(false), 700);
+              navigateTo('/register');
             }}
           >
-            <ThemedText style={styles.forgot}>{clickedRecover ? '...' : '¿Olvidaste tu contraseña?'}</ThemedText>
+            <Text style={styles.registerLink}>{clickedRegister ? '...' : 'Regístrate'}</Text>
           </Pressable>
-
         </View>
 
       </SafeAreaView>
@@ -175,42 +165,49 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
+    paddingHorizontal: 28,
+    justifyContent: 'center',
     paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
+    alignSelf: 'center',
   },
+  // Estilos del avatar agregados nuevamente
   avatarWrap: {
-    marginTop: Spacing.four,
     alignItems: 'center',
+    marginBottom: 16,
   },
   avatarCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#FFF1D9',
+    backgroundColor: '#FFF1D9', // Fondo cremita/naranja claro
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emoji: {
+    fontSize: 36,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#0A1E3F',
     marginBottom: 8,
   },
-  header: {
-    alignItems: 'center',
-    marginTop: Spacing.four,
-  },
   subtitle: {
-    marginTop: 6,
+    fontSize: 16,
+    color: '#6B7280',
   },
   form: {
     width: '100%',
-    gap: Spacing.three,
-    marginTop: Spacing.four,
   },
   errorBanner: {
     backgroundColor: '#FFECEC',
@@ -219,6 +216,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#E74C3C',
     width: '100%',
+    marginBottom: 16,
   },
   errorBannerText: { color: '#7B241C', fontSize: 14 },
   errorBannerTitle: {
@@ -227,59 +225,69 @@ const styles = StyleSheet.create({
     color: '#C0392B',
   },
   label: {
-    marginBottom: 6,
-    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0A1E3F',
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E6E9EB',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: '#FFF',
+    borderColor: '#D1D5DB',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 20,
   },
   inputError: {
     borderColor: '#E74C3C',
   },
   fieldError: {
     color: '#E74C3C',
-    marginTop: 6,
-    marginLeft: 6,
+    marginTop: -14,
+    marginBottom: 14,
+    fontSize: 13,
   },
   primaryButton: {
-    marginTop: Spacing.three,
-    backgroundColor: '#F47B1F',
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: '#E67E22',
+    paddingVertical: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   secondaryButton: {
-    marginTop: Spacing.two,
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#E6E9EB',
-    paddingVertical: 12,
-    borderRadius: 10,
+    borderColor: '#E5E7EB',
+    paddingVertical: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    backgroundColor: '#F6F6F6',
   },
   secondaryButtonText: {
-    color: '#333',
-  },
-  forgot: {
-    marginTop: Spacing.two,
-    color: '#1E90FF',
-    textAlign: 'center',
+    color: '#0A1E3F',
+    fontSize: 16,
+    fontWeight: '600',
   },
   registerRow: {
-    marginTop: Spacing.two,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
+    marginTop: 32,
+  },
+  registerText: {
+    color: '#6B7280',
+    fontSize: 15,
   },
   registerLink: {
-    color: '#F47B1F',
+    color: '#E67E22',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });

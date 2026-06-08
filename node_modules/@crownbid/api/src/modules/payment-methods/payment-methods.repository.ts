@@ -48,7 +48,7 @@ export async function listByCliente(clienteId: number): Promise<MedioPagoRow[]> 
     .query<MedioPagoRow>(`
       SELECT ${SELECT_LIST}
       FROM dbo.mediosPago
-      WHERE cliente = @cliente
+      WHERE cliente = @cliente AND estado <> 'deshabilitado'
       ORDER BY identificador DESC
     `);
   return result.recordset;

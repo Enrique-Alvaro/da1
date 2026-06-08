@@ -1,17 +1,15 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import { createPaymentMethod } from '@/services/api';
 
 export default function AddCertifiedCheckScreen() {
   const router = useRouter();
-  const theme = useTheme();
 
   const [issuerBank, setIssuerBank] = useState('');
   const [holder, setHolder] = useState('');
@@ -55,34 +53,44 @@ export default function AddCertifiedCheckScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={{ width: '100%' }} contentContainerStyle={styles.content}>
-          <ThemedText type="title">Cheque Certificado</ThemedText>
-          <ThemedText type="small" style={styles.subtitle}>
-            Registra tu cheque certificado.
-          </ThemedText>
+        <ScrollView 
+          style={{ width: '100%' }} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+        >
+          
+          <View style={styles.headerContainer}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="document-text-outline" size={36} color="#059669" />
+            </View>
+            <Text style={styles.title}>Cheque Certificado</Text>
+            <Text style={styles.subtitle}>
+              Registra tu cheque certificado
+            </Text>
+          </View>
 
           <View style={styles.form}>
-            <ThemedText style={styles.label}>Banco Emisor</ThemedText>
+            <Text style={styles.label}>Banco Emisor</Text>
             <TextInput
-              style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
+              style={styles.input}
               value={issuerBank}
               onChangeText={setIssuerBank}
               placeholder="Nombre del banco"
               placeholderTextColor="#9AA0A6"
             />
 
-            <ThemedText style={styles.label}>Titular</ThemedText>
+            <Text style={styles.label}>Titular</Text>
             <TextInput
-              style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
+              style={styles.input}
               value={holder}
               onChangeText={setHolder}
               placeholder="Nombre completo del titular"
               placeholderTextColor="#9AA0A6"
             />
 
-            <ThemedText style={styles.label}>Número de Cheque</ThemedText>
+            <Text style={styles.label}>Número de Cheque</Text>
             <TextInput
-              style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
+              style={styles.input}
               value={checkNumber}
               onChangeText={setCheckNumber}
               placeholder="Opcional"
@@ -92,9 +100,9 @@ export default function AddCertifiedCheckScreen() {
 
             <View style={styles.row}>
               <View style={styles.rowItem}>
-                <ThemedText style={styles.label}>Monto Certificado</ThemedText>
+                <Text style={styles.label}>Monto Certificado</Text>
                 <TextInput
-                  style={[styles.input, { borderColor: theme.backgroundSelected, backgroundColor: theme.surface }]}
+                  style={styles.input}
                   value={amount}
                   onChangeText={setAmount}
                   placeholder="100000"
@@ -103,23 +111,35 @@ export default function AddCertifiedCheckScreen() {
                 />
               </View>
               <View style={styles.rowItem}>
-                <ThemedText style={styles.label}>Moneda</ThemedText>
-                <View style={[styles.toggle, { borderColor: theme.backgroundSelected }]}>
+                <Text style={styles.label}>Moneda</Text>
+                <View style={styles.toggle}>
                   <Pressable
-                    style={[styles.toggleOption, currency === 'ARS' && { backgroundColor: theme.primary }]}
+                    style={[styles.toggleOption, currency === 'ARS' && styles.toggleOptionActive]}
                     onPress={() => setCurrency('ARS')}
                   >
-                    <ThemedText style={currency === 'ARS' ? styles.toggleTextActive : undefined}>ARS</ThemedText>
+                    <Text style={[styles.toggleText, currency === 'ARS' && styles.toggleTextActive]}>
+                      ARS
+                    </Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.toggleOption, currency === 'USD' && { backgroundColor: theme.primary }]}
+                    style={[styles.toggleOption, currency === 'USD' && styles.toggleOptionActive]}
                     onPress={() => setCurrency('USD')}
                   >
-                    <ThemedText style={currency === 'USD' ? styles.toggleTextActive : undefined}>USD</ThemedText>
+                    <Text style={[styles.toggleText, currency === 'USD' && styles.toggleTextActive]}>
+                      USD
+                    </Text>
                   </Pressable>
                 </View>
               </View>
             </View>
+          </View>
+
+          {/* Cuadro de aviso importante */}
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              <Text style={styles.infoTextBold}>Importante: </Text>
+              El cheque certificado debe ser entregado en nuestras oficinas antes del inicio de la subasta.
+            </Text>
           </View>
 
           {error && (
@@ -129,14 +149,23 @@ export default function AddCertifiedCheckScreen() {
           )}
 
           <Pressable
-            style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: submitting ? 0.6 : 1 }]}
+            style={[styles.primaryButton, submitting && { opacity: 0.6 }]}
             onPress={handleSubmit}
             disabled={submitting}
           >
-            <ThemedText type="default" style={styles.primaryButtonText}>
-              {submitting ? 'Guardando...' : 'Continuar'}
-            </ThemedText>
+            <Text style={styles.primaryButtonText}>
+              {submitting ? 'Guardando...' : 'Registrar Cheque'}
+            </Text>
           </Pressable>
+
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => router.back()}
+            disabled={submitting}
+          >
+            <Text style={styles.secondaryButtonText}>Cancelar</Text>
+          </Pressable>
+
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -144,39 +173,72 @@ export default function AddCertifiedCheckScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', flexDirection: 'row' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFFFF',
+  },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: 28,
     alignItems: 'center',
     paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
+    alignSelf: 'center',
+    paddingTop: 24,
   },
   content: {
     width: '100%',
-    gap: Spacing.four,
     paddingBottom: Spacing.six,
   },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#ECFDF5', // Verde muy claro
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#0A1E3F', // Azul marino oscuro
+    marginBottom: 8,
+    textAlign: 'center',
+  },
   subtitle: {
-    marginTop: Spacing.one,
-    marginBottom: Spacing.two,
+    fontSize: 16,
+    color: '#6B7280', // Gris
+    textAlign: 'center',
   },
   form: {
-    gap: Spacing.three,
+    marginBottom: 16,
   },
   label: {
-    marginBottom: 6,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0A1E3F',
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderColor: '#D1D5DB',
     paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 20,
   },
   row: {
     flexDirection: 'row',
-    gap: Spacing.three,
+    gap: 16,
   },
   rowItem: {
     flex: 1,
@@ -184,18 +246,44 @@ const styles = StyleSheet.create({
   toggle: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderRadius: 12,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
     overflow: 'hidden',
-    height: 50,
+    height: 52, // Alineado con la altura del input de texto
+    backgroundColor: '#F9FAFB',
   },
   toggleOption: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  toggleTextActive: {
-    color: '#fff',
+  toggleOptionActive: {
+    backgroundColor: '#059669', // Verde principal
+  },
+  toggleText: {
+    color: '#4B5563',
     fontWeight: '600',
+    fontSize: 14,
+  },
+  toggleTextActive: {
+    color: '#FFFFFF',
+  },
+  infoBox: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    padding: 16,
+    marginBottom: 24,
+  },
+  infoText: {
+    color: '#1E40AF',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  infoTextBold: {
+    fontWeight: 'bold',
   },
   errorBanner: {
     backgroundColor: '#FFECEC',
@@ -203,17 +291,33 @@ const styles = StyleSheet.create({
     padding: 12,
     borderLeftWidth: 4,
     borderLeftColor: '#E74C3C',
+    marginBottom: 20,
   },
   errorBannerText: {
     color: '#7B241C',
     fontSize: 14,
   },
   primaryButton: {
+    backgroundColor: '#059669', // Verde principal
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 12,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  secondaryButton: {
+    backgroundColor: '#F3F4F6', // Gris claro
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
