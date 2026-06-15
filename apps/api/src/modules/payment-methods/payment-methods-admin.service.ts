@@ -1,3 +1,7 @@
+import {
+  notifyPaymentMethodRejected,
+  notifyPaymentMethodVerified,
+} from "../notifications/notifications.events";
 import type { AuthUserContext } from "../../shared/types/auth";
 import {
   ConflictError,
@@ -100,6 +104,12 @@ export async function verifyPaymentMethod(authUser: AuthUserContext, id: number)
       id,
       await adminRepository.verifyById(id, verifierId)
     );
+    void notifyPaymentMethodVerified({
+      clienteId: existing.cliente,
+      paymentMethodId: id,
+      entity: existing.entidad,
+      lastDigits: existing.ultimosDigitos,
+    });
     return mapVerifyResponse(updated);
   }
 
@@ -137,6 +147,11 @@ export async function rejectPaymentMethod(
       id,
       await adminRepository.rejectById(id, verifierId, reason)
     );
+    void notifyPaymentMethodRejected({
+      clienteId: existing.cliente,
+      paymentMethodId: id,
+      reason,
+    });
     return mapRejectResponse(updated);
   }
 

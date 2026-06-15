@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,7 +9,7 @@ import { changeInitialPassword, resetPassword } from '@/services/api';
 
 export default function NewPasswordScreen() {
   const router = useRouter();
-  const searchParams = useLocalSearchParams<{ mode?: string }>();
+  const searchParams = useLocalSearchParams<{ mode?: string; token?: string }>();
   const mode = searchParams.mode === 'reset' ? 'reset' : 'initial';
   
   const [currentPassword, setCurrentPassword] = useState('');
@@ -18,6 +18,12 @@ export default function NewPasswordScreen() {
   const [confirmPass, setConfirmPass] = useState('');
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof searchParams.token === 'string' && searchParams.token.trim()) {
+      setToken(searchParams.token.trim());
+    }
+  }, [searchParams.token]);
 
   // Validaciones dinámicas para la UI
   const hasUpper = /[A-Z]/.test(newPass);

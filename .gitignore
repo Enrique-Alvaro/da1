@@ -1,3 +1,20 @@
 node_modules/
+**/node_modules/
 .expo/
+**/.expo/
+
+# macOS metadata
+__MACOSX/
+**/__MACOSX/
+.DS_Store
+
+# Build output
+dist/
+**/dist/
+
+# Environment (secrets)
 .env
+.env.local
+.env.*.local
+**/.env
+!**/.env.example

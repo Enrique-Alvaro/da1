@@ -12,10 +12,12 @@ export default function RecoverScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [serverError, setServerError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSend() {
     setServerError(null);
+    setSuccessMessage(null);
     if (!email) {
       setServerError('Ingresa tu email para continuar.');
       return;
@@ -23,8 +25,8 @@ export default function RecoverScreen() {
 
     setLoading(true);
     try {
-      await forgotPassword(email);
-      router.push('/new-password?mode=reset');
+      const res = await forgotPassword(email);
+      setSuccessMessage(res.message);
     } catch (error: any) {
       setServerError(error?.message || 'No se pudo enviar el correo de recuperación.');
     } finally {
@@ -52,11 +54,21 @@ export default function RecoverScreen() {
               <Text style={styles.errorBannerText}>{serverError}</Text>
             </View>
           ) : null}
-          <Pressable style={styles.primaryButton} onPress={onSend} disabled={loading}>
-            <ThemedText type="default" style={styles.primaryButtonText}>
-              {loading ? 'Enviando...' : 'Enviar Instrucciones'}
-            </ThemedText>
-          </Pressable>
+
+          {successMessage ? (
+            <View style={[styles.infoBox, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+              <Text style={{ color: '#065F46', lineHeight: 20 }}>{successMessage}</Text>
+              <Pressable style={styles.primaryButton} onPress={() => router.push('/new-password?mode=reset')}>
+                <ThemedText type="default" style={styles.primaryButtonText}>Ya tengo el código</ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.primaryButton} onPress={onSend} disabled={loading}>
+              <ThemedText type="default" style={styles.primaryButtonText}>
+                {loading ? 'Enviando...' : 'Enviar Instrucciones'}
+              </ThemedText>
+            </Pressable>
+          )}
 
           <Pressable style={styles.secondaryButton} onPress={() => router.push('/')}>
             <ThemedText>Volver a Inicio de Sesión</ThemedText>

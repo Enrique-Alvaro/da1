@@ -1,18 +1,37 @@
-import { ApiError, AuthResponse, PaymentMethod, UserMetrics, UserProfile } from './types';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+import { readStoredToken, writeStoredToken } from './token-storage';
+import { normalizeEmail } from '../utils/email';
+import {
+  ApiError,
+  AuthResponse,
+  ItemFinalizationResult,
+  LiveAuctionState,
+  Notification,
+  NotificationListResponse,
+  PaymentMethod,
+  PurchaseItem,
+  UserMetrics,
+  UserProfile,
+} from './types';
+
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ??
+  (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
+  'http://localhost:3000/api';
+
 let authToken: string | null = null;
+let tokenHydrated = false;
 
-function persistToken(token: string | null) {
+async function persistToken(token: string | null) {
   authToken = token;
+  await writeStoredToken(token);
+}
 
-  if (typeof window !== 'undefined' && window.localStorage) {
-    if (token) {
-      window.localStorage.setItem('crownbid_token', token);
-    } else {
-      window.localStorage.removeItem('crownbid_token');
-    }
-  }
+export async function initAuthToken(): Promise<void> {
+  if (tokenHydrated) return;
+  authToken = await readStoredToken();
+  tokenHydrated = true;
 }
 
 export function loadStoredToken() {
@@ -27,10 +46,14 @@ export function getAuthToken() {
 }
 
 export function setAuthToken(token: string | null) {
-  persistToken(token);
+  void persistToken(token);
 }
 
-function buildHeaders(contentType = 'application/json') {
+export async function setAuthTokenAsync(token: string | null) {
+  await persistToken(token);
+}
+
+function buildHeaders(contentType?: string) {
   const headers: Record<string, string> = {};
   if (contentType) {
     headers['Content-Type'] = contentType;
@@ -58,7 +81,15 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  const headers = new Headers(options.headers as HeadersInit | undefined);
+  if (options.body != null && options.body !== '' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
   if (!response.ok) {
     const payload = await parseResponse<ApiError>(response);
     const error: ApiError = {
@@ -91,7 +122,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
   const response = await request<AuthResponse>('/auth/login', {
     method: 'POST',
     headers: buildHeaders(),
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: normalizeEmail(email), password }),
   });
 
   if (response.accessToken) {
@@ -167,7 +198,25 @@ export async function logout(): Promise<void> {
     method: 'POST',
     headers: buildHeaders(),
   });
-  setAuthToken(null);
+  await setAuthTokenAsync(null);
+}
+
+export async function fetchRegisterCountries(): Promise<{ items: { id: number; name: string; shortName: string | null }[] }> {
+  return request('/auth/register/countries', {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function updatePaymentMethodGuarantee(
+  id: number,
+  montoGarantia: number
+): Promise<{ item: PaymentMethod; message: string }> {
+  return request(`/users/me/payment-methods/${id}/guarantee`, {
+    method: 'PATCH',
+    headers: buildHeaders(),
+    body: JSON.stringify({ montoGarantia }),
+  });
 }
 
 export async function fetchPaymentMethods(): Promise<{ items: PaymentMethod[] }> {
@@ -308,6 +357,58 @@ export async function fetchMySubmissions() {
 export async function cancelSubmission(id: number): Promise<void> {
   return request(`/users/me/item-submissions/${id}`, {
     method: 'DELETE',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchNotifications(limit = 50, offset = 0): Promise<NotificationListResponse> {
+  return request(`/users/me/notifications?limit=${limit}&offset=${offset}`, {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchUnreadNotificationCount(): Promise<{ unreadCount: number }> {
+  return request('/users/me/notifications/unread-count', {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function markNotificationRead(notificationId: number): Promise<Notification> {
+  return request(`/users/me/notifications/${notificationId}/read`, {
+    method: 'PATCH',
+    headers: buildHeaders(),
+  });
+}
+
+export async function markAllNotificationsRead(): Promise<{ updated: number }> {
+  return request('/users/me/notifications/read-all', {
+    method: 'PATCH',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchLiveAuctionState(auctionId: number): Promise<LiveAuctionState> {
+  return request(`/subastas/${auctionId}/live`, {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchItemResult(
+  auctionId: number,
+  itemId: number
+): Promise<ItemFinalizationResult> {
+  return request(`/subastas/${auctionId}/items/${itemId}/resultado`, {
+    method: 'GET',
+    headers: buildHeaders(),
+  });
+}
+
+export async function fetchMyPurchases(): Promise<{ items: PurchaseItem[]; limitations?: string[] }> {
+  return request('/users/me/purchases', {
+    method: 'GET',
     headers: buildHeaders(),
   });
 }

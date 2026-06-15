@@ -57,7 +57,7 @@ export default function AddPaymentCardScreen() {
       });
       router.push('/payment-verify-success');
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'No se pudo registrar el medio de pago.');
+      router.push('/payment-verify-error');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,19 +1,29 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { registerUser } from '@/services/api';
+import { fetchRegisterCountries, registerUser } from '@/services/api';
 
-const COUNTRIES = [
-  { code: 'AR', name: 'Argentina',       id: 1   },
-  { code: 'US', name: 'Estados Unidos',  id: 840 },
-  { code: 'ES', name: 'España',          id: 724 },
-  { code: 'CO', name: 'Colombia',        id: 170 },
-  { code: 'BR', name: 'Brasil',          id: 76  },
+type CountryOption = { id: number; name: string; shortName: string | null };
+
+const FALLBACK_COUNTRIES: CountryOption[] = [
+  { id: 1, name: 'Argentina', shortName: 'AR' },
+  { id: 840, name: 'Estados Unidos', shortName: 'US' },
 ];
 
 export default function RegisterScreen() {
@@ -23,7 +33,8 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
   const [address, setAddress] = useState('');
-  const [countryCode, setCountryCode] = useState('AR');
+  const [countries, setCountries] = useState<CountryOption[]>(FALLBACK_COUNTRIES);
+  const [countryId, setCountryId] = useState<number>(FALLBACK_COUNTRIES[0].id);
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [frontImageBase64, setFrontImageBase64] = useState<string | null>(null);
@@ -32,7 +43,20 @@ export default function RegisterScreen() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const selectedCountry = COUNTRIES.find(c => c.code === countryCode) ?? COUNTRIES[0];
+  const selectedCountry = countries.find((c) => c.id === countryId) ?? countries[0];
+
+  useEffect(() => {
+    fetchRegisterCountries()
+      .then((res) => {
+        if (res.items.length > 0) {
+          setCountries(res.items);
+          setCountryId(res.items[0].id);
+        }
+      })
+      .catch(() => {
+        // fallback list remains
+      });
+  }, []);
 
   async function requestPermissions() {
     const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
@@ -69,7 +93,7 @@ export default function RegisterScreen() {
 
   async function onSubmit() {
     setServerError(null);
-    if (!firstName || !lastName || !email || !documentNumber || !address || !frontImage || !backImage || !countryCode) {
+    if (!firstName || !lastName || !email || !documentNumber || !address || !frontImage || !backImage || !selectedCountry) {
       setServerError('Completa todos los campos obligatorios y sube ambas imágenes del documento.');
       return;
     }
@@ -128,20 +152,42 @@ export default function RegisterScreen() {
             <Text style={styles.label}>País</Text>
             {Platform.OS === 'web' ? (
               <select
-                value={countryCode}
-                onChange={e => setCountryCode((e.target as HTMLSelectElement).value)}
+                value={String(countryId)}
+                onChange={(e) => setCountryId(Number.parseInt((e.target as HTMLSelectElement).value, 10))}
                 style={{ borderWidth: 1, borderColor: '#D1D5DB', padding: 14, borderRadius: 8, backgroundColor: '#FFFFFF', marginBottom: 20, fontSize: 16, width: '100%', color: '#1F2937' } as any}
               >
-                <option value="" disabled>Selecciona un país</option>
-                {COUNTRIES.map(c => (
-                  <option key={c.code} value={c.code}>{c.name}</option>
+                {countries.map((c) => (
+                  <option key={c.id} value={String(c.id)}>{c.name}</option>
                 ))}
               </select>
             ) : (
-              <Pressable style={[styles.input, styles.selectInput]} onPress={() => setCountryDropdownOpen(true)}>
-                <Text style={styles.selectText}>{selectedCountry.name}</Text>
-                <Text style={styles.selectChevron}>▾</Text>
-              </Pressable>
+              <>
+                <Pressable style={[styles.input, styles.selectInput]} onPress={() => setCountryDropdownOpen(true)}>
+                  <Text style={styles.selectText}>{selectedCountry?.name ?? 'Seleccioná un país'}</Text>
+                  <Text style={styles.selectChevron}>▾</Text>
+                </Pressable>
+                <Modal visible={countryDropdownOpen} transparent animationType="slide">
+                  <Pressable style={styles.modalOverlay} onPress={() => setCountryDropdownOpen(false)}>
+                    <View style={styles.modalSheet}>
+                      <Text style={styles.modalTitle}>Seleccioná tu país</Text>
+                      <ScrollView>
+                        {countries.map((c) => (
+                          <Pressable
+                            key={c.id}
+                            style={styles.modalOption}
+                            onPress={() => {
+                              setCountryId(c.id);
+                              setCountryDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={styles.modalOptionText}>{c.name}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </Pressable>
+                </Modal>
+              </>
             )}
 
             <View style={styles.separator} />
@@ -268,6 +314,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '60%',
+    padding: 20,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#002855', marginBottom: 12 },
+  modalOption: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  modalOptionText: { fontSize: 16, color: '#1F2937' },
   separator: {
     height: 1,
     backgroundColor: '#E5E7EB',

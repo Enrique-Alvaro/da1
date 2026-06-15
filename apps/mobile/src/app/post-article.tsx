@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -115,7 +116,7 @@ export default function PostArticleScreen() {
       });
       router.push('/post-article-success');
     } catch (e: any) {
-      setApiError(e?.message || 'No se pudo enviar el artículo. Intentá de nuevo.');
+      router.push('/post-article-error');
     } finally {
       setIsSubmitting(false);
     }
@@ -123,9 +124,15 @@ export default function PostArticleScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={{ width: '100%' }} contentContainerStyle={styles.content}>
-          <ThemedText type="title">Postular Artículo</ThemedText>
+      <View style={styles.headerWrap}>
+        <ScreenHeader title="Postular Artículo" fallbackRoute="/home" />
+      </View>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <ScrollView
+          style={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+        >
           <ThemedText type="small" style={styles.subtitle}>
             Tu artículo será evaluado por nuestro equipo antes de ser incluido en una subasta.
           </ThemedText>
@@ -273,19 +280,30 @@ export default function PostArticleScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', flexDirection: 'row' },
+  container: {
+    flex: 1,
+    flexDirection: 'column',
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+  },
+  headerWrap: {
+    width: '100%',
+    alignSelf: 'stretch',
+  },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
+    width: '100%',
     maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+  },
+  scroll: {
     width: '100%',
   },
   content: {
     width: '100%',
     gap: Spacing.four,
-    paddingBottom: Spacing.six,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.six,
   },
   subtitle: { marginTop: Spacing.one, marginBottom: Spacing.two },
   section: { width: '100%', gap: Spacing.two },

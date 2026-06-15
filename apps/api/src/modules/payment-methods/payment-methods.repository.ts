@@ -160,3 +160,29 @@ export async function disableMedioPago(id: number, clienteId: number): Promise<M
     `);
   return result.recordset[0] ?? null;
 }
+
+export async function updateGuaranteeAmount(
+  id: number,
+  clienteId: number,
+  montoGarantia: number
+): Promise<MedioPagoRow | null> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("id", sql.Int, id)
+    .input("cliente", sql.Int, clienteId)
+    .input("montoGarantia", sql.Decimal(18, 2), montoGarantia)
+    .query<MedioPagoRow>(`
+      UPDATE dbo.mediosPago
+      SET
+        montoGarantia = @montoGarantia,
+        montoDisponible = @montoGarantia,
+        actualizadoEn = SYSUTCDATETIME()
+      OUTPUT INSERTED.*
+      WHERE identificador = @id
+        AND cliente = @cliente
+        AND estado <> 'deshabilitado'
+        AND tipo <> 'cheque_certificado'
+    `);
+  return result.recordset[0] ?? null;
+}

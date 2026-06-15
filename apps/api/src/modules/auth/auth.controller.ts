@@ -11,6 +11,19 @@ import {
   resetPasswordBodySchema,
 } from "./auth.schemas";
 import * as authService from "./auth.service";
+import * as paisesRepository from "../paises/paises.repository";
+
+/** GET /api/auth/register/countries — países disponibles para registro (público). */
+export const listRegisterCountries: RequestHandler = asyncHandler(async (_req, res) => {
+  const rows = await paisesRepository.listPaises();
+  res.status(200).json({
+    items: rows.map((row) => ({
+      id: row.numero,
+      name: row.nombre,
+      shortName: row.nombreCorto,
+    })),
+  });
+});
 
 /** POST /api/auth/register */
 export const register: RequestHandler = asyncHandler(async (req, res) => {

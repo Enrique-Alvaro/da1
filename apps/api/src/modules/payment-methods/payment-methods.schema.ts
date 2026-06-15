@@ -162,3 +162,11 @@ export type CreatePaymentMethodBody = z.infer<typeof createPaymentMethodBodySche
 export const paymentMethodIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
+
+export const updateGuaranteeBodySchema = z
+  .object({
+    montoGarantia: z.coerce.number().positive("montoGarantia debe ser mayor a 0"),
+  })
+  .strict();
+
+export type UpdateGuaranteeBody = z.infer<typeof updateGuaranteeBodySchema>;

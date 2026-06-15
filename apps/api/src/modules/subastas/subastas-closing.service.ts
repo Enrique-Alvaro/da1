@@ -13,6 +13,7 @@ import * as closingRepository from "./subastas-closing.repository";
 import type { FinalizationResponse } from "./subastas-closing.types";
 import { toFinalizationApiResponse, type FinalizationApiResponse } from "./subastas-closing-api.mapper";
 import { requireSubastaById } from "./subastas.repository";
+import { emitItemCloseNotifications } from "../notifications/notifications.events";
 
 const SHIPPING_AMOUNT = 0;
 const MIN_REGISTRO_COMISION = 0.02;
@@ -161,6 +162,25 @@ export async function closeAuctionItem(
       winningPujoId: winningBid.pujoId,
     });
 
+    const finalAmount = Number(registro.importe);
+    const commissionAmount = Number(registro.comision);
+    const totalAmount = finalAmount + commissionAmount + SHIPPING_AMOUNT;
+    const itemTitle = ctx.descripcionCatalogo?.trim() || `Artículo #${itemId}`;
+
+    void emitItemCloseNotifications({
+      auctionId,
+      itemId,
+      itemTitle,
+      currency,
+      basePrice,
+      saleId: registro.identificador,
+      resultType: "BIDDER_WON",
+      winnerClienteId: winningBid.clienteId,
+      finalAmount,
+      commissionAmount,
+      totalAmount,
+    });
+
     return toFinalizationApiResponse(
       buildFinalizationResponse({
         auctionId,
@@ -209,6 +229,24 @@ export async function closeAuctionItem(
     finalAmount: basePrice,
     commissionAmount: MIN_REGISTRO_COMISION,
     winningPujoId: null,
+  });
+
+  const finalAmount = Number(registro.importe);
+  const commissionAmount = Number(registro.comision);
+  const itemTitle = ctx.descripcionCatalogo?.trim() || `Artículo #${itemId}`;
+
+  void emitItemCloseNotifications({
+    auctionId,
+    itemId,
+    itemTitle,
+    currency,
+    basePrice,
+    saleId: registro.identificador,
+    resultType: "COMPANY_PURCHASED",
+    winnerClienteId: null,
+    finalAmount,
+    commissionAmount,
+    totalAmount: finalAmount + commissionAmount + SHIPPING_AMOUNT,
   });
 
   return toFinalizationApiResponse(

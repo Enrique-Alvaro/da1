@@ -4,6 +4,7 @@ import { requireAuth } from "../../shared/middlewares/requireAuth";
 import {
   changeInitialPassword,
   forgotPassword,
+  listRegisterCountries,
   logout,
   login,
   register,
@@ -13,6 +14,7 @@ import { employeeLogin } from "./auth-employee.controller";
 
 export const authRoutes = Router();
 
+authRoutes.get("/register/countries", listRegisterCountries);
 authRoutes.post("/register", register);
 authRoutes.post("/login", login);
 authRoutes.post("/employee/login", employeeLogin);

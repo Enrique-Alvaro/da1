@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { disablePaymentMethod, fetchPaymentMethods } from '@/services/api';
@@ -81,7 +82,8 @@ export default function PaymentMethodsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Métodos de Pago" fallbackRoute="/perfil" />
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView 
           style={{ width: '100%' }} 
           showsVerticalScrollIndicator={false}
@@ -89,7 +91,6 @@ export default function PaymentMethodsScreen() {
         >
           
           <View style={styles.headerContainer}>
-            <Text style={styles.title}>Métodos de Pago</Text>
             <Text style={styles.subtitle}>
               Administra tus garantías de pago
             </Text>
@@ -188,9 +189,16 @@ export default function PaymentMethodsScreen() {
                   </View>
                 ) : (
                   <View style={styles.cardActions}>
-                    <Pressable onPress={() => router.push('/payment-method-verify')}>
+                    <Pressable onPress={() => router.push(`/payment-method-verify?methodId=${method.id}`)}>
                       <Text style={styles.linkText}>Ver Detalles</Text>
                     </Pressable>
+                    {method.type !== 'cheque_certificado' && (
+                      <Pressable onPress={() => router.push(`/reserve-funds?methodId=${method.id}`)}>
+                        <Text style={styles.linkText}>
+                          {method.guaranteeAmount ? 'Modificar reserva' : 'Reservar fondos'}
+                        </Text>
+                      </Pressable>
+                    )}
                     <Pressable onPress={() => { setDisableError(null); setConfirmingId(method.id); }}>
                       <Text style={styles.deleteText}>Eliminar</Text>
                     </Pressable>
@@ -206,14 +214,6 @@ export default function PaymentMethodsScreen() {
             onPress={() => router.push('/select-payment-method')}
           >
             <Text style={styles.dashedButtonText}>+  Agregar Método de Pago</Text>
-          </Pressable>
-
-          {/* Botón Principal de Confirmación (Naranja) */}
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => router.push('/reserve-funds')}
-          >
-            <Text style={styles.primaryButtonText}>Completar</Text>
           </Pressable>
 
         </ScrollView>

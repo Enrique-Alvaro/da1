@@ -34,3 +34,19 @@ export const disablePaymentMethod: RequestHandler = asyncHandler(async (req, res
   );
   res.status(200).json(result);
 });
+
+export const updatePaymentMethodGuarantee: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = paymentMethodIdParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  if (!req.authUser) {
+    throw new UnauthorizedError("No autorizado.", "UNAUTHENTICATED");
+  }
+  const result = await paymentMethodsService.updatePaymentMethodGuarantee(
+    req.authUser,
+    parsed.data.id,
+    req.body
+  );
+  res.status(200).json(result);
+});

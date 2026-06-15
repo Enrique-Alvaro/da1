@@ -9,11 +9,24 @@ import {
   getMySubmissionPhoto,
   listMySubmissions,
 } from "../productos/productos-submissions.controller";
-import { getMe, getMyMetrics, getMyOperationalStatus, getMyPurchases, updateMe } from "./users.controller";
+import {
+  getMe,
+  getMyMetrics,
+  getMyOperationalStatus,
+  getMyPurchases,
+  updateMe,
+} from "./users.controller";
+import {
+  getUnreadNotificationsCount,
+  listMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "../notifications/notifications.controller";
 import {
   createPaymentMethod,
   disablePaymentMethod,
   listMyPaymentMethods,
+  updatePaymentMethodGuarantee,
 } from "../payment-methods/payment-methods.controller";
 
 export const usersRoutes = Router();
@@ -32,12 +45,46 @@ usersRoutes.get("/me/status", ...clientOperationalChain, getMyOperationalStatus)
 usersRoutes.get("/me/metrics", requireAuth, requireAccessToken, getMyMetrics);
 usersRoutes.get("/me/purchases", requireAuth, requireAccessToken, requireClienteAuth, getMyPurchases);
 
+usersRoutes.get(
+  "/me/notifications",
+  requireAuth,
+  requireAccessToken,
+  requireClienteAuth,
+  listMyNotifications
+);
+usersRoutes.get(
+  "/me/notifications/unread-count",
+  requireAuth,
+  requireAccessToken,
+  requireClienteAuth,
+  getUnreadNotificationsCount
+);
+usersRoutes.patch(
+  "/me/notifications/read-all",
+  requireAuth,
+  requireAccessToken,
+  requireClienteAuth,
+  markAllNotificationsRead
+);
+usersRoutes.patch(
+  "/me/notifications/:notificationId/read",
+  requireAuth,
+  requireAccessToken,
+  requireClienteAuth,
+  markNotificationRead
+);
+
 usersRoutes.get("/me/payment-methods", ...clientOperationalChain, listMyPaymentMethods);
 usersRoutes.post("/me/payment-methods", ...clientOperationalChain, createPaymentMethod);
 usersRoutes.patch(
   "/me/payment-methods/:id/disable",
   ...clientOperationalChain,
   disablePaymentMethod
+);
+usersRoutes.patch(
+  "/me/payment-methods/:id/guarantee",
+  ...clientOperationalChain,
+  updatePaymentMethodGuarantee
 );
 
 const submissionChain = [

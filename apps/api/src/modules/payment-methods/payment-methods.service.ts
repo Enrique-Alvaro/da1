@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AuthUserContext } from "../../shared/types/auth";
 import {
   BadRequestError,
+  ConflictError,
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
@@ -15,6 +16,7 @@ import {
   createPaymentMethodBodySchema,
   formatZodError,
   type CreatePaymentMethodBody,
+  updateGuaranteeBodySchema,
 } from "./payment-methods.schema";
 
 /**
@@ -152,4 +154,47 @@ export async function disablePaymentMethod(
     throw new NotFoundError("Medio de pago no encontrado.", "PAYMENT_METHOD_NOT_FOUND");
   }
   return { id: row.identificador, status: row.estado };
+}
+
+export async function updatePaymentMethodGuarantee(
+  authUser: AuthUserContext,
+  paymentMethodId: number,
+  body: unknown
+): Promise<{ item: PaymentMethodPublic; message: string }> {
+  const parsed = updateGuaranteeBodySchema.safeParse(body);
+  if (!parsed.success) {
+    mapZodToHttpError(parsed.error);
+  }
+
+  const clienteId = await resolveClienteId(authUser);
+  const existing = await paymentMethodsRepository.findByIdAndCliente(paymentMethodId, clienteId);
+  if (!existing) {
+    throw new NotFoundError("Medio de pago no encontrado.", "PAYMENT_METHOD_NOT_FOUND");
+  }
+  if (existing.tipo === "cheque_certificado") {
+    throw new BadRequestError(
+      "El monto del cheque certificado se define al registrarlo.",
+      "CHEQUE_GUARANTEE_IMMUTABLE"
+    );
+  }
+  if (existing.estado === "deshabilitado" || existing.estado === "rechazado") {
+    throw new ConflictError(
+      "No se puede reservar fondos en un medio deshabilitado o rechazado.",
+      "PAYMENT_METHOD_NOT_ACTIVE"
+    );
+  }
+
+  const row = await paymentMethodsRepository.updateGuaranteeAmount(
+    paymentMethodId,
+    clienteId,
+    parsed.data.montoGarantia
+  );
+  if (!row) {
+    throw new NotFoundError("Medio de pago no encontrado.", "PAYMENT_METHOD_NOT_FOUND");
+  }
+
+  return {
+    item: mapMedioPagoToPublic(row),
+    message: "Monto de garantía actualizado. La empresa verificará el medio antes de pujar.",
+  };
 }

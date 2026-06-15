@@ -1,7 +1,8 @@
 import { CustomNavBar } from '@/components/CustomNavBar';
+import { NotificationBell } from '@/components/NotificationBell';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { fetchAuctions, getAuthToken, getCurrentUser } from '@/services/api';
+import { fetchAuctions, getAuthToken, getCurrentUser, logout } from '@/services/api';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View, Text } from 'react-native';
@@ -142,14 +143,27 @@ export default function HomeScreen() {
     );
   };
 
+  async function onLogout() {
+    try {
+      if (getAuthToken()) {
+        await logout();
+      }
+    } catch {
+      // clear local session even if API fails
+    } finally {
+      router.replace('/login');
+    }
+  }
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.topBar}>
+        {!isGuest && <NotificationBell color="#FFFFFF" />}
         <View style={{ flex: 1, alignItems: 'center' }}>
           <ThemedText style={styles.topBarTitle}>CrownBid</ThemedText>
         </View>
-        <Pressable style={styles.iconButton} onPress={() => router.replace('/login')}>
-          <ThemedText style={styles.topBarIcon}>Salir</ThemedText>
+        <Pressable style={styles.iconButton} onPress={() => void (isGuest ? router.replace('/login') : onLogout())}>
+          <ThemedText style={styles.topBarIcon}>{isGuest ? 'Entrar' : 'Salir'}</ThemedText>
         </Pressable>
       </View>
 

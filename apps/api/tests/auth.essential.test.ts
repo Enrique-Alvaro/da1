@@ -23,7 +23,19 @@ vi.mock("../src/modules/users/users.repository", () => ({
   findProfileByPersonId: vi.fn(),
 }));
 
+vi.mock("../src/modules/auth/auth-password-reset.repository", () => ({
+  createPasswordResetToken: vi.fn(),
+  findValidPasswordResetToken: vi.fn(),
+  completePasswordReset: vi.fn(),
+}));
+
+vi.mock("../src/shared/email/email.service", () => ({
+  sendTemporaryPasswordEmail: vi.fn(),
+  sendPasswordResetEmail: vi.fn(),
+}));
+
 import * as usersRepository from "../src/modules/users/users.repository";
+import * as passwordResetRepository from "../src/modules/auth/auth-password-reset.repository";
 import {
   loginUser,
   changeInitialPassword,
@@ -242,18 +254,17 @@ describe("auth essentials (Auth-2)", () => {
   });
 
   describe("forgotPassword / resetPassword", () => {
-    it("forgotPassword throws NotImplementedError with code", async () => {
-      await expect(forgotPassword({ email: "any@example.com" })).rejects.toMatchObject({
-        code: "PASSWORD_RESET_NOT_IMPLEMENTED",
-      });
+    it("forgotPassword returns generic message when email is unknown", async () => {
+      mocks.findCredentialByEmailWithPassword.mockResolvedValue(null);
+      const result = await forgotPassword({ email: "unknown@example.com" });
+      expect(result.message).toContain("correo");
     });
 
-    it("resetPassword throws NotImplementedError with code", async () => {
+    it("resetPassword rejects invalid token", async () => {
+      vi.mocked(passwordResetRepository.findValidPasswordResetToken).mockResolvedValue(null);
       await expect(
         resetPassword({ token: "some-valid-length-token-here", password: "NewStrong789" })
-      ).rejects.toMatchObject({
-        code: "PASSWORD_RESET_NOT_IMPLEMENTED",
-      });
+      ).rejects.toBeInstanceOf(UnauthorizedError);
     });
   });
 

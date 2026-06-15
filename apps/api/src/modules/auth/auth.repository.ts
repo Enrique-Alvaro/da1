@@ -1,13 +1,11 @@
 import sql from "mssql";
 import { getSqlPool } from "../../db/sqlServer";
 import type { DbClientCredentialLoginRow } from "./auth.types";
+import { getDefaultReviewerEmployeeId } from "../../config/env";
 import {
   BadRequestError,
   ConflictError,
 } from "../../shared/errors/httpErrors";
-
-/** FK `clientes.verificador` → `empleados.identificador` (fijo hasta definir producto). */
-const CLIENT_VERIFIER_EMPLOYEE_ID = 1;
 
 export type CreatePersonaClienteCredentialInput = {
   documentNumber: string;
@@ -84,7 +82,7 @@ export async function createPersonaClienteCredential(
     const insC = new sql.Request(tx);
     insC.input("identificador", sql.Int, personaId);
     insC.input("numeroPais", sql.Int, input.countryId);
-    insC.input("verificador", sql.Int, CLIENT_VERIFIER_EMPLOYEE_ID);
+    insC.input("verificador", sql.Int, getDefaultReviewerEmployeeId());
     await insC.query(`
       INSERT INTO dbo.clientes (identificador, numeroPais, admitido, categoria, verificador)
       VALUES (@identificador, @numeroPais, N'no', N'comun', @verificador)
@@ -129,7 +127,7 @@ export async function createPersonaClienteCredential(
     }
     if (number === 547) {
       throw new BadRequestError(
-        "No se pudo completar el registro: conflicto de integridad referencial. Verificá que exista el país (paises.numero = countryId del body) y un empleado con identificador 1 (verificador fijo en la API). Podés usar database/seed_registro_cliente_fk.sql."
+        "No se pudo completar el registro: conflicto de integridad referencial. Verificá que exista el país (paises.numero = countryId del body) y el empleado verificador (DEFAULT_REVIEWER_EMPLOYEE_ID). Podés usar database/seed_registro_cliente_fk.sql."
       );
     }
     throw err;

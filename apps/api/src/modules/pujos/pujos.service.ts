@@ -22,6 +22,9 @@ import { computeBidLimits } from "../subastas/subastas-bid-limits";
 import { pickCurrentItemId } from "../subastas/subastas-current-item";
 import { mapSubastaStatus } from "../subastas/subastas-access.service";
 import { listCatalogItemsBySubasta } from "../subastas/subastas-items.repository";
+import * as liveRepo from "../subastas/subastas-live.repository";
+import * as closingRepository from "../subastas/subastas-closing.repository";
+import { notifyOutbid, notifyLeadingBid } from "../notifications/notifications.events";
 import {
   countAsistentesBySubasta,
   findAsistenteByClienteAndSubasta,
@@ -282,6 +285,8 @@ export async function createBid(
 
   const basePrice = Number(ctx.item.precioBase);
 
+  const previousWinning = await liveRepo.findWinningBidForItem(body.itemId);
+
   const row = await insertBidInTransaction({
     asistenteId: ctx.asistente.identificador,
     itemId: body.itemId,
@@ -300,6 +305,35 @@ export async function createBid(
     basePrice,
     ctx.subasta.categoria ?? "comun"
   );
+
+  const itemCtx = await closingRepository.findItemCloseContext(auctionId, body.itemId);
+  const itemTitle = itemCtx?.descripcionCatalogo?.trim() || `Artículo #${body.itemId}`;
+
+  if (
+    previousWinning &&
+    previousWinning.cliente !== ctx.clienteId &&
+    Number(previousWinning.importe) < body.amount
+  ) {
+    void notifyOutbid({
+      outbidClienteId: previousWinning.cliente,
+      auctionId,
+      itemId: body.itemId,
+      itemTitle,
+      newAmount: body.amount,
+      currency: ctx.auctionCurrency,
+      bidId: row.identificador,
+    });
+  }
+
+  void notifyLeadingBid({
+    clienteId: ctx.clienteId,
+    auctionId,
+    itemId: body.itemId,
+    itemTitle,
+    amount: body.amount,
+    currency: ctx.auctionCurrency,
+    bidId: row.identificador,
+  });
 
   return {
     id: row.identificador,

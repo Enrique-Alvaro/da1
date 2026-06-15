@@ -13,10 +13,16 @@ import type { UserPublic } from "../users/user.mapper";
 import type { AuthUserContext } from "../../shared/types/auth";
 import * as usersRepository from "../users/users.repository";
 import { mapPersonaClienteToUserPublic } from "../users/user.mapper";
-import { getEmployeeAdminCredentials } from "../../config/env";
+import {
+  getEmployeeAdminCredentials,
+  getFrontendUrl,
+  getPasswordResetTtlMinutes,
+} from "../../config/env";
+import { sendPasswordResetEmail } from "../../shared/email/email.service";
+import * as passwordResetRepository from "./auth-password-reset.repository";
+import { createHash, randomBytes } from "node:crypto";
 import {
   ConflictError,
-  NotImplementedError,
   UnauthorizedError,
 } from "../../shared/errors/httpErrors";
 import * as submissionsRepository from "../productos/productos-submissions.repository";
@@ -242,18 +248,71 @@ export async function logout(_ctx: AuthUserContext): Promise<LogoutResult> {
   };
 }
 
-export async function forgotPassword(_input: ForgotPasswordBodyInput): Promise<{ message: string }> {
-  throw new NotImplementedError(
-    "El restablecimiento de contraseña por correo no está implementado en el alcance actual del TP.",
-    "PASSWORD_RESET_NOT_IMPLEMENTED"
-  );
+const PASSWORD_RESET_GENERIC_MESSAGE =
+  "Si el correo está registrado, recibirás instrucciones para restablecer tu contraseña.";
+
+function hashPasswordResetToken(token: string): string {
+  return createHash("sha256").update(token.trim()).digest("hex");
 }
 
-export async function resetPassword(_input: ResetPasswordBodyInput): Promise<LoginResult> {
-  throw new NotImplementedError(
-    "El restablecimiento de contraseña por token no está implementado en el alcance actual del TP.",
-    "PASSWORD_RESET_NOT_IMPLEMENTED"
-  );
+function resolveFirstName(fullName: string): string {
+  const part = fullName.trim().split(/\s+/)[0];
+  return part || "Usuario";
+}
+
+export async function forgotPassword(input: ForgotPasswordBodyInput): Promise<{ message: string }> {
+  const email = input.email.trim().toLowerCase();
+  const row = await authRepository.findCredentialByEmailWithPassword(email);
+  if (!row) {
+    return { message: PASSWORD_RESET_GENERIC_MESSAGE };
+  }
+
+  const token = randomBytes(32).toString("hex");
+  const tokenHash = hashPasswordResetToken(token);
+  const expiresAt = new Date(Date.now() + getPasswordResetTtlMinutes() * 60 * 1000);
+
+  await passwordResetRepository.createPasswordResetToken({
+    personaId: row.persona_id,
+    tokenHash,
+    expiresAt,
+  });
+
+  const resetUrl = `${getFrontendUrl()}/new-password?mode=reset&token=${encodeURIComponent(token)}`;
+  await sendPasswordResetEmail({
+    to: email,
+    firstName: resolveFirstName(row.full_name),
+    resetUrl,
+  });
+
+  return { message: PASSWORD_RESET_GENERIC_MESSAGE };
+}
+
+export async function resetPassword(input: ResetPasswordBodyInput): Promise<LoginResult> {
+  const tokenHash = hashPasswordResetToken(input.token);
+  const resetRow = await passwordResetRepository.findValidPasswordResetToken(tokenHash);
+  if (!resetRow) {
+    throw new UnauthorizedError("Token de restablecimiento inválido o expirado.");
+  }
+
+  const newHash = await hashPassword(input.password);
+  const row = await passwordResetRepository.completePasswordReset({
+    personaId: resetRow.persona_id,
+    passwordHash: newHash,
+    tokenHash,
+  });
+
+  const payload = buildLoginTokenPayload({
+    personaId: row.persona_id,
+    email: row.email,
+    tokenType: "access",
+  });
+
+  return {
+    accessToken: signAccessToken(payload),
+    user: mapCredentialLoginRowToUserPublic(row),
+    mustChangePassword: false,
+    isFirstLogin: false,
+  };
 }
 
 export type EmployeeLoginResult = {

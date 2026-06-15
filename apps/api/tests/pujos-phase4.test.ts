@@ -4,6 +4,8 @@ import * as paymentMethodsRepository from "../src/modules/payment-methods/paymen
 import * as subastasRepository from "../src/modules/subastas/subastas.repository";
 import * as pujosRepository from "../src/modules/pujos/pujos.repository";
 import * as itemsRepository from "../src/modules/subastas/subastas-items.repository";
+import * as liveRepo from "../src/modules/subastas/subastas-live.repository";
+import * as closingRepository from "../src/modules/subastas/subastas-closing.repository";
 import {
   assertCanBid,
   assertCategoryAllowed,
@@ -383,6 +385,8 @@ describe("Pujas — createBid pasa revalidación de medio a transacción", () =>
       importe: 10100,
       ganador: "no",
     });
+    vi.spyOn(liveRepo, "findWinningBidForItem").mockResolvedValue(null);
+    vi.spyOn(closingRepository, "findItemCloseContext").mockResolvedValue(null);
   });
 
   it("insertBidInTransaction recibe clienteId, paymentMethodId y auctionCurrency", async () => {

@@ -1,5 +1,6 @@
 import { NotFoundError } from "../../shared/errors/httpErrors";
 import type { UserCategory } from "../users/user.mapper";
+import { notifyClientAdmitted } from "../notifications/notifications.events";
 import * as usersRepository from "../users/users.repository";
 import type { AdmitClienteBody } from "./admin-clients.schema";
 
@@ -41,6 +42,9 @@ export async function admitCliente(clienteId: number, body: AdmitClienteBody) {
     admitido: body.admitido,
     categoria: body.categoria,
   });
+  if (body.admitido.trim().toLowerCase() === "si") {
+    void notifyClientAdmitted({ clienteId: updated.identificador });
+  }
   return {
     clienteId: updated.identificador,
     admitido: updated.admitido.trim().toLowerCase() === "si" ? "si" : "no",

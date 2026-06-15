@@ -7,6 +7,8 @@ import { admitCliente, getAdminClientDetail } from "../src/modules/admin/admin-c
 import { getMyOperationalStatus } from "../src/modules/users/users-me-status.service";
 import { assertCanBid } from "../src/modules/pujos/pujos.service";
 import { forgotPassword, logout, resetPassword } from "../src/modules/auth/auth.service";
+import * as authRepository from "../src/modules/auth/auth.repository";
+import * as passwordResetRepository from "../src/modules/auth/auth-password-reset.repository";
 import type { AuthUserContext } from "../src/shared/types/auth";
 
 const authCliente: AuthUserContext = {
@@ -207,19 +209,17 @@ describe("admission enables bidding guard", () => {
 });
 
 describe("auth alignment", () => {
-  it("forgotPassword returns PASSWORD_RESET_NOT_IMPLEMENTED", async () => {
-    await expect(forgotPassword({ email: "a@b.com" })).rejects.toMatchObject({
-      code: "PASSWORD_RESET_NOT_IMPLEMENTED",
-      statusCode: 501,
-    });
+  it("forgotPassword returns generic message for unknown email", async () => {
+    vi.spyOn(authRepository, "findCredentialByEmailWithPassword").mockResolvedValue(null);
+    const result = await forgotPassword({ email: "a@b.com" });
+    expect(result.message).toContain("correo");
   });
 
-  it("resetPassword returns PASSWORD_RESET_NOT_IMPLEMENTED", async () => {
+  it("resetPassword rejects invalid token", async () => {
+    vi.spyOn(passwordResetRepository, "findValidPasswordResetToken").mockResolvedValue(null);
     await expect(
       resetPassword({ token: "some-valid-length-token-here", password: "NewStrong789" })
-    ).rejects.toMatchObject({
-      code: "PASSWORD_RESET_NOT_IMPLEMENTED",
-    });
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
   it("logout returns client-side discard message", async () => {

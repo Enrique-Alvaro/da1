@@ -4,6 +4,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
@@ -40,7 +41,8 @@ export default function SelectPaymentMethodScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <ScreenHeader title="Seleccionar Método" fallbackRoute="/payment-methods" />
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView 
           style={{ width: '100%' }} 
           showsVerticalScrollIndicator={false}
@@ -48,7 +50,6 @@ export default function SelectPaymentMethodScreen() {
         >
           
           <View style={styles.headerContainer}>
-            <Text style={styles.title}>Selecciona Método de Pago</Text>
             <Text style={styles.subtitle}>
               Elige cómo deseas garantizar tu participación
             </Text>

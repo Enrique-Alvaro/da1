@@ -119,6 +119,15 @@ export function getCompanyClientId(): number | null {
   return id;
 }
 
+/** URL base del frontend/mobile web para enlaces en correos (restablecimiento de contraseña). */
+export function getFrontendUrl(): string {
+  const url = getEnv().FRONTEND_URL?.trim();
+  if (url) {
+    return url.replace(/\/$/, "");
+  }
+  return "http://localhost:8081";
+}
+
 export function getEmployeeAdminCredentials(): {
   email: string;
   password: string;

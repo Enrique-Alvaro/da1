@@ -14,6 +14,7 @@
     "android": "npm --workspace @crownbid/mobile run android",
     "ios": "npm --workspace @crownbid/mobile run ios",
     "web": "npm --workspace @crownbid/mobile run web",
+    "expo": "node scripts/expo-mobile.mjs",
     "lint": "npm --workspace @crownbid/mobile run lint",
     "reset-project": "node ./scripts/reset-project.js"
   }

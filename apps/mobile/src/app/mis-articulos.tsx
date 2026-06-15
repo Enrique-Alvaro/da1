@@ -237,7 +237,7 @@ export default function MisArticulosScreen() {
         )}
 
         {/* Cancelar */}
-        {(item.status === 'PENDING_REVIEW' || item.status === 'ACCEPTED') && (
+        {(item.status === 'PENDING_REVIEW') && (
           isConfirmingCancel ? (
             <View style={styles.cancelConfirmRow}>
               <Text style={styles.cancelConfirmText}>¿Confirmás la cancelación?</Text>
