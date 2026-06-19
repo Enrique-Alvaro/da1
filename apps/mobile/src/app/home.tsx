@@ -167,9 +167,10 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      <CustomNavBar />
+
       <View style={styles.userBanner}>
         {isGuest ? (
-          <>
             <View style={styles.guestBannerHeader}>
               <View>
                 <Text style={styles.greeting}>Bienvenido</Text>
@@ -196,8 +197,6 @@ export default function HomeScreen() {
           </>
         )}
       </View>
-
-      <CustomNavBar />
 
       <ThemedText style={styles.sectionTitle}>Subastas</ThemedText>
 

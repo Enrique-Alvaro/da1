@@ -53,10 +53,10 @@ export default function PerfilScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
+        <CustomNavBar />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#D35400" />
         </View>
-        <CustomNavBar />
       </SafeAreaView>
     );
   }
@@ -64,16 +64,17 @@ export default function PerfilScreen() {
   if (error || !user) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
+        <CustomNavBar />
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error ?? 'Error al cargar perfil.'}</Text>
         </View>
-        <CustomNavBar />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomNavBar />
 
       {/* Cabecera Naranja */}
       <View style={styles.profileHeader}>
@@ -107,9 +108,6 @@ export default function PerfilScreen() {
           </View>
         </View>
       </View>
-
-      {/* Barra de navegación */}
-      <CustomNavBar />
 
       {/* Lista de Tarjetas (Cards) */}
       <ScrollView contentContainerStyle={styles.cardsContainer} showsVerticalScrollIndicator={false}>

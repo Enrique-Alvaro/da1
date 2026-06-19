@@ -268,6 +268,8 @@ export default function MisArticulosScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <CustomNavBar />
+
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -278,8 +280,6 @@ export default function MisArticulosScreen() {
           <Text style={styles.newBtnText}>+ Nuevo</Text>
         </Pressable>
       </View>
-
-      <CustomNavBar />
 
       {loading ? (
         <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
