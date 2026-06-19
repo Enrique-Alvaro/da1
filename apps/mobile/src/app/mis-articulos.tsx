@@ -1,5 +1,5 @@
 import { CustomNavBar } from '@/components/CustomNavBar';
-import { cancelSubmission, fetchAuctionDetail, fetchMySubmissions } from '@/services/api';
+import { cancelSubmission, fetchAuctionDetail, fetchMySubmissions, getAuthToken } from '@/services/api';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -67,6 +67,13 @@ export default function MisArticulosScreen() {
   async function load() {
     setLoading(true);
     setError(null);
+
+    if (!getAuthToken()) {
+      setError('Debe iniciar sesión para acceder a esta sección.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const result = await (fetchMySubmissions() as Promise<Submission[]>);
       const list = Array.isArray(result) ? result : [];
@@ -87,7 +94,11 @@ export default function MisArticulosScreen() {
         setAuctionMap(map);
       }
     } catch (e: any) {
-      setError(e?.message || 'Error al cargar los artículos.');
+      if (e?.statusCode === 401) {
+        setError('Debe iniciar sesión para acceder a esta sección.');
+      } else {
+        setError(e?.message || 'Error al cargar los artículos.');
+      }
     } finally {
       setLoading(false);
     }

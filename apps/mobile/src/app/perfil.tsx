@@ -1,5 +1,5 @@
 import { CustomNavBar } from '@/components/CustomNavBar';
-import { getCurrentUser, getMyMetrics, logout, updateProfile } from '@/services/api';
+import { getAuthToken, getCurrentUser, getMyMetrics, logout, updateProfile } from '@/services/api';
 import type { UserMetrics, UserProfile } from '@/services/types';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -30,15 +30,31 @@ export default function PerfilScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getCurrentUser(), getMyMetrics()])
-      .then(([u, m]) => {
+    async function loadProfile() {
+      if (!getAuthToken()) {
+        setError('Debe iniciar sesión para acceder a esta sección.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const [u, m] = await Promise.all([getCurrentUser(), getMyMetrics()]);
         setUser(u);
         setMetrics(m);
         setEditEmail(u.email);
         setEditAddress(u.address ?? '');
-      })
-      .catch(() => setError('No se pudo cargar el perfil.'))
-      .finally(() => setLoading(false));
+      } catch (e: any) {
+        if (e?.statusCode === 401) {
+          setError('Debe iniciar sesión para acceder a esta sección.');
+        } else {
+          setError('No se pudo cargar el perfil.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfile();
   }, []);
 
   async function handleLogout() {
