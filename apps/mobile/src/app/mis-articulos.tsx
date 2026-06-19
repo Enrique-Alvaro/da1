@@ -49,6 +49,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   comun: 'Común', especial: 'Especial', plata: 'Plata', oro: 'Oro', platino: 'Platino',
 };
 
+function normalizeSubmissionStatus(status: string | null | undefined): string {
+  return String(status ?? '').trim().toUpperCase();
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -120,15 +124,17 @@ export default function MisArticulosScreen() {
   }
 
   const total      = submissions.length;
-  const revision   = submissions.filter(s => s.status === 'PENDING_REVIEW').length;
-  const enSubasta  = submissions.filter(s => s.status === 'ASSIGNED_TO_AUCTION').length;
+  const revision   = submissions.filter(s => normalizeSubmissionStatus(s.status) === 'PENDING_REVIEW').length;
+  const enSubasta  = submissions.filter(s => normalizeSubmissionStatus(s.status) === 'ASSIGNED_TO_AUCTION').length;
 
   const renderItem = ({ item }: { item: Submission }) => {
-    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.UNKNOWN;
+    const status = normalizeSubmissionStatus(item.status);
+    const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.UNKNOWN;
     const auction = item.auctionId ? auctionMap[item.auctionId] : null;
-    const stepIndex = STEPS.indexOf(item.status);
-    const isInAuction = item.status === 'ASSIGNED_TO_AUCTION';
+    const stepIndex = STEPS.indexOf(status);
+    const isInAuction = status === 'ASSIGNED_TO_AUCTION';
     const isConfirmingCancel = cancelConfirm === item.submissionId;
+    const isCancellable = status === 'PENDING_REVIEW';
 
     return (
       <View style={[styles.card, { borderLeftColor: cfg.accent }]}>
@@ -248,7 +254,7 @@ export default function MisArticulosScreen() {
         )}
 
         {/* Cancelar */}
-        {(item.status === 'PENDING_REVIEW') && (
+        {isCancellable && (
           isConfirmingCancel ? (
             <View style={styles.cancelConfirmRow}>
               <Text style={styles.cancelConfirmText}>¿Confirmás la cancelación?</Text>
