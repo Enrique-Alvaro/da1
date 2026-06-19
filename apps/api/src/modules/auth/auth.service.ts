@@ -144,6 +144,10 @@ export async function loginUser(body: LoginBodyInput): Promise<LoginResult> {
     throw new UnauthorizedError("Credenciales inválidas.");
   }
 
+  if (row.status !== "activo") {
+    throw new UnauthorizedError("Credenciales inválidas.");
+  }
+
   const valid = await verifyPassword(body.password, row.password_hash);
   if (!valid) {
     throw new UnauthorizedError("Credenciales inválidas.");

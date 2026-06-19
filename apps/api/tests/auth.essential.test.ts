@@ -86,6 +86,17 @@ describe("auth essentials (Auth-2)", () => {
       });
     });
 
+    it("returns generic UnauthorizedError when user is inactive", async () => {
+      const hash = await hashPassword("CorrectPass123");
+      mocks.findCredentialByEmailWithPassword.mockResolvedValue(
+        baseCredentialRow({ password_hash: hash, status: "incativo" })
+      );
+      await expect(loginUser({ email: "qa.user@example.com", password: "CorrectPass123" })).rejects.toMatchObject({
+        message: "Credenciales inválidas.",
+        statusCode: 401,
+      });
+    });
+
     it("returns first-login shape when requires_password_change is set", async () => {
       const plain = "TempLogin123";
       const hash = await hashPassword(plain);
