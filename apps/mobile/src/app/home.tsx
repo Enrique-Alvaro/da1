@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { fetchAuctions, getAuthToken, getCurrentUser, logout } from '@/services/api';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View, Text } from 'react-native';
 
 type Auction = {
@@ -54,6 +54,7 @@ export default function HomeScreen() {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [userLoading, setUserLoading] = useState(!isGuest);
   const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [showLiveOnly, setShowLiveOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +85,21 @@ export default function HomeScreen() {
     }
     load();
   }, []);
+
+  const visibleAuctions = useMemo(() => {
+    const sorted = [...auctions].sort((a, b) => {
+      const aLive = a.status === 'live';
+      const bLive = b.status === 'live';
+      if (aLive && !bLive) return -1;
+      if (!aLive && bLive) return 1;
+      return 0;
+    });
+    return showLiveOnly ? sorted.filter((auction) => auction.status === 'live') : sorted;
+  }, [auctions, showLiveOnly]);
+
+  const noAuctionsMessage = showLiveOnly
+    ? 'No hay subastas en vivo disponibles.'
+    : 'No hay subastas disponibles.';
 
   const renderAuctionCard = ({ item }: { item: Auction }) => {
     const categoryLabel = CATEGORY_LABELS[item.category] ?? item.category;
@@ -198,7 +214,17 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <ThemedText style={styles.sectionTitle}>Subastas</ThemedText>
+      <View style={styles.sectionHeader}>
+        <ThemedText style={styles.sectionTitle}>Subastas</ThemedText>
+        <Pressable
+          style={[styles.filterButton, showLiveOnly && styles.filterButtonActive]}
+          onPress={() => setShowLiveOnly((prev) => !prev)}
+        >
+          <Text style={[styles.filterButtonText, showLiveOnly && styles.filterButtonTextActive]}>
+            {showLiveOnly ? 'Todas' : 'Solo en vivo'}
+          </Text>
+        </Pressable>
+      </View>
 
       {loading ? (
         <ActivityIndicator style={styles.loader} color="#D35400" />
@@ -206,13 +232,13 @@ export default function HomeScreen() {
         <View style={styles.emptyState}>
           <ThemedText style={styles.emptyText}>{error}</ThemedText>
         </View>
-      ) : auctions.length === 0 ? (
+      ) : visibleAuctions.length === 0 ? (
         <View style={styles.emptyState}>
-          <ThemedText style={styles.emptyText}>No hay subastas disponibles.</ThemedText>
+          <ThemedText style={styles.emptyText}>{noAuctionsMessage}</ThemedText>
         </View>
       ) : (
         <FlatList
-          data={auctions}
+          data={visibleAuctions}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContainer}
           renderItem={renderAuctionCard}
@@ -247,7 +273,12 @@ const styles = StyleSheet.create({
   guestAlertBox: { backgroundColor: '#A04000', padding: 12, borderRadius: 8, marginTop: 15 },
   guestAlertText: { color: '#FFF', fontSize: 14 },
 
-  sectionTitle: { fontSize: 18, color: '#002855', paddingHorizontal: 15, paddingTop: 20, paddingBottom: 8, fontWeight: 'bold' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 20, paddingBottom: 8 },
+  sectionTitle: { fontSize: 18, color: '#002855', fontWeight: 'bold' },
+  filterButton: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#F3F4F6', borderRadius: 999 },
+  filterButtonActive: { backgroundColor: '#D35400' },
+  filterButtonText: { fontSize: 12, color: '#334155', fontWeight: '700' },
+  filterButtonTextActive: { color: '#FFFFFF' },
   listContainer: { padding: 15, paddingBottom: 30 },
   loader: { marginTop: 40 },
 
