@@ -215,6 +215,12 @@ export default function LiveAuctionScreen() {
   }, [liveState, itemFinalized, bidAmount]);
 
   useEffect(() => {
+    if (auctionEnded && !itemFinalized && !resultLoading) {
+      void loadResult();
+    }
+  }, [auctionEnded, itemFinalized, resultLoading, loadResult]);
+
+  useEffect(() => {
     async function setup() {
       try {
         await registerAsistente(aucId);

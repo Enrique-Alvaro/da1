@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 type ScreenHeaderProps = {
   title?: string;
   /** Ruta si no hay historial para volver atrás */
-  fallbackRoute?: '/home' | '/perfil' | '/payment-methods' | '/mis-articulos';
+  fallbackRoute?: string;
   right?: ReactNode;
   dark?: boolean;
 };

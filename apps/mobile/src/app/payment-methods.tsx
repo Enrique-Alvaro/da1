@@ -82,7 +82,7 @@ export default function PaymentMethodsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title="Métodos de Pago" fallbackRoute="/perfil" />
+      <ScreenHeader title="Métodos de Pago" fallbackRoute="/home" />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView 
           style={{ width: '100%' }} 
@@ -94,6 +94,14 @@ export default function PaymentMethodsScreen() {
             <Text style={styles.subtitle}>
               Administra tus garantías de pago
             </Text>
+          </View>
+          <View style={styles.backActionRow}>
+            <Pressable
+              style={styles.backActionButton}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
+            >
+              <Text style={styles.backActionText}>Volver</Text>
+            </Pressable>
           </View>
 
           {loading && (
@@ -257,6 +265,21 @@ const styles = StyleSheet.create({
   centered: {
     paddingVertical: Spacing.six,
     alignItems: 'center',
+  },
+  backActionRow: {
+    marginTop: 18,
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  backActionButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+  },
+  backActionText: {
+    color: '#1D4ED8',
+    fontWeight: '700',
   },
   errorBanner: {
     backgroundColor: '#FFECEC',

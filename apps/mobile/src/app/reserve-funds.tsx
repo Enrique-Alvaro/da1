@@ -112,6 +112,14 @@ export default function ReserveFundsScreen() {
           <View style={styles.headerContainer}>
             <Text style={styles.subtitle}>Define el monto de garantía para participar en subastas.</Text>
           </View>
+          <View style={styles.backActionRow}>
+            <Pressable
+              style={styles.backActionButton}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/payment-methods'))}
+            >
+              <Text style={styles.backActionText}>Volver</Text>
+            </Pressable>
+          </View>
 
           {loading && (
             <View style={styles.centered}>
@@ -190,6 +198,9 @@ const styles = StyleSheet.create({
   headerContainer: { marginBottom: Spacing.three, marginTop: Spacing.two },
   subtitle: { fontSize: 15, color: '#6B7280', lineHeight: 22 },
   centered: { paddingVertical: 40, alignItems: 'center' },
+  backActionRow: { marginBottom: 16, alignItems: 'flex-start' },
+  backActionButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#F3F4F6' },
+  backActionText: { color: '#1D4ED8', fontWeight: '700' },
   methodBox: {
     backgroundColor: '#F8FAFC',
     borderRadius: 10,
