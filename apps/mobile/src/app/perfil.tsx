@@ -78,11 +78,23 @@ export default function PerfilScreen() {
   }
 
   if (error || !user) {
+    const isAuthError = error?.includes('iniciar sesión');
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <CustomNavBar />
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error ?? 'Error al cargar perfil.'}</Text>
+          {isAuthError ? (
+            <>
+              <Text style={styles.authGateIcon}>🔒</Text>
+              <Text style={styles.authGateTitle}>Acceso restringido</Text>
+              <Text style={styles.authGateText}>Debés iniciar sesión para acceder a esta sección.</Text>
+              <Pressable style={styles.authGateButton} onPress={() => router.replace('/login')}>
+                <Text style={styles.authGateButtonText}>Iniciar sesión</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.errorText}>{error ?? 'Error al cargar perfil.'}</Text>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -97,7 +109,9 @@ export default function PerfilScreen() {
         {/* Fila de Usuario (Avatar y Nombre) */}
         <View style={styles.userInfoRow}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarIcon}>👤</Text>
+            <Text style={styles.avatarInitials}>
+              {user.fullName.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')}
+            </Text>
           </View>
           <View style={styles.userNameBlock}>
             <Text style={styles.userName}>{user.fullName}</Text>
@@ -258,7 +272,7 @@ const styles = StyleSheet.create({
   userInfoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 25 },
 
   avatar: { width: 75, height: 75, borderRadius: 37.5, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  avatarIcon: { fontSize: 40, color: '#D35400' },
+  avatarInitials: { fontSize: 28, fontWeight: 'bold', color: '#888' },
 
   userNameBlock: { flex: 1 },
   userName: { fontSize: 26, fontWeight: 'bold', color: '#FFF', marginBottom: 5 },
@@ -298,4 +312,10 @@ const styles = StyleSheet.create({
   successBannerText: { color: '#065F46', fontWeight: '600', fontSize: 14 },
   errorBanner: { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 10, padding: 12, marginBottom: 12 },
   errorBannerText: { color: '#DC2626', fontSize: 14 },
+
+  authGateIcon: { fontSize: 48, marginBottom: 16 },
+  authGateTitle: { fontSize: 20, fontWeight: 'bold', color: '#002855', marginBottom: 8 },
+  authGateText: { fontSize: 15, color: '#555', textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 },
+  authGateButton: { backgroundColor: '#D35400', paddingVertical: 14, paddingHorizontal: 40, borderRadius: 12 },
+  authGateButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
 });
