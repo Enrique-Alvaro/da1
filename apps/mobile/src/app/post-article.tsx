@@ -9,6 +9,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  Text, // Importamos Text nativo
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -123,7 +124,7 @@ export default function PostArticleScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: '#FFFFFF' }]}>
       <View style={styles.headerWrap}>
         <ScreenHeader title="Postular Artículo" fallbackRoute="/home" />
       </View>
@@ -133,22 +134,22 @@ export default function PostArticleScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          <ThemedText type="small" style={styles.subtitle}>
+          <Text style={{ color: '#000000', marginBottom: 8 }}>
             Tu artículo será evaluado por nuestro equipo antes de ser incluido en una subasta.
-          </ThemedText>
+          </Text>
 
           {/* Fotos */}
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Fotos del Artículo *</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
+            <Text style={{ color: '#000000', fontWeight: 'bold' }}>Fotos del Artículo *</Text>
+            <Text style={{ color: '#6B7280', fontSize: 12 }}>
               PNG, JPG o WebP — mínimo {MIN_IMAGES}, máximo {MAX_IMAGES}
-            </ThemedText>
+            </Text>
             <View style={styles.imageRow}>
               {images.map((item) => (
                 <View key={item.uri} style={styles.imagePreviewWrap}>
                   <Image source={{ uri: item.uri }} style={styles.imagePreview} />
                   <Pressable style={styles.removeTag} onPress={() => removeImage(item.uri)}>
-                    <ThemedText type="smallBold" style={styles.removeText}>×</ThemedText>
+                    <Text style={{ color: '#000000', fontWeight: 'bold' }}>×</Text>
                   </Pressable>
                 </View>
               ))}
@@ -156,95 +157,79 @@ export default function PostArticleScreen() {
                 <Pressable
                   style={[
                     styles.uploadButton,
-                    { borderColor: imageError ? theme.error : theme.backgroundSelected, backgroundColor: theme.surface },
+                    { borderColor: imageError ? theme.error : theme.backgroundSelected },
                   ]}
                   onPress={() => pickImage(false)}
                 >
-                  <ThemedText>Subir fotos</ThemedText>
+                  <Text style={{ color: '#000000' }}>Subir fotos</Text>
                 </Pressable>
               )}
             </View>
-            <ThemedText type="small" themeColor="textSecondary">
+            <Text style={{ color: '#6B7280', fontSize: 12 }}>
               {images.length}/{MAX_IMAGES} imágenes{images.length < MIN_IMAGES ? ` (mínimo ${MIN_IMAGES})` : ''}
-            </ThemedText>
+            </Text>
             {imageError && (
-              <ThemedText style={styles.errorText}>
+              <Text style={styles.errorText}>
                 Debes subir al menos {MIN_IMAGES} imágenes del artículo.
-              </ThemedText>
+              </Text>
             )}
           </View>
 
           {/* Datos del artículo */}
           <View style={styles.section}>
-            <ThemedText style={styles.label}>Nombre del Artículo *</ThemedText>
+            <Text style={{ color: '#000000', marginBottom: 6 }}>Nombre del Artículo *</Text>
             <TextInput
               style={[
                 styles.input,
-                { borderColor: titleError ? theme.error : theme.backgroundSelected, backgroundColor: theme.surface },
+                { borderColor: titleError ? theme.error : theme.backgroundSelected },
               ]}
               value={title}
               onChangeText={setTitle}
               placeholder="Ej: Reloj Vintage 1950"
-              placeholderTextColor="#9AA0A6"
+              placeholderTextColor="#6B7280"
             />
-            {titleError && <ThemedText style={styles.errorText}>Este campo es obligatorio.</ThemedText>}
+            {titleError && <Text style={styles.errorText}>Este campo es obligatorio.</Text>}
 
-            <ThemedText style={styles.label}>Descripción *</ThemedText>
+            <Text style={{ color: '#000000', marginBottom: 6 }}>Descripción *</Text>
             <TextInput
               style={[
                 styles.textArea,
-                { borderColor: descriptionError ? theme.error : theme.backgroundSelected, backgroundColor: theme.surface },
+                { borderColor: descriptionError ? theme.error : theme.backgroundSelected },
               ]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Describe tu artículo en detalle: estado, historia, características..."
-              placeholderTextColor="#9AA0A6"
+              placeholder="Describe tu artículo en detalle..."
+              placeholderTextColor="#6B7280"
               multiline
               numberOfLines={4}
             />
             {descriptionError && (
-              <ThemedText style={styles.errorText}>La descripción debe tener al menos 10 caracteres.</ThemedText>
+              <Text style={styles.errorText}>La descripción debe tener al menos 10 caracteres.</Text>
             )}
           </View>
 
           {/* Declaraciones */}
           <View style={styles.section}>
-            <ThemedText type="subtitle">Declaraciones Obligatorias</ThemedText>
-            <View style={styles.checkboxRow}>
-              <Pressable
-                style={[styles.checkbox, { borderColor: theme.backgroundSelected }]}
-                onPress={() => setAcceptedOwner((p) => !p)}
-              >
-                <ThemedText>{acceptedOwner ? '☑' : '☐'}</ThemedText>
-              </Pressable>
-              <View style={styles.checkboxLabel}>
-                <ThemedText>Declaro que soy el propietario legítimo del artículo *</ThemedText>
+            <Text style={{ color: '#000000', fontSize: 18, fontWeight: 'bold' }}>Declaraciones Obligatorias</Text>
+            {[
+              { label: 'Declaro que soy el propietario legítimo del artículo *', state: acceptedOwner, setter: setAcceptedOwner },
+              { label: 'Declaro que el artículo no posee impedimentos legales para su venta *', state: acceptedLegal, setter: setAcceptedLegal },
+              { label: 'Acepto condiciones de envío y devolución en caso de rechazo *', state: acceptedTerms, setter: setAcceptedTerms },
+            ].map((item, index) => (
+              <View key={index} style={styles.checkboxRow}>
+                <Pressable
+                  style={[styles.checkbox, { borderColor: theme.backgroundSelected }]}
+                  onPress={() => item.setter((p) => !p)}
+                >
+                  <Text style={{ color: '#000000' }}>{item.state ? '☑' : '☐'}</Text>
+                </Pressable>
+                <View style={styles.checkboxLabel}>
+                  <Text style={{ color: '#000000' }}>{item.label}</Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.checkboxRow}>
-              <Pressable
-                style={[styles.checkbox, { borderColor: theme.backgroundSelected }]}
-                onPress={() => setAcceptedLegal((p) => !p)}
-              >
-                <ThemedText>{acceptedLegal ? '☑' : '☐'}</ThemedText>
-              </Pressable>
-              <View style={styles.checkboxLabel}>
-                <ThemedText>Declaro que el artículo no posee impedimentos legales para su venta *</ThemedText>
-              </View>
-            </View>
-            <View style={styles.checkboxRow}>
-              <Pressable
-                style={[styles.checkbox, { borderColor: theme.backgroundSelected }]}
-                onPress={() => setAcceptedTerms((p) => !p)}
-              >
-                <ThemedText>{acceptedTerms ? '☑' : '☐'}</ThemedText>
-              </Pressable>
-              <View style={styles.checkboxLabel}>
-                <ThemedText>Acepto condiciones de envío y devolución en caso de rechazo *</ThemedText>
-              </View>
-            </View>
+            ))}
             {declarationError && (
-              <ThemedText style={styles.errorText}>Debes aceptar todas las declaraciones obligatorias.</ThemedText>
+              <Text style={styles.errorText}>Debes aceptar todas las declaraciones obligatorias.</Text>
             )}
           </View>
 
@@ -256,23 +241,9 @@ export default function PostArticleScreen() {
             {isSubmitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <ThemedText type="default" style={styles.primaryButtonText}>
-                Enviar Solicitud
-              </ThemedText>
+              <Text style={{ color: '#FFFFFF', textAlign: 'center' }}>Enviar Solicitud</Text>
             )}
           </Pressable>
-
-          {hasErrors && submitAttempted && (
-            <ThemedText style={styles.formError}>
-              Revisa los datos marcados antes de enviar tu solicitud.
-            </ThemedText>
-          )}
-
-          {apiError && (
-            <View style={styles.apiErrorBox}>
-              <ThemedText style={styles.apiErrorText}>{apiError}</ThemedText>
-            </View>
-          )}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -280,88 +251,23 @@ export default function PostArticleScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'column',
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-  },
-  headerWrap: {
-    width: '100%',
-    alignSelf: 'stretch',
-  },
-  safeArea: {
-    flex: 1,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-  },
-  scroll: {
-    width: '100%',
-  },
-  content: {
-    width: '100%',
-    gap: Spacing.four,
-    paddingHorizontal: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.six,
-  },
-  subtitle: { marginTop: Spacing.one, marginBottom: Spacing.two },
-  section: { width: '100%', gap: Spacing.two },
-  sectionTitle: { marginBottom: 8 },
+  container: { flex: 1, flexDirection: 'column', width: '100%', backgroundColor: '#FFFFFF' },
+  headerWrap: { width: '100%', alignSelf: 'stretch' },
+  safeArea: { flex: 1, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  scroll: { width: '100%' },
+  content: { width: '100%', gap: 16, paddingHorizontal: 16, paddingBottom: 50 },
+  section: { width: '100%', gap: 8 },
   imageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  uploadButton: {
-    minWidth: 120,
-    minHeight: 120,
-    borderWidth: 1,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 12,
-  },
+  uploadButton: { minWidth: 120, minHeight: 120, borderWidth: 1, borderRadius: 14, justifyContent: 'center', alignItems: 'center', padding: 12, backgroundColor: '#F3F4F6' },
   imagePreviewWrap: { width: 120, height: 120, borderRadius: 14, overflow: 'hidden', position: 'relative' },
   imagePreview: { width: '100%', height: '100%' },
-  removeTag: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 14,
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeText: { color: '#333' },
-  label: { marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-  },
-  textArea: {
-    minHeight: 110,
-    borderWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    textAlignVertical: 'top',
-  },
+  removeTag: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center' },
+  input: { borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 12, backgroundColor: '#F3F4F6', color: '#000000' },
+  textArea: { minHeight: 110, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 12, textAlignVertical: 'top', backgroundColor: '#F3F4F6', color: '#000000' },
   checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   checkbox: { width: 24, height: 24, borderWidth: 1, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   checkboxLabel: { flex: 1 },
   primaryButton: { paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   primaryButtonDisabled: { opacity: 0.6 },
-  primaryButtonText: { color: '#fff' },
   errorText: { color: '#E74C3C', marginTop: 6 },
-  formError: { color: '#E74C3C', textAlign: 'center', marginTop: Spacing.two },
-  apiErrorBox: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 10,
-    padding: 14,
-    marginTop: Spacing.two,
-  },
-  apiErrorText: { color: '#DC2626', fontSize: 14 },
 });
