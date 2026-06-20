@@ -70,10 +70,6 @@ function resolveFirstNameForEmail(body: RegisterBodyInput): string {
 }
 
 function resolveFotoBuffer(body: RegisterBodyInput): Buffer | null {
-  const front = body.documentFrontImageBase64;
-  if (front != null && typeof front === "string" && front.trim().length > 0) {
-    return Buffer.from(front.trim(), "base64");
-  }
   if (body.photoBase64 != null && typeof body.photoBase64 === "string" && body.photoBase64.trim().length > 0) {
     return Buffer.from(body.photoBase64.trim(), "base64");
   }

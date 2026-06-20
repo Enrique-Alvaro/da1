@@ -283,30 +283,45 @@ export default function MisArticulosScreen() {
     );
   };
 
+  const isAuthError = error?.includes('iniciar sesión');
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <CustomNavBar />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Mis Artículos</Text>
-          <Text style={styles.subtitle}>Seguí el estado de tus envíos</Text>
+      {/* Header — se oculta si hay error de auth */}
+      {!isAuthError && (
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>Mis Artículos</Text>
+            <Text style={styles.subtitle}>Seguí el estado de tus envíos</Text>
+          </View>
+          <Pressable style={styles.newBtn} onPress={() => router.push('/post-article')}>
+            <Text style={styles.newBtnText}>+ Nuevo</Text>
+          </Pressable>
         </View>
-        <Pressable style={styles.newBtn} onPress={() => router.push('/post-article')}>
-          <Text style={styles.newBtnText}>+ Nuevo</Text>
-        </Pressable>
-      </View>
+      )}
 
       {loading ? (
         <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
       ) : error ? (
-        <View style={styles.errorState}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={load} style={styles.retryBtn}>
-            <Text style={styles.retryBtnText}>Reintentar</Text>
-          </Pressable>
-        </View>
+        isAuthError ? (
+          <View style={styles.authGate}>
+            <Text style={styles.authGateIcon}>🔒</Text>
+            <Text style={styles.authGateTitle}>Acceso restringido</Text>
+            <Text style={styles.authGateText}>Debés iniciar sesión para acceder a esta sección.</Text>
+            <Pressable style={styles.authGateButton} onPress={() => router.replace('/login')}>
+              <Text style={styles.authGateButtonText}>Iniciar sesión</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.errorState}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable onPress={load} style={styles.retryBtn}>
+              <Text style={styles.retryBtnText}>Reintentar</Text>
+            </Pressable>
+          </View>
+        )
       ) : (
         <>
           {/* Stats */}
@@ -439,4 +454,11 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 24, lineHeight: 20 },
   emptyBtn: { backgroundColor: '#D35400', paddingHorizontal: 28, paddingVertical: 13, borderRadius: 10 },
   emptyBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+
+  authGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  authGateIcon: { fontSize: 48, marginBottom: 16 },
+  authGateTitle: { fontSize: 20, fontWeight: 'bold', color: '#002855', marginBottom: 8 },
+  authGateText: { fontSize: 15, color: '#555', textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 },
+  authGateButton: { backgroundColor: '#D35400', paddingVertical: 14, paddingHorizontal: 40, borderRadius: 12 },
+  authGateButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
 });
