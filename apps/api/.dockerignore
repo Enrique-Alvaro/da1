@@ -1,0 +1,12 @@
+# Used when build context is apps/api only (prefer root context + root .dockerignore)
+node_modules
+dist
+.env
+.env.*
+!.env.example
+!.env.production.example
+tests
+coverage
+*.log
+.git
+.gitignore

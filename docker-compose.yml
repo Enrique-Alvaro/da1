@@ -1,0 +1,84 @@
+# CrownBid — production stack (API + SQL Server)
+# Usage: docker compose up -d --build
+# Env:   copy apps/api/.env.production.example → apps/api/.env.production
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: crownbid-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env or shell}
+    volumes:
+      - crownbid_sql_data:/var/opt/mssql
+    networks:
+      - crownbid
+    restart: unless-stopped
+    # Bound to localhost on the host for DBeaver via SSH tunnel.
+    # For remote DBeaver without tunnel, change to "1433:1433" (less secure).
+    ports:
+      - "127.0.0.1:${MSSQL_PUBLISH_PORT:-1433}:1433"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: crownbid-api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_NAME: ${DB_NAME:-CrownBid}
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      EMPLOYEE_ADMIN_EMAIL: ${EMPLOYEE_ADMIN_EMAIL:-admin@crownbid.local}
+      EMPLOYEE_ADMIN_PASSWORD: ${EMPLOYEE_ADMIN_PASSWORD:?Set EMPLOYEE_ADMIN_PASSWORD in .env}
+      EMPLOYEE_ADMIN_ID: ${EMPLOYEE_ADMIN_ID:-1}
+      DEFAULT_REVIEWER_EMPLOYEE_ID: ${DEFAULT_REVIEWER_EMPLOYEE_ID:-1}
+      COMPANY_CLIENT_ID: ${COMPANY_CLIENT_ID:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    ports:
+      - "${API_HOST_PORT:-3000}:3000"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - crownbid
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+networks:
+  crownbid:
+    driver: bridge
+
+volumes:
+  crownbid_sql_data:

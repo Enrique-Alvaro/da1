@@ -17,6 +17,13 @@ const rawSchema = z.object({
   /** @deprecated Preferir SQLSERVER_CONNECTION_STRING */
   DATABASE_URL: z.string().optional(),
 
+  /** Partes opcionales para armar la cadena ADO (útil en Docker Compose). */
+  DB_HOST: z.string().optional(),
+  DB_PORT: z.coerce.number().int().positive().optional(),
+  DB_NAME: z.string().optional(),
+  DB_USER: z.string().optional(),
+  DB_PASSWORD: z.string().optional(),
+
   JWT_SECRET: z.string().optional(),
   JWT_EXPIRES_IN: z.string().optional(),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().positive().optional(),
@@ -52,14 +59,29 @@ export type Env = z.infer<typeof rawSchema> & {
 
 let cached: Env | null = null;
 
+/** Construye cadena ADO desde DB_HOST/DB_PORT/... cuando no hay SQLSERVER_CONNECTION_STRING. */
+function buildConnectionStringFromParts(data: z.infer<typeof rawSchema>): string | null {
+  const host = data.DB_HOST?.trim();
+  const database = data.DB_NAME?.trim();
+  const user = data.DB_USER?.trim();
+  const password = data.DB_PASSWORD;
+  if (!host || !database || !user || password === undefined || password === "") {
+    return null;
+  }
+  const port = data.DB_PORT ?? 1433;
+  return `Server=${host},${port};Database=${database};User Id=${user};Password=${password};Encrypt=true;TrustServerCertificate=true`;
+}
+
 function resolveConnectionString(data: z.infer<typeof rawSchema>): string {
   const primary = data.SQLSERVER_CONNECTION_STRING?.trim();
   const sqlServerUnderscore = data.SQL_SERVER_CONNECTION_STRING?.trim();
   const legacy = data.DATABASE_URL?.trim();
-  const conn = primary || sqlServerUnderscore || legacy;
+  const fromParts = buildConnectionStringFromParts(data);
+  const conn = primary || sqlServerUnderscore || legacy || fromParts;
   if (!conn) {
     throw new Error(
-      "Missing connection string: set SQLSERVER_CONNECTION_STRING, SQL_SERVER_CONNECTION_STRING, or DATABASE_URL."
+      "Missing connection string: set SQLSERVER_CONNECTION_STRING (or SQL_SERVER_CONNECTION_STRING / DATABASE_URL), " +
+        "or DB_HOST + DB_NAME + DB_USER + DB_PASSWORD."
     );
   }
   if (conn.includes("jdbc:")) {

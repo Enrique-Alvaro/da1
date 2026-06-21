@@ -16,6 +16,10 @@
     "web": "npm --workspace @crownbid/mobile run web",
     "expo": "node scripts/expo-mobile.mjs",
     "lint": "npm --workspace @crownbid/mobile run lint",
-    "reset-project": "node ./scripts/reset-project.js"
+    "reset-project": "node ./scripts/reset-project.js",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f api"
   }
 }

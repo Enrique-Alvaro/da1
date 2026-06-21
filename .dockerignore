@@ -1,0 +1,55 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Secrets and local env
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
+
+# Build artifacts
+dist
+**/dist
+build
+**/build
+
+# Tests and coverage
+coverage
+**/coverage
+**/*.test.ts
+**/*.spec.ts
+apps/api/tests
+
+# Mobile app (not needed for API image)
+apps/mobile
+
+# VCS and IDE
+.git
+.gitignore
+**/.git
+**/.DS_Store
+__MACOSX
+**/__MACOSX
+.vscode
+.idea
+
+# Logs and caches
+*.log
+npm-debug.log*
+.expo
+**/.expo
+.cache
+**/.cache
+
+# Docs and misc (optional slimming)
+docs
+audit
+*.md
+!apps/api/README.md
+
+# Docker meta (avoid recursive copy noise)
+docker-compose*.yml
+Dockerfile*
