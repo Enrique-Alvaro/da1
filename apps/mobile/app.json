@@ -1,11 +1,11 @@
 {
   "expo": {
-  "name": "DesarrolloDeApis1TP",
-  "slug": "desarrollodeapis1tp",
+    "name": "DesarrolloDeApis1TP",
+    "slug": "desarrollodeapis1tp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-  "scheme": "desarrollodeapis1tp",
+    "scheme": "desarrollodeapis1tp",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -45,9 +45,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0bb0e307-ff43-49d7-a154-d8e9fb6e3939"
+        "projectId": "5de14bf6-0968-4862-8ce8-d60cdc6c7778"
       }
     },
-    "owner": "juanpeirettis-organization"
+    "owner": "nasserelbacha2002"
   }
 }

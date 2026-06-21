@@ -20,6 +20,8 @@ const API_BASE_URL =
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
   'http://localhost:3000/api';
 
+console.log('[CrownBid API_BASE_URL]', API_BASE_URL);
+
 let authToken: string | null = null;
 let tokenHydrated = false;
 
@@ -86,10 +88,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  const url = `${API_BASE_URL}${path}`;
+  console.log('[CrownBid Request]', url);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    console.warn('[CrownBid Request failed]', url, error);
+    throw error;
+  }
   if (!response.ok) {
     const payload = await parseResponse<ApiError>(response);
     const error: ApiError = {
