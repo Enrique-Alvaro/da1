@@ -11,6 +11,7 @@ COPY apps/api/package.json apps/api/
 RUN npm ci --workspace @crownbid/api
 
 COPY apps/api/tsconfig.json apps/api/
+COPY apps/api/tsconfig.build.json apps/api/
 COPY apps/api/src apps/api/src
 
 RUN npm run build --workspace @crownbid/api
