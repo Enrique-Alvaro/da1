@@ -35,6 +35,7 @@ const VISUAL_BY_TYPE: Record<string, NotificationVisual> = {
   submission_accepted: { icon: '✓', backgroundColor: '#F0FDF4', borderColor: '#A7F3D0' },
   submission_rejected: { icon: '✕', backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   submission_pending: { icon: '📦', backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  submission_custody_updated: { icon: '🏷', backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' },
   client_admitted: { icon: '✓', backgroundColor: '#F0FDF4', borderColor: '#A7F3D0' },
 };
 
@@ -79,6 +80,7 @@ export function resolveNotificationNavigation(
     case 'submission_accepted':
     case 'submission_rejected':
     case 'submission_pending':
+    case 'submission_custody_updated':
       return { type: 'submissions' };
     default:
       if (auctionId != null && itemId != null) {

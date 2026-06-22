@@ -5,15 +5,18 @@ import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthSessionGuard } from '@/components/AuthSessionGuard';
+import { AuctionTickerProvider } from '@/contexts/AuctionTickerContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthSessionGuard />
-      <AnimatedSplashOverlay />
-      <Slot />
+      <AuctionTickerProvider>
+        <AuthSessionGuard />
+        <AnimatedSplashOverlay />
+        <Slot />
+      </AuctionTickerProvider>
     </ThemeProvider>
   );
 }

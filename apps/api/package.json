@@ -12,6 +12,7 @@
     "test": "vitest run",
     "db:test": "tsx scripts/test-db-connection.ts",
     "seed:demo": "tsx scripts/seed-demo-data.ts",
+    "seed:live-auction-demo": "tsx scripts/seed-live-auction-demo.ts",
     "approve-client": "tsx scripts/approve-client.ts"
   },
   "dependencies": {

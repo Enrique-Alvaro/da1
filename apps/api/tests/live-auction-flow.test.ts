@@ -13,7 +13,10 @@ import {
   pickCurrentItemId,
   getLiveAuctionState,
   getBidHistory,
+  getCatalogItemDetail,
 } from "../src/modules/subastas/subastas.service";
+import { mapSubastaStatus } from "../src/modules/subastas/subastas-access.service";
+import { areAllCatalogItemsSold } from "../src/modules/subastas/subastas-current-item";
 import { assertCategoryAllowed, assertCanBid } from "../src/modules/pujos/pujos.service";
 import { assertPaymentMethodForBid } from "../src/modules/pujos/pujos-payment-validation";
 import * as liveSessionStore from "../src/modules/subastas/live-session.store";
@@ -92,6 +95,60 @@ describe("Live auction flow", () => {
       },
     ];
     expect(pickCurrentItemId(items, "live")).toBe(2);
+  });
+
+  it("areAllCatalogItemsSold is true only when every item is sold", () => {
+    const sold: CatalogItemRow = {
+      identificador: 1,
+      catalogo: 1,
+      producto: 1,
+      precioBase: 100,
+      comision: 10,
+      subastado: "si",
+      descripcionCatalogo: "A",
+      descripcionCompleta: "url",
+      subastaId: 10,
+      catalogDescription: null,
+      isSoldInRegistro: 0,
+      duenio: 1,
+      numeroPieza: "1",
+      artistaODisenador: null,
+      fechaOrigen: null,
+      historia: null,
+      componentes: null,
+      depositoUbicacion: null,
+      seguroPoliza: null,
+    };
+    const pending: CatalogItemRow = { ...sold, identificador: 2, subastado: "no" };
+    expect(areAllCatalogItemsSold([sold, pending])).toBe(false);
+    expect(areAllCatalogItemsSold([sold, { ...sold, identificador: 2 }])).toBe(true);
+  });
+
+  it("mapSubastaStatus returns closed when all catalog items are sold", () => {
+    const items: CatalogItemRow[] = [
+      {
+        identificador: 1,
+        catalogo: 1,
+        producto: 1,
+        precioBase: 100,
+        comision: 10,
+        subastado: "si",
+        descripcionCatalogo: "A",
+        descripcionCompleta: "url",
+        subastaId: 10,
+        catalogDescription: null,
+        isSoldInRegistro: 1,
+        duenio: 1,
+        numeroPieza: "1",
+        artistaODisenador: null,
+        fechaOrigen: null,
+        historia: null,
+        componentes: null,
+        depositoUbicacion: null,
+        seguroPoliza: null,
+      },
+    ];
+    expect(mapSubastaStatus(subastaAbierta, items)).toBe("closed");
   });
 
   it("assertCategoryAllowed blocks lower category", () => {
@@ -326,6 +383,187 @@ describe("Live auction flow", () => {
     expect(history.order).toBe("newest_first");
     expect(history.bids[0].id).toBe(2);
     expect(history.bids[0].isWinning).toBe(true);
+  });
+
+  it("sold catalog item cannot enter live room", async () => {
+    const soldItem: CatalogItemRow = {
+      identificador: 100,
+      catalogo: 1,
+      producto: 1,
+      precioBase: 10000,
+      comision: 1000,
+      subastado: "si",
+      descripcionCatalogo: "Reloj vendido",
+      descripcionCompleta: "http://x",
+      subastaId: 10,
+      catalogDescription: null,
+      isSoldInRegistro: 1,
+      duenio: 99,
+      numeroPieza: 1,
+      artistaODisenador: null,
+      fechaOrigen: null,
+      historia: null,
+      componentes: null,
+    };
+    const liveItem: CatalogItemRow = {
+      identificador: 101,
+      catalogo: 1,
+      producto: 2,
+      precioBase: 20000,
+      comision: 2000,
+      subastado: "no",
+      descripcionCatalogo: "Siguiente",
+      descripcionCompleta: "http://y",
+      subastaId: 10,
+      catalogDescription: null,
+      isSoldInRegistro: 0,
+      duenio: 99,
+      numeroPieza: 2,
+      artistaODisenador: null,
+      fechaOrigen: null,
+      historia: null,
+      componentes: null,
+    };
+
+    vi.spyOn(itemsRepository, "requireCatalogItemById").mockResolvedValue(soldItem);
+    vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(subastaAbierta);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([soldItem, liveItem]);
+    vi.spyOn(liveRepo, "findWinningBidForItem").mockResolvedValue({
+      identificador: 1,
+      importe: 12000,
+      cliente: 8,
+      numeroPostor: 2,
+    });
+    vi.spyOn(itemsRepository, "listPhotoIdsByProduct").mockResolvedValue([1]);
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
+      identificador: 7,
+      admitido: "si",
+      categoria: "platino",
+    });
+    vi.spyOn(paymentMethodsRepository, "listByCliente").mockResolvedValue([
+      {
+        identificador: 1,
+        cliente: 7,
+        tipo: "tarjeta_credito",
+        estado: "verificado",
+        moneda: "ARS",
+        titular: "J",
+        entidad: null,
+        ultimosDigitos: "1234",
+        aliasOCbu: null,
+        montoGarantia: null,
+        montoDisponible: null,
+        motivoRechazo: null,
+        verificador: 1,
+        creadoEn: new Date(),
+        actualizadoEn: new Date(),
+        verificadoEn: new Date(),
+      },
+    ]);
+
+    const detail = await getCatalogItemDetail(100, authCliente);
+    expect(detail.status).toBe("sold");
+    expect(detail.canEnterLive).toBe(false);
+  });
+
+  it("watched sold item is finalized even when another item is live", async () => {
+    liveSessionStore.enterSession(7, 10);
+    const soldItem: CatalogItemRow = {
+      identificador: 100,
+      catalogo: 1,
+      producto: 1,
+      precioBase: 10000,
+      comision: 1000,
+      subastado: "si",
+      descripcionCatalogo: "Reloj vendido",
+      descripcionCompleta: "http://x",
+      subastaId: 10,
+      catalogDescription: null,
+      isSoldInRegistro: 1,
+      duenio: 99,
+      numeroPieza: 1,
+      artistaODisenador: null,
+      fechaOrigen: null,
+      historia: null,
+      componentes: null,
+    };
+    const liveItem: CatalogItemRow = {
+      identificador: 101,
+      catalogo: 1,
+      producto: 2,
+      precioBase: 20000,
+      comision: 2000,
+      subastado: "no",
+      descripcionCatalogo: "Siguiente",
+      descripcionCompleta: "http://y",
+      subastaId: 10,
+      catalogDescription: null,
+      isSoldInRegistro: 0,
+      duenio: 99,
+      numeroPieza: 2,
+      artistaODisenador: null,
+      fechaOrigen: null,
+      historia: null,
+      componentes: null,
+    };
+
+    vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(subastaAbierta);
+    vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
+      identificador: 7,
+      admitido: "si",
+      categoria: "platino",
+    });
+    vi.spyOn(paymentMethodsRepository, "listByCliente").mockResolvedValue([
+      {
+        identificador: 1,
+        cliente: 7,
+        tipo: "tarjeta_credito",
+        estado: "verificado",
+        moneda: "ARS",
+        titular: "J",
+        entidad: null,
+        ultimosDigitos: "1234",
+        aliasOCbu: null,
+        montoGarantia: null,
+        montoDisponible: null,
+        motivoRechazo: null,
+        verificador: 1,
+        creadoEn: new Date(),
+        actualizadoEn: new Date(),
+        verificadoEn: new Date(),
+      },
+    ]);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([soldItem, liveItem]);
+    vi.spyOn(liveRepo, "findWinningBidForItem").mockResolvedValue({
+      identificador: 1,
+      importe: 12000,
+      cliente: 8,
+      numeroPostor: 2,
+    });
+    vi.spyOn(liveRepo, "listBidHistoryBySubasta").mockResolvedValue([]);
+    vi.spyOn(closingRepository, "findRegistroByProductoAndSubasta").mockImplementation(
+      async (productId: number) =>
+        productId === 1
+          ? {
+              identificador: 500,
+              subasta: 10,
+              producto: 1,
+              cliente: 8,
+              importe: 12000,
+              comision: 1000,
+              duenio: 99,
+            }
+          : null
+    );
+    vi.spyOn(usersRepository, "findProfileByPersonId").mockResolvedValue({
+      full_name: "Ganador Demo",
+    } as never);
+
+    const state = await getLiveAuctionState(10, authCliente, 100);
+    expect(state.isFinalized).toBe(true);
+    expect(state.soldItemId).toBe(100);
+    expect(state.currentItem?.id).toBe(101);
+    expect(state.watchedItem?.isCurrentItem).toBe(false);
   });
 
   it("metrics return zeros for unknown cliente", async () => {

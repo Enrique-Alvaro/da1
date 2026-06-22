@@ -53,7 +53,8 @@ export function combineSubastaDateTime(
   if (!dateStr || !timeStr) {
     return null;
   }
-  const parsed = new Date(`${dateStr}T${timeStr}`);
+  // SQL TIME/DATE values are read as UTC wall-clock via formatTimePart/formatDatePart.
+  const parsed = new Date(`${dateStr}T${timeStr}Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 

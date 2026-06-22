@@ -16,6 +16,9 @@ import {
 
 export const productosRoutes = Router();
 
+/** Public catalog photos (React Native Image cannot send Bearer tokens). */
+productosRoutes.get("/:id/photos/:photoId", getProductPhoto);
+
 productosRoutes.use(requireAuth, requireAccessToken);
 
 const clientSubmissionChain = [
@@ -40,5 +43,4 @@ productosRoutes.post(
 );
 
 productosRoutes.get("/", listProductos);
-productosRoutes.get("/:id/photos/:photoId", getProductPhoto);
 productosRoutes.get("/:id", getProducto);

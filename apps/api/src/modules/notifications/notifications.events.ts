@@ -1,6 +1,7 @@
 import * as notificationsService from "./notifications.service";
 import type { CreateNotificationInput } from "./notifications.types";
 import * as notificationsRepository from "./notifications.repository";
+import { findClienteByPersonId } from "../users/users.repository";
 
 function formatMoney(amount: number, currency: string): string {
   return `${currency} ${amount.toLocaleString("es-AR", { minimumFractionDigits: 0 })}`;
@@ -156,6 +157,91 @@ export async function notifyLeadingBid(params: {
     itemId: params.itemId,
     idempotencyKey: `leading:${params.itemId}:${params.clienteId}:${params.bidId}`,
   });
+}
+
+export type SubmissionCustodyChangeKind = "deposit" | "insurance" | "both";
+
+function buildSubmissionCustodyMessage(params: {
+  itemTitle: string;
+  submissionId: number;
+  kind: SubmissionCustodyChangeKind;
+  depositLocation?: string | null;
+  insurancePolicy?: string | null;
+  insuranceCompany?: string | null;
+}): string {
+  const name = params.itemTitle.trim() || `Artículo #${params.submissionId}`;
+  const detailParts: string[] = [];
+
+  if (params.kind === "deposit" || params.kind === "both") {
+    if (params.depositLocation?.trim()) {
+      detailParts.push(`Depósito: ${params.depositLocation.trim()}`);
+    }
+  }
+  if (params.kind === "insurance" || params.kind === "both") {
+    const policy = params.insurancePolicy?.trim();
+    const company = params.insuranceCompany?.trim();
+    if (policy) {
+      detailParts.push(
+        company ? `Póliza ${policy} (${company})` : `Póliza ${policy}`
+      );
+    }
+  }
+
+  const details = detailParts.length > 0 ? ` ${detailParts.join(". ")}.` : "";
+  return `Se asignó el depósito y/o la póliza de seguro de "${name}".${details}`;
+}
+
+function custodyIdempotencyKey(
+  kind: SubmissionCustodyChangeKind,
+  submissionId: number,
+  depositLocation?: string | null,
+  insurancePolicy?: string | null,
+  insuranceCompany?: string | null
+): string {
+  const depositPart = (depositLocation ?? "").trim().slice(0, 40);
+  const policyPart = (insurancePolicy ?? "").trim();
+  const companyPart = (insuranceCompany ?? "").trim().slice(0, 40);
+  return `custody:${kind}:${submissionId}:${depositPart}:${policyPart}:${companyPart}`;
+}
+
+/** Notifies the product owner when deposit and/or insurance custody data changes. */
+export async function notifySubmissionCustodyUpdated(params: {
+  ownerDuenioId: number;
+  submissionId: number;
+  itemTitle: string;
+  auctionId?: number | null;
+  catalogItemId?: number | null;
+  kind: SubmissionCustodyChangeKind;
+  depositLocation?: string | null;
+  insurancePolicy?: string | null;
+  insuranceCompany?: string | null;
+}): Promise<void> {
+  try {
+    const cliente = await findClienteByPersonId(params.ownerDuenioId);
+    if (!cliente) {
+      return;
+    }
+
+    const input: CreateNotificationInput = {
+      clienteId: cliente.identificador,
+      type: "submission_custody_updated",
+      title: "Tu artículo fue actualizado",
+      message: buildSubmissionCustodyMessage(params),
+      submissionId: params.submissionId,
+      auctionId: params.auctionId ?? null,
+      itemId: params.catalogItemId ?? null,
+      idempotencyKey: custodyIdempotencyKey(
+        params.kind,
+        params.submissionId,
+        params.depositLocation,
+        params.insurancePolicy,
+        params.insuranceCompany
+      ),
+    };
+    await notificationsService.createNotificationSafe(input);
+  } catch {
+    /* notification side-effects must not break custody updates */
+  }
 }
 
 export async function emitItemCloseNotifications(params: {

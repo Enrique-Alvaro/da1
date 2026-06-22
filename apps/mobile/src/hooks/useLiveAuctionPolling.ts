@@ -50,10 +50,7 @@ export function useLiveAuctionPolling({
         onItemChangedRef.current?.(state);
       }
 
-      const itemClosed =
-        state.isFinalized &&
-        (state.soldItemId === watchedItemId ||
-          (state.soldItemId == null && state.currentItem?.id === watchedItemId));
+      const itemClosed = state.isFinalized && state.soldItemId === watchedItemId;
 
       if (itemClosed && !finalizedRef.current) {
         finalizedRef.current = true;

@@ -18,13 +18,7 @@ function formatDate(value: Date | string | null): string | null {
 }
 
 function formatTime(value: Date | string | null): string | null {
-  if (value == null) {
-    return null;
-  }
-  if (value instanceof Date) {
-    return value.toISOString().slice(11, 19);
-  }
-  return String(value);
+  return formatTimePart(value);
 }
 
 export type ItemLifecycleStatus = "pending" | "live" | "sold" | "closed";
@@ -141,6 +135,6 @@ export function mapCatalogItem(
     auctionId: params.auctionId,
     status: params.itemStatus,
     auctioned: row.subastado,
-    imageUrls: params.photoIds.map((pid) => `/api/products/${row.producto}/photos/${pid}`),
+    imageUrls: params.photoIds.map((pid) => `/api/productos/${row.producto}/photos/${pid}`),
   };
 }

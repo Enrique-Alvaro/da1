@@ -12,6 +12,7 @@ export const NOTIFICATION_TYPES = [
   "submission_pending",
   "submission_accepted",
   "submission_rejected",
+  "submission_custody_updated",
   "payment_pending",
   "payment_confirmed",
 ] as const;

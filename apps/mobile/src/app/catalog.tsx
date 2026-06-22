@@ -1,14 +1,17 @@
+import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { fetchAuctionDetail, fetchAuctionItems } from '@/services/api';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type AuctionDetail = {
   id: number;
   date: string | null;
   time: string | null;
+  endTime: string | null;
   status: 'scheduled' | 'live' | 'closed';
   category: string | null;
   currency: string;
@@ -65,28 +68,39 @@ export default function CatalogScreen() {
   const auctionId = Number(catalogId);
 
   const [auction, setAuction] = useState<AuctionDetail | null>(null);
+  const [displayStatus, setDisplayStatus] = useState<AuctionDetail['status']>('scheduled');
   const [items, setItems] = useState<AuctionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      if (!auctionId) { setError('Subasta inválida.'); setLoading(false); return; }
-      try {
-        const [detail, itemsResult] = await Promise.all([
-          fetchAuctionDetail(auctionId) as Promise<AuctionDetail>,
-          fetchAuctionItems(auctionId) as Promise<{ items: AuctionItem[] }>,
-        ]);
-        setAuction(detail);
-        setItems(itemsResult?.items ?? []);
-      } catch (e: any) {
-        setError(e?.message || 'No se pudo cargar la subasta.');
-      } finally {
-        setLoading(false);
-      }
+  const load = useCallback(async () => {
+    if (!auctionId) {
+      setError('Subasta inválida.');
+      setLoading(false);
+      return;
     }
-    load();
+    setLoading(true);
+    setError(null);
+    try {
+      const [detail, itemsResult] = await Promise.all([
+        fetchAuctionDetail(auctionId) as Promise<AuctionDetail>,
+        fetchAuctionItems(auctionId) as Promise<{ items: AuctionItem[] }>,
+      ]);
+      setAuction(detail);
+      setDisplayStatus(detail.status);
+      setItems(itemsResult?.items ?? []);
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo cargar la subasta.');
+    } finally {
+      setLoading(false);
+    }
   }, [auctionId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -117,11 +131,23 @@ export default function CatalogScreen() {
             <Text style={styles.title}>
               Subasta #{auction.id}
             </Text>
-            <View style={[styles.statusBadge, { backgroundColor: STATUS_BG[auction.status] }]}>
-              <Text style={[styles.statusBadgeText, { color: STATUS_COLOR[auction.status] }]}>
-                {STATUS_LABEL[auction.status] ?? auction.status}
+            <View style={[styles.statusBadge, { backgroundColor: STATUS_BG[displayStatus] }]}>
+              <Text style={[styles.statusBadgeText, { color: STATUS_COLOR[displayStatus] }]}>
+                {STATUS_LABEL[displayStatus] ?? displayStatus}
               </Text>
             </View>
+          </View>
+
+          <View style={styles.countdownCard}>
+            <AuctionCountdown
+              date={auction.date}
+              time={auction.time}
+              endTime={auction.endTime}
+              status={displayStatus}
+              variant="detail"
+              onStatusChange={setDisplayStatus}
+              onExpired={() => setDisplayStatus('closed')}
+            />
           </View>
 
           {/* Info grid */}
@@ -134,8 +160,14 @@ export default function CatalogScreen() {
             )}
             {auction.time && (
               <View style={styles.infoCard}>
-                <Text style={styles.infoLabel}>Hora</Text>
+                <Text style={styles.infoLabel}>Inicio</Text>
                 <Text style={styles.infoValue}>{auction.time.slice(0, 5)}</Text>
+              </View>
+            )}
+            {auction.endTime && (
+              <View style={styles.infoCard}>
+                <Text style={styles.infoLabel}>Cierre</Text>
+                <Text style={styles.infoValue}>{auction.endTime.slice(0, 5)}</Text>
               </View>
             )}
             <View style={styles.infoCard}>
@@ -242,6 +274,15 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', color: '#002855', flex: 1, marginRight: 10 },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusBadgeText: { fontSize: 13, fontWeight: '700' },
+
+  countdownCard: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    padding: 14,
+    marginBottom: 16,
+  },
 
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 28 },
   infoCard: { width: '47%', backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1, borderColor: '#E6E9EB', padding: 14 },

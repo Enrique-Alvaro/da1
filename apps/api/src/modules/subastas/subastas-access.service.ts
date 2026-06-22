@@ -6,6 +6,8 @@ import type { AuthUserContext } from "../../shared/types/auth";
 import * as paymentMethodsRepository from "../payment-methods/payment-methods.repository";
 import * as usersRepository from "../users/users.repository";
 import { SUBASTA_ESTADO_ABIERTA, type SubastaRow } from "./subastas.repository";
+import type { CatalogItemRow } from "./subastas-items.repository";
+import { areAllCatalogItemsSold } from "./subastas-current-item";
 import * as liveSessionStore from "./live-session.store";
 import { getEffectiveAuctionStatus } from "./subastas-schedule";
 
@@ -32,8 +34,15 @@ export type AuctionAccessSnapshot = {
   liveSessionAuctionId: number | null;
 };
 
-export function mapSubastaStatus(subasta: SubastaRow): "scheduled" | "live" | "closed" {
-  return getEffectiveAuctionStatus(subasta);
+export function mapSubastaStatus(
+  subasta: SubastaRow,
+  items?: CatalogItemRow[]
+): "scheduled" | "live" | "closed" {
+  const base = getEffectiveAuctionStatus(subasta);
+  if (items && items.length > 0 && areAllCatalogItemsSold(items)) {
+    return "closed";
+  }
+  return base;
 }
 
 export function isAuctionOpen(subasta: SubastaRow): boolean {

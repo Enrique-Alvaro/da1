@@ -189,6 +189,8 @@ export async function persistItemClose(
       throw new Error("INSERT registroDeSubasta did not return row");
     }
 
+    await closeAuctionIfAllItemsSoldInTransaction(tx, input.auctionId);
+
     await tx.commit();
     return registro;
   } catch (err) {
@@ -199,6 +201,36 @@ export async function persistItemClose(
     }
     throw err;
   }
+}
+
+/** When every catalog item is sold, persist subasta as carrada (closed). */
+export async function closeAuctionIfAllItemsSoldInTransaction(
+  tx: sql.Transaction,
+  auctionId: number
+): Promise<boolean> {
+  const countReq = new sql.Request(tx);
+  countReq.input("subasta", sql.Int, auctionId);
+  const countRes = await countReq.query<{ n: number }>(`
+    SELECT COUNT_BIG(1) AS n
+    FROM dbo.itemsCatalogo AS ic
+    INNER JOIN dbo.catalogos AS cat ON cat.identificador = ic.catalogo
+    WHERE cat.subasta = @subasta
+      AND LOWER(LTRIM(RTRIM(ISNULL(ic.subastado, N'')))) <> N'si'
+  `);
+  const unsold = Number(countRes.recordset[0]?.n ?? 0);
+  if (unsold > 0) {
+    return false;
+  }
+
+  const closeReq = new sql.Request(tx);
+  closeReq.input("subasta", sql.Int, auctionId);
+  await closeReq.query(`
+    UPDATE dbo.subastas
+    SET estado = N'carrada'
+    WHERE identificador = @subasta
+      AND LOWER(LTRIM(RTRIM(ISNULL(estado, N'')))) = N'abierta'
+  `);
+  return true;
 }
 
 /** Marca ítem vendido sin registroDeSubasta (compra empresa cuando COMPANY_CLIENT_ID no está definido). */

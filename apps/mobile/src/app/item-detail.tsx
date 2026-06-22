@@ -1,9 +1,12 @@
+import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { ThemedText } from '@/components/themed-text';
-import { fetchItem } from '@/services/api';
+import { fetchAuctionDetail, fetchItem } from '@/services/api';
+import type { AuctionScheduleFields } from '@/types/auction';
 import { BID_DENIAL_MESSAGES } from '@/utils/bidErrors';
 import { resolveProductImageUrl } from '@/utils/images';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -55,23 +58,55 @@ export default function ItemDetailScreen() {
   const { itemId, auctionId } = useLocalSearchParams<{ itemId: string; auctionId: string }>();
 
   const [item, setItem] = useState<ItemDetail | null>(null);
+  const [auctionSchedule, setAuctionSchedule] = useState<AuctionScheduleFields | null>(null);
+  const [displayAuctionStatus, setDisplayAuctionStatus] = useState<ItemDetail['auctionStatus']>('scheduled');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      if (!itemId) { setError('Ítem inválido.'); setLoading(false); return; }
-      try {
-        const result = await (fetchItem(Number(itemId)) as Promise<ItemDetail>);
-        setItem(result);
-      } catch (e: any) {
-        setError(e?.message || 'No se pudo cargar el artículo.');
-      } finally {
-        setLoading(false);
-      }
+  const loadItem = useCallback(async () => {
+    if (!itemId) {
+      setError('Ítem inválido.');
+      setLoading(false);
+      return;
     }
-    load();
-  }, [itemId]);
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await (fetchItem(Number(itemId)) as Promise<ItemDetail>);
+      setItem(result);
+      setDisplayAuctionStatus(result.auctionStatus);
+      const auctionIdForSchedule = result.auctionId ?? Number(auctionId);
+      if (auctionIdForSchedule) {
+        try {
+          const detail = await (fetchAuctionDetail(auctionIdForSchedule) as Promise<AuctionScheduleFields & { status: ItemDetail['auctionStatus'] }>);
+          setAuctionSchedule({
+            date: detail.date,
+            time: detail.time,
+            endTime: detail.endTime,
+            status: detail.status,
+          });
+          setDisplayAuctionStatus(detail.status);
+        } catch {
+          setAuctionSchedule(null);
+        }
+      }
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo cargar el artículo.');
+    } finally {
+      setLoading(false);
+    }
+  }, [itemId, auctionId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadItem();
+    }, [loadItem])
+  );
+
+  const effectiveAuctionId = item?.auctionId ?? Number(auctionId);
+  const isItemLive = item?.status === 'live';
+  const canEnterLiveNow =
+    !!item?.canEnterLive && displayAuctionStatus === 'live' && isItemLive;
 
   if (loading) {
     return (
@@ -104,7 +139,6 @@ export default function ItemDetailScreen() {
     );
   }
 
-  const effectiveAuctionId = item.auctionId ?? Number(auctionId);
   const primaryImage = resolveProductImageUrl(item.imageUrls?.[0]);
 
   return (
@@ -150,6 +184,27 @@ export default function ItemDetailScreen() {
           ) : null}
 
           {/* Precios */}
+          {auctionSchedule && isItemLive ? (
+            <View style={styles.countdownCard}>
+              <AuctionCountdown
+                date={auctionSchedule.date}
+                time={auctionSchedule.time}
+                endTime={auctionSchedule.endTime}
+                status={displayAuctionStatus}
+                variant="detail"
+                onStatusChange={setDisplayAuctionStatus}
+                onExpired={() => setDisplayAuctionStatus('closed')}
+              />
+            </View>
+          ) : item.status === 'sold' ? (
+            <View style={styles.soldBanner}>
+              <Text style={styles.soldBannerTitle}>Artículo vendido</Text>
+              <Text style={styles.soldBannerText}>
+                Este ítem ya fue adjudicado y no admite nuevas ofertas.
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.priceBox}>
             {item.basePrice != null && (
               <View style={styles.priceRow}>
@@ -200,7 +255,7 @@ export default function ItemDetailScreen() {
 
       {/* Botón inferior */}
       <View style={styles.bottomBar}>
-        {item.canEnterLive ? (
+        {canEnterLiveNow ? (
           <Pressable
             style={styles.actionButton}
             onPress={() => router.push({
@@ -222,9 +277,13 @@ export default function ItemDetailScreen() {
             <Text style={styles.actionButtonText}>
               {item.isOwner
                 ? 'No podés pujar sobre un artículo propio.'
-                : item.auctionStatus === 'closed'
+                : item.status === 'sold'
+                ? 'Artículo vendido'
+                : item.status === 'closed'
+                ? 'Artículo cerrado'
+                : displayAuctionStatus === 'closed'
                 ? 'Subasta finalizada'
-                : item.auctionStatus === 'scheduled'
+                : displayAuctionStatus === 'scheduled'
                 ? 'Subasta aún no comenzó'
                 : 'No disponible'}
             </Text>
@@ -260,6 +319,26 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: 'bold', color: '#002855', marginBottom: 8 },
   description: { fontSize: 15, color: '#4A5568', lineHeight: 22, marginBottom: 20 },
   metaLine: { fontSize: 13, color: '#6B7280', marginBottom: 4 },
+
+  countdownCard: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    padding: 14,
+    marginBottom: 16,
+  },
+  soldBanner: {
+    backgroundColor: '#F3E8FF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    padding: 14,
+    marginBottom: 16,
+    gap: 4,
+  },
+  soldBannerTitle: { fontSize: 16, fontWeight: '700', color: '#6B21A8' },
+  soldBannerText: { fontSize: 13, color: '#7C3AED' },
 
   priceBox: { backgroundColor: '#F8F9FA', borderRadius: 12, padding: 18, marginBottom: 20, gap: 12 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

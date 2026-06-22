@@ -1,18 +1,12 @@
 import type { SubastaRow } from "../../src/modules/subastas/subastas.repository";
 
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/** Local wall-clock time string for subasta hora/horaFin fields. */
+/** UTC wall-clock time string (matches SQL Server GETDATE() / mssql TIME reads). */
 export function localTimeWithOffset(minutes: number): string {
-  const d = new Date(Date.now() + minutes * 60_000);
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return new Date(Date.now() + minutes * 60_000).toISOString().slice(11, 19);
 }
 
 export function todayDateString(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return new Date().toISOString().slice(0, 10);
 }
 
 /** Subasta row that is effectively live at the current instant. */

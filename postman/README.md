@@ -101,6 +101,16 @@ See [MISSING_EMPLOYEE_ENDPOINTS.md](./MISSING_EMPLOYEE_ENDPOINTS.md). Summary of
 
 Still deferred: image upload by employee, auction delete, bulk winners list, payment/shipping updates.
 
+## Live auction demo (E2E testing)
+
+Seed a 10-minute live auction with 3 lots, 6 photos each, and a competitor bid on lot 1:
+
+```bash
+npm run seed:live-auction-demo
+```
+
+See [docs/live-auction-demo.md](../docs/live-auction-demo.md) for credentials, auction IDs, and the employee **close item** flow (`POST /api/subastas/:id/items/:itemId/cerrar`).
+
 Apply migration before testing rejection:
 
 ```bash

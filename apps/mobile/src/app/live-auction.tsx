@@ -1,7 +1,10 @@
+import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { ThemedText } from '@/components/themed-text';
 import { useLiveAuctionPolling } from '@/hooks/useLiveAuctionPolling';
 import {
   enterLiveSession,
+  fetchAuctionDetail,
+  fetchItem,
   fetchItemResult,
   fetchPaymentMethods,
   leaveLiveSession,
@@ -9,6 +12,7 @@ import {
   registerAsistente,
 } from '@/services/api';
 import type { ItemFinalizationResult, LiveAuctionState } from '@/services/types';
+import type { AuctionScheduleFields } from '@/types/auction';
 import { resolveBidErrorMessage } from '@/utils/bidErrors';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -153,6 +157,8 @@ export default function LiveAuctionScreen() {
   const [finalResult, setFinalResult] = useState<ItemFinalizationResult | null>(null);
   const [resultLoading, setResultLoading] = useState(false);
   const [auctionEnded, setAuctionEnded] = useState(false);
+  const [auctionSchedule, setAuctionSchedule] = useState<AuctionScheduleFields | null>(null);
+  const [displayAuctionStatus, setDisplayAuctionStatus] = useState<AuctionScheduleFields['status']>('live');
   const [waitingNextItem, setWaitingNextItem] = useState(false);
 
   const sessionEntered = useRef(false);
@@ -246,6 +252,7 @@ export default function LiveAuctionScreen() {
 
     if (liveState.status === 'closed') {
       setAuctionEnded(true);
+      setDisplayAuctionStatus('closed');
     }
   }, [liveState, itemFinalized, bidAmount, itmId]);
 
@@ -258,6 +265,26 @@ export default function LiveAuctionScreen() {
   useEffect(() => {
     async function setup() {
       try {
+        const itemDetail = await (fetchItem(itmId) as Promise<{ status: string }>);
+        if (itemDetail.status === 'sold' || itemDetail.status === 'closed') {
+          setItemFinalized(true);
+          setSetupLoading(false);
+          void loadResult();
+          return;
+        }
+
+        const detail = await (fetchAuctionDetail(aucId) as Promise<AuctionScheduleFields>);
+        setAuctionSchedule({
+          date: detail.date,
+          time: detail.time,
+          endTime: detail.endTime,
+          status: detail.status,
+        });
+        setDisplayAuctionStatus(detail.status);
+        if (detail.status === 'closed') {
+          setAuctionEnded(true);
+        }
+
         await registerAsistente(aucId);
         await enterLiveSession(aucId);
         sessionEntered.current = true;
@@ -283,7 +310,7 @@ export default function LiveAuctionScreen() {
         leaveLiveSession(aucId).catch(() => {});
       }
     };
-  }, [aucId, displayCurrency]);
+  }, [aucId, displayCurrency, itmId, loadResult]);
 
   function goToNextItem() {
     if (!liveState?.currentItem) return;
@@ -373,11 +400,13 @@ export default function LiveAuctionScreen() {
     }
   }
 
+  const auctionClosed = auctionEnded || displayAuctionStatus === 'closed';
+
   const biddingDisabled =
     itemFinalized ||
     bidding ||
     paymentMethods.length === 0 ||
-    auctionEnded ||
+    auctionClosed ||
     liveState?.cannotBidReason === 'OWNER_CANNOT_BID' ||
     (bidContextIsCurrent === false && bidContextItemId === itmId) ||
     (liveState?.canBid === false && bidContextIsCurrent);
@@ -394,10 +423,26 @@ export default function LiveAuctionScreen() {
               <ThemedText style={styles.backText}>←</ThemedText>
             </Pressable>
             <ThemedText style={styles.liveTitle}>
-              {auctionEnded ? 'SUBASTA FINALIZADA' : '🔴 SUBASTA EN VIVO'}
+              {auctionClosed ? 'SUBASTA FINALIZADA' : '🔴 SUBASTA EN VIVO'}
             </ThemedText>
           </View>
         </View>
+        {auctionSchedule ? (
+          <AuctionCountdown
+            date={auctionSchedule.date}
+            time={auctionSchedule.time}
+            endTime={auctionSchedule.endTime}
+            status={displayAuctionStatus}
+            serverTime={liveState?.serverTime}
+            variant="live"
+            onStatusChange={setDisplayAuctionStatus}
+            onExpired={() => {
+              setAuctionEnded(true);
+              setDisplayAuctionStatus('closed');
+            }}
+            style={styles.liveCountdown}
+          />
+        ) : null}
         <ThemedText style={styles.itemTitleBanner} numberOfLines={2}>
           {title || liveState?.currentItem?.catalogDescription || `Ítem #${itmId}`}
         </ThemedText>
@@ -596,6 +641,7 @@ export default function LiveAuctionScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   liveBanner: { backgroundColor: '#C81010', padding: 20, paddingTop: 55 },
+  liveCountdown: { marginTop: 8, marginBottom: 4 },
   liveHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   backText: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
   liveTitle: { color: '#FFF', fontWeight: 'bold', fontSize: 17, letterSpacing: 0.5 },

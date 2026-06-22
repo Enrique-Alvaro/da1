@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createAuction } from "../src/modules/admin/admin-auctions.controller";
 import * as adminProductosService from "../src/modules/admin/admin-productos.service";
+import * as notificationsEvents from "../src/modules/notifications/notifications.events";
 import * as submissionsRepository from "../src/modules/productos/productos-submissions.repository";
 import { getEmpleadoMe } from "../src/modules/empleados/empleados.controller";
 import * as empleadosRepository from "../src/modules/empleados/empleados.repository";
@@ -81,18 +82,55 @@ describe("POST /api/admin/subastas", () => {
 
 describe("admin productos operational endpoints", () => {
   it("updateProductDeposito returns mapped detail", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById").mockResolvedValue({
+      ...sampleRow,
+      depositoUbicacion: null,
+    });
     vi.spyOn(submissionsRepository, "updateProductDepositoUbicacion").mockResolvedValue(sampleRow);
     vi.spyOn(submissionsRepository, "listPhotoIdsByProduct").mockResolvedValue([]);
+    const notifySpy = vi
+      .spyOn(notificationsEvents, "notifySubmissionCustodyUpdated")
+      .mockResolvedValue();
 
     const result = await adminProductosService.updateProductDeposito(100, {
       depositoUbicacion: "Depósito Central",
     });
     expect(result.depositLocation).toBe("Depósito Central");
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submissionId: 100,
+        kind: "deposit",
+        depositLocation: "Depósito Central",
+        ownerDuenioId: 7,
+      })
+    );
+  });
+
+  it("updateProductDeposito skips notification when deposit unchanged", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById").mockResolvedValue(sampleRow);
+    vi.spyOn(submissionsRepository, "updateProductDepositoUbicacion").mockResolvedValue(sampleRow);
+    vi.spyOn(submissionsRepository, "listPhotoIdsByProduct").mockResolvedValue([]);
+    const notifySpy = vi
+      .spyOn(notificationsEvents, "notifySubmissionCustodyUpdated")
+      .mockResolvedValue();
+
+    await adminProductosService.updateProductDeposito(100, {
+      depositoUbicacion: "Depósito Central",
+    });
+    expect(notifySpy).not.toHaveBeenCalled();
   });
 
   it("updateProductSeguro returns insurance fields", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById").mockResolvedValue({
+      ...sampleRow,
+      seguro: null,
+      seguroCompania: null,
+    });
     vi.spyOn(submissionsRepository, "upsertProductInsurance").mockResolvedValue(sampleRow);
     vi.spyOn(submissionsRepository, "listPhotoIdsByProduct").mockResolvedValue([]);
+    const notifySpy = vi
+      .spyOn(notificationsEvents, "notifySubmissionCustodyUpdated")
+      .mockResolvedValue();
 
     const result = await adminProductosService.updateProductSeguro(100, {
       seguro: "POL-1",
@@ -100,6 +138,30 @@ describe("admin productos operational endpoints", () => {
     });
     expect(result.insurancePolicyNumber).toBe("POL-1");
     expect(result.insuranceCompany).toBe("Sancor");
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submissionId: 100,
+        kind: "insurance",
+        insurancePolicy: "POL-1",
+        insuranceCompany: "Sancor",
+        ownerDuenioId: 7,
+      })
+    );
+  });
+
+  it("updateProductSeguro skips notification when policy unchanged", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById").mockResolvedValue(sampleRow);
+    vi.spyOn(submissionsRepository, "upsertProductInsurance").mockResolvedValue(sampleRow);
+    vi.spyOn(submissionsRepository, "listPhotoIdsByProduct").mockResolvedValue([]);
+    const notifySpy = vi
+      .spyOn(notificationsEvents, "notifySubmissionCustodyUpdated")
+      .mockResolvedValue();
+
+    await adminProductosService.updateProductSeguro(100, {
+      seguro: "POL-1",
+      compania: "Sancor",
+    });
+    expect(notifySpy).not.toHaveBeenCalled();
   });
 });
 

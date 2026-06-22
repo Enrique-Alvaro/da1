@@ -101,6 +101,23 @@ describe("Notification mapper", () => {
     expect(visual.icon).toBe("🏆");
   });
 
+  it("resolveNotificationNavigation routes custody updates to submissions", () => {
+    const dest = resolveNotificationNavigation({
+      id: 2,
+      type: "submission_custody_updated",
+      title: "Tu artículo fue actualizado",
+      message: "msg",
+      read: false,
+      auctionId: null,
+      itemId: null,
+      saleId: null,
+      paymentMethodId: null,
+      submissionId: 100,
+      createdAt: new Date().toISOString(),
+    });
+    expect(dest.type).toBe("submissions");
+  });
+
   it("resolveNotificationNavigation routes outbid to live auction", () => {
     const dest = resolveNotificationNavigation({
       id: 1,

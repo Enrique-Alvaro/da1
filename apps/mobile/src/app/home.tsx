@@ -1,4 +1,5 @@
 import { CustomNavBar } from '@/components/CustomNavBar';
+import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { NotificationBell } from '@/components/NotificationBell';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -6,13 +7,14 @@ import { fetchAuctions, getAuthToken, getCurrentUser, logout } from '@/services/
 import type { UserProfile } from '@/services/types';
 import { isUserAdmitted, PENDING_ADMISSION_BANNER } from '@/utils/clientPermissions';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, Text } from 'react-native';
 
 type Auction = {
   id: number;
   date: string | null;
   time: string | null;
+  endTime: string | null;
   status: string;
   category: string;
   currency: string;
@@ -99,6 +101,77 @@ function CalendarGrid({ month, availableDates, selectedDate, onSelect }: {
   );
 }
 
+function AuctionListCard({
+  item,
+  onAuctionUpdate,
+}: {
+  item: Auction;
+  onAuctionUpdate: (id: number, status: string) => void;
+}) {
+  const router = useRouter();
+  const [localStatus, setLocalStatus] = useState(item.status);
+
+  useEffect(() => {
+    setLocalStatus(item.status);
+  }, [item.id, item.status]);
+
+  const categoryLabel = CATEGORY_LABELS[item.category] ?? item.category;
+  const statusLabel = STATUS_LABELS[localStatus] ?? localStatus;
+  const isLive = localStatus === 'live';
+
+  return (
+    <Pressable
+      style={styles.card}
+      onPress={() => {
+        router.push({ pathname: '/catalog', params: { catalogId: String(item.id) } });
+      }}
+    >
+      <View style={styles.cardHeader}>
+        <View style={[styles.badge, isLive ? styles.badgeLive : styles.badgeDefault]}>
+          <ThemedText style={[styles.badgeText, isLive ? styles.badgeTextLive : styles.badgeTextDefault]}>
+            {statusLabel}
+          </ThemedText>
+        </View>
+        <View style={styles.badgeCategory}>
+          <ThemedText style={styles.badgeCategoryText}>{categoryLabel}</ThemedText>
+        </View>
+      </View>
+
+      <ThemedText style={styles.location}>{item.location}</ThemedText>
+
+      <AuctionCountdown
+        date={item.date}
+        time={item.time}
+        endTime={item.endTime}
+        status={localStatus}
+        variant="card"
+        onStatusChange={(nextStatus) => {
+          setLocalStatus(nextStatus);
+          onAuctionUpdate(item.id, nextStatus);
+        }}
+        onExpired={() => onAuctionUpdate(item.id, 'closed')}
+      />
+
+      <View style={styles.metaRow}>
+        <ThemedText style={styles.meta}>
+          {item.date ?? '—'}{item.time ? `  ${item.time.slice(0, 5)}` : ''}
+        </ThemedText>
+        <ThemedText style={styles.meta}>{item.currency}</ThemedText>
+      </View>
+
+      {item.itemCount != null && (
+        <ThemedText style={styles.meta}>{item.itemCount} ítems</ThemedText>
+      )}
+
+      {item.currentHighestBid != null && (
+        <ThemedText style={styles.bid}>
+          Mejor oferta: {item.currency} {item.currentHighestBid.toLocaleString()}
+        </ThemedText>
+      )}
+    </Pressable>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const isGuest = !getAuthToken();
@@ -173,50 +246,13 @@ export default function HomeScreen() {
 
   const isNotAdmitted = !isGuest && user != null && !isUserAdmitted(user);
 
-  const renderAuctionCard = ({ item }: { item: Auction }) => {
-    const categoryLabel = CATEGORY_LABELS[item.category] ?? item.category;
-    const statusLabel = STATUS_LABELS[item.status] ?? item.status;
-    const isLive = item.status === 'live';
+  const handleAuctionUpdate = useCallback((id: number, status: string) => {
+    setAuctions((prev) => prev.map((auction) => (auction.id === id ? { ...auction, status } : auction)));
+  }, []);
 
-    return (
-      <Pressable
-        style={styles.card}
-        onPress={() => {
-          router.push({ pathname: '/catalog', params: { catalogId: String(item.id) } });
-        }}
-      >
-        <View style={styles.cardHeader}>
-          <View style={[styles.badge, isLive ? styles.badgeLive : styles.badgeDefault]}>
-            <ThemedText style={[styles.badgeText, isLive ? styles.badgeTextLive : styles.badgeTextDefault]}>
-              {statusLabel}
-            </ThemedText>
-          </View>
-          <View style={styles.badgeCategory}>
-            <ThemedText style={styles.badgeCategoryText}>{categoryLabel}</ThemedText>
-          </View>
-        </View>
-
-        <ThemedText style={styles.location}>{item.location}</ThemedText>
-
-        <View style={styles.metaRow}>
-          <ThemedText style={styles.meta}>
-            {item.date ?? '—'}{item.time ? `  ${item.time}` : ''}
-          </ThemedText>
-          <ThemedText style={styles.meta}>{item.currency}</ThemedText>
-        </View>
-
-        {item.itemCount != null && (
-          <ThemedText style={styles.meta}>{item.itemCount} ítems</ThemedText>
-        )}
-
-        {item.currentHighestBid != null && (
-          <ThemedText style={styles.bid}>
-            Mejor oferta: {item.currency} {item.currentHighestBid.toLocaleString()}
-          </ThemedText>
-        )}
-      </Pressable>
-    );
-  };
+  const renderAuctionCard = ({ item }: { item: Auction }) => (
+    <AuctionListCard item={item} onAuctionUpdate={handleAuctionUpdate} />
+  );
 
   function formatDateChip(dateStr: string): string {
     const d = new Date(dateStr + 'T00:00:00');

@@ -20,7 +20,7 @@ import * as liveSessionStore from "../subastas/live-session.store";
 import { computeBidLimits } from "../subastas/subastas-bid-limits";
 import { pickCurrentItemId } from "../subastas/subastas-current-item";
 import { mapSubastaStatus, isDbEstadoAbierta } from "../subastas/subastas-access.service";
-import { listCatalogItemsBySubasta } from "../subastas/subastas-items.repository";
+import { listCatalogItemsBySubasta, type CatalogItemRow } from "../subastas/subastas-items.repository";
 import * as liveRepo from "../subastas/subastas-live.repository";
 import * as closingRepository from "../subastas/subastas-closing.repository";
 import { notifyOutbid, notifyLeadingBid } from "../notifications/notifications.events";
@@ -72,8 +72,8 @@ function assertClienteAdmitted(admitido: string): void {
   }
 }
 
-function assertSubastaAbierta(subasta: SubastaRow): void {
-  if (mapSubastaStatus(subasta) !== "live") {
+function assertSubastaAbierta(subasta: SubastaRow, items?: CatalogItemRow[]): void {
+  if (mapSubastaStatus(subasta, items) !== "live") {
     throw new ConflictError("La subasta no está abierta.", "AUCTION_NOT_OPEN");
   }
   if (!isDbEstadoAbierta(subasta)) {
@@ -208,7 +208,8 @@ export async function assertCanBid(params: {
   assertLiveSessionForBid(cliente.identificador, params.auctionId);
 
   const subasta = await requireSubastaById(params.auctionId);
-  assertSubastaAbierta(subasta);
+  const catalogItems = await listCatalogItemsBySubasta(params.auctionId);
+  assertSubastaAbierta(subasta, catalogItems);
   const auctionCurrency = assertSubastaMoneda(subasta);
   assertCategoryAllowed(cliente.categoria, subasta.categoria);
 
@@ -226,8 +227,8 @@ export async function assertCanBid(params: {
   }
   assertNotItemOwner(cliente.identificador, item.ownerPersonId);
 
-  const catalogItems = await listCatalogItemsBySubasta(params.auctionId);
-  const currentItemId = pickCurrentItemId(catalogItems, mapSubastaStatus(subasta));
+  const auctionLiveStatus = mapSubastaStatus(subasta, catalogItems);
+  const currentItemId = pickCurrentItemId(catalogItems, auctionLiveStatus);
   if (currentItemId !== null && params.itemId !== currentItemId) {
     throw new ConflictError(
       "Solo se puede pujar por el ítem en curso de la subasta.",
