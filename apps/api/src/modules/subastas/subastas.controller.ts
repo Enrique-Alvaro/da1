@@ -4,6 +4,7 @@ import { asyncHandler } from "../../shared/utils/asyncHandler";
 import {
   formatZodError,
   listSubastasQuerySchema,
+  liveStateQuerySchema,
   subastasIdParamSchema,
 } from "./subastas.schema";
 import * as subastasService from "./subastas.service";
@@ -74,7 +75,15 @@ export const getLiveState: RequestHandler = asyncHandler(async (req, res) => {
   if (!req.authUser) {
     throw new ValidationError("Autenticación requerida.");
   }
-  const result = await subastasService.getLiveAuctionState(parsed.data.id, req.authUser);
+  const parsedQuery = liveStateQuerySchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    throw new ValidationError(formatZodError(parsedQuery.error));
+  }
+  const result = await subastasService.getLiveAuctionState(
+    parsed.data.id,
+    req.authUser,
+    parsedQuery.data.watchedItemId
+  );
   res.status(200).json(result);
 });
 

@@ -14,3 +14,7 @@ export const listSubastasQuerySchema = z.object({
     .enum(["comun", "especial", "plata", "oro", "platino"])
     .optional(),
 });
+
+export const liveStateQuerySchema = z.object({
+  watchedItemId: z.coerce.number().int().positive().optional(),
+});

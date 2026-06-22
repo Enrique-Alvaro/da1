@@ -18,7 +18,8 @@ export type MedioPagoBidRow = {
 export function assertPaymentMethodForBid(
   medio: MedioPagoBidRow | null,
   auctionCurrency: string,
-  bidAmount: number
+  bidAmount: number,
+  options?: { committedExposure?: number }
 ): MedioPagoBidRow {
   if (!medio) {
     throw new NotFoundError("Medio de pago no encontrado.", "PAYMENT_METHOD_NOT_FOUND");
@@ -54,9 +55,11 @@ export function assertPaymentMethodForBid(
         "PAYMENT_METHOD_INSUFFICIENT_FUNDS"
       );
     }
-    if (Number(medio.montoDisponible) < bidAmount) {
+    const exposure = options?.committedExposure ?? 0;
+    const totalCommitted = exposure + bidAmount;
+    if (Number(medio.montoDisponible) < totalCommitted) {
       throw new ConflictError(
-        "El monto disponible del cheque certificado es insuficiente para esta puja.",
+        "El monto comprometido supera tu garantía disponible.",
         "GUARANTEE_LIMIT_EXCEEDED"
       );
     }

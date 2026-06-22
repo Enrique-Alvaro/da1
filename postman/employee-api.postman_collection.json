@@ -1,0 +1,2242 @@
+{
+  "info": {
+    "_postman_id": "crownbid-employee-api-2026",
+    "name": "CrownBid Employee API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Complete Postman collection for CrownBid endpoints accessible to the **empleado** (employee/operator) role.\n\nThere is no separate admin JWT role: all `/api/admin/*` routes use `requireEmployeeAuth`.\n\nImport `employee-api.postman_environment.json` and run **Auth → Employee Login** first."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "employee_email",
+      "value": "admin@crownbid.local"
+    },
+    {
+      "key": "employee_password",
+      "value": "EmpleadoAdmin2026!"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "description": "Employee authentication. Client login endpoints are public but not employee workflows.",
+      "item": [
+        {
+          "name": "Employee Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/employee/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "employee",
+                "login"
+              ]
+            },
+            "description": "Authenticates an employee using `EMPLOYEE_ADMIN_EMAIL` / `EMPLOYEE_ADMIN_PASSWORD` from API `.env` and a row in `dbo.empleados`.\n\n**Response 200:** `{ accessToken, employeeId, email, role: \"empleado\" }`\n\n**Errors:** 401 invalid credentials, 422 validation",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employee_email}}\",\n  \"password\": \"{{employee_password}}\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"accessToken present\", function () {",
+                  "    pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+                  "  });",
+                  "  pm.environment.set(\"access_token\", body.accessToken);",
+                  "  if (body.employeeId) {",
+                  "    pm.environment.set(\"employee_id\", String(body.employeeId));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Stateless logout. Requires valid Bearer access token.\n\n**Response:** `{ ok: true, message }`",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout — Unauthorized (no token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Verifies missing token returns 401.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [401]\", function () {",
+                  "  pm.expect([401]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Employee / Profile",
+      "description": "Employee directory endpoints. `/api/users/me` is NOT usable with employee tokens (401).",
+      "item": [
+        {
+          "name": "List Employees",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/empleados",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "empleados"
+              ]
+            },
+            "description": "Lists employees from `dbo.empleados`.\n\n**Response:** `{ items: [{ identificador, cargo, sector }] }`"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.items && body.items[0]) {",
+                  "    pm.environment.set(\"employee_id\", String(body.items[0].identificador));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Employee by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/empleados/{{employee_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "empleados",
+                "{{employee_id}}"
+              ]
+            },
+            "description": "Get single employee record.\n\n**Path:** `employee_id` (empleados.identificador)"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Auctions",
+      "description": "Create/update via admin routes. Public reads via optional auth. Close item is employee-only.",
+      "item": [
+        {
+          "name": "Create Auction (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/subastas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "subastas"
+              ]
+            },
+            "description": "Creates a new auction. Employee-only (`requireEmployeeAuth`).\n\n**Response 201:** auction summary with `id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"2026-07-15\",\n  \"hora\": \"18:00\",\n  \"horaFin\": \"22:00\",\n  \"ubicacion\": \"Salón Principal CrownBid\",\n  \"capacidadAsistentes\": 120,\n  \"tieneDeposito\": \"si\",\n  \"seguridadPropia\": \"si\",\n  \"categoria\": \"platino\",\n  \"moneda\": \"ARS\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [201]\", function () {",
+                  "  pm.expect([201]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.id) pm.environment.set(\"auction_id\", String(body.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Auction (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/subastas/{{auction_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "subastas",
+                "{{auction_id}}"
+              ]
+            },
+            "description": "Partial update of auction fields.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"abierta\",\n  \"ubicacion\": \"Salón Principal — actualizado\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Auctions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/subastas?status=scheduled&category=platino",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "scheduled",
+                  "description": "scheduled | live | closed"
+                },
+                {
+                  "key": "category",
+                  "value": "platino",
+                  "description": "comun | especial | plata | oro | platino"
+                }
+              ]
+            },
+            "description": "Public/optional-auth list. Employee token is accepted but `canAccess`/`canBid` remain false for employees.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.items && body.items[0] && body.items[0].id) {",
+                  "    pm.environment.set(\"auction_id\", String(body.items[0].id));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Auction by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/subastas/{{auction_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas",
+                "{{auction_id}}"
+              ]
+            },
+            "description": "Auction detail. Optional auth.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Auction Catalog Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/subastas/{{auction_id}}/items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas",
+                "{{auction_id}}",
+                "items"
+              ]
+            },
+            "description": "Items assigned to an auction catalog.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const items = body.items || body;",
+                  "  if (Array.isArray(items) && items[0]) {",
+                  "    const first = items[0];",
+                  "    if (first.id) pm.environment.set(\"item_id\", String(first.id));",
+                  "    if (first.productId) pm.environment.set(\"article_id\", String(first.productId));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Close Auction Item (Employee)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subastas/{{auction_id}}/items/{{item_id}}/cerrar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas",
+                "{{auction_id}}",
+                "items",
+                "{{item_id}}",
+                "cerrar"
+              ]
+            },
+            "description": "Finalize/close an auction catalog item. Employee-only.\n\n**Body:** optional `{ paymentMethodId }` for winner payment method.\n\n**Response:** finalization result with winner and amounts.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Auction Item Result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subastas/{{auction_id}}/items/{{item_id}}/resultado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas",
+                "{{auction_id}}",
+                "items",
+                "{{item_id}}",
+                "resultado"
+              ]
+            },
+            "description": "Post-auction finalization result. Any authenticated user (employee or client)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Bids (Client-only — reference)",
+      "description": "These endpoints exist but return **403** for employee tokens (`requireClienteAuth`). Included for negative testing only.",
+      "item": [
+        {
+          "name": "[403 expected] Bid History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subastas/{{auction_id}}/pujos/history?itemId={{item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas",
+                "{{auction_id}}",
+                "pujos",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "itemId",
+                  "value": "{{item_id}}"
+                }
+              ]
+            },
+            "description": "Client-only. Employees receive 403."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [403]\", function () {",
+                  "  pm.expect([403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[403 expected] Live Auction State",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subastas/{{auction_id}}/live?watchedItemId={{item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas",
+                "{{auction_id}}",
+                "live"
+              ],
+              "query": [
+                {
+                  "key": "watchedItemId",
+                  "value": "{{item_id}}"
+                }
+              ]
+            },
+            "description": "Client-only live session state."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [403]\", function () {",
+                  "  pm.expect([403]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Submitted Articles / Item Review",
+      "description": "Admin submission review workflow (Spanish paths). English aliases exist under `/api/admin/items/submissions`.",
+      "item": [
+        {
+          "name": "List Submissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/solicitudes?status=pending&limit=50&offset=0&search=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "solicitudes"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "pending | accepted | assigned | all"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "optional text search"
+                }
+              ]
+            },
+            "description": "List item submissions for employee review."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const items = Array.isArray(body) ? body : body.items;",
+                  "  if (Array.isArray(items) && items[0]) {",
+                  "    const row = items[0];",
+                  "    const id = row.submissionId || row.productId || row.id;",
+                  "    if (id) pm.environment.set(\"article_id\", String(id));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Submission Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/solicitudes/{{article_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "solicitudes",
+                "{{article_id}}"
+              ]
+            },
+            "description": "Full submission detail including photos and metadata."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.photos && body.photos[0] && body.photos[0].id) {",
+                  "    pm.environment.set(\"image_id\", String(body.photos[0].id));",
+                  "  }",
+                  "  if (body.productId) pm.environment.set(\"article_id\", String(body.productId));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept Submission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/solicitudes/{{article_id}}/aceptar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "solicitudes",
+                "{{article_id}}",
+                "aceptar"
+              ]
+            },
+            "description": "Accept a pending submission and set base price / commission.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"basePrice\": 15000,\n  \"commissionPercent\": 10,\n  \"notes\": \"Aprobado por operador\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.productId) pm.environment.set(\"article_id\", String(body.productId));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Submission (schema limitation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/solicitudes/{{article_id}}/rechazar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "solicitudes",
+                "{{article_id}}",
+                "rechazar"
+              ]
+            },
+            "description": "Rejection endpoint exists but currently returns **409** `REJECTION_NOT_SUPPORTED_BY_SCHEMA` until DB schema supports it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Documentación insuficiente\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [409]\", function () {",
+                  "  pm.expect([409]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assign Submission to Auction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/solicitudes/{{article_id}}/asignar-subasta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "solicitudes",
+                "{{article_id}}",
+                "asignar-subasta"
+              ]
+            },
+            "description": "Assign accepted product to auction or existing catalog.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"auctionId\": {{auction_id}},\n  \"basePrice\": 15000,\n  \"commissionPercent\": 10\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Legacy — List Pending Review",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/revision",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "revision"
+              ]
+            },
+            "description": "Legacy pending-only review list."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Legacy — Approve/Reject Decision",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{article_id}}/decision",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{article_id}}",
+                "decision"
+              ]
+            },
+            "description": "Legacy decision endpoint. Body: `{ decision: \"approve\" | \"reject\" }`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Legacy — Auction Assignment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{article_id}}/auction-assignment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{article_id}}",
+                "auction-assignment"
+              ]
+            },
+            "description": "Legacy assignment. Requires `catalogId` OR `subastaId`, plus `precioBase` and `comision`. `catalogDescription` required when creating new catalog.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subastaId\": {{auction_id}},\n  \"catalogDescription\": \"Reloj de bolsillo — catálogo demo\",\n  \"precioBase\": 15000,\n  \"comision\": 1500\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Catalog / Items",
+      "description": "Read-only catalog access for employees.",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/productos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "description": "List products in catalog."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/productos/{{article_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "productos",
+                "{{article_id}}"
+              ]
+            },
+            "description": "Product detail from `dbo.productos`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Product Photo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/productos/{{article_id}}/photos/{{image_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "productos",
+                "{{article_id}}",
+                "photos",
+                "{{image_id}}"
+              ]
+            },
+            "description": "Binary JPEG photo stream."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200, 404]\", function () {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Catalog Item (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/items/{{item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "items",
+                "{{item_id}}"
+              ]
+            },
+            "description": "Catalog item detail via `/api/items/:id` (optional auth).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Clients / Users",
+      "description": "Client admission workflow for employees.",
+      "item": [
+        {
+          "name": "List Clients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/clientes?admitido=all&search=&limit=50&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clientes"
+              ],
+              "query": [
+                {
+                  "key": "admitido",
+                  "value": "all",
+                  "description": "si | no | all"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "List registered clients for admission review."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.items && body.items[0] && body.items[0].clienteId) {",
+                  "    pm.environment.set(\"client_id\", String(body.items[0].clienteId));",
+                  "    pm.environment.set(\"user_id\", String(body.items[0].clienteId));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Client Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/clientes/{{client_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clientes",
+                "{{client_id}}"
+              ]
+            },
+            "description": "Client detail for admission decisions."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admit Client",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/clientes/{{client_id}}/admitir",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "clientes",
+                "{{client_id}}",
+                "admitir"
+              ]
+            },
+            "description": "Approve or reject client admission. Set `categoria` when admitting.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admitido\": \"si\",\n  \"categoria\": \"comun\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[401 expected] Users Me (not for employees)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "description": "Passes auth middleware but fails at service layer for employee JWT (persona lookup). Do not use as employee profile."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [401]\", function () {",
+                  "  pm.expect([401]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Payment Methods (Admin)",
+      "description": "Verify or reject client payment methods.",
+      "item": [
+        {
+          "name": "List Payment Methods for Review",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/payment-methods?status=pendiente",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "payment-methods"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pendiente",
+                  "description": "pendiente | verificado | rechazado | deshabilitado | all"
+                }
+              ]
+            },
+            "description": "List payment methods pending employee verification."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.items && body.items[0] && body.items[0].id) {",
+                  "    pm.environment.set(\"payment_method_id\", String(body.items[0].id));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Payment Method",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/payment-methods/{{payment_method_id}}/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "payment-methods",
+                "{{payment_method_id}}",
+                "verify"
+              ]
+            },
+            "description": "Mark payment method as verified.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Payment Method",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/payment-methods/{{payment_method_id}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "payment-methods",
+                "{{payment_method_id}}",
+                "reject"
+              ]
+            },
+            "description": "Reject with reason (1–500 chars).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Documentación del titular no coincide\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Post-auction / Winners",
+      "description": "Employee can close items and read finalization results.",
+      "item": [
+        {
+          "name": "Get Item Finalization Result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subastas/{{auction_id}}/items/{{item_id}}/resultado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "subastas",
+                "{{auction_id}}",
+                "items",
+                "{{item_id}}",
+                "resultado"
+              ]
+            },
+            "description": "Winner, amounts, and payment summary after close."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Reference Data",
+      "description": "Países and sectores CRUD — any authenticated token (including employee).",
+      "item": [
+        {
+          "name": "List Countries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/paises",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "paises"
+              ]
+            },
+            "description": "List countries."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Country",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/paises/{{category_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "paises",
+                "{{category_id}}"
+              ]
+            },
+            "description": "Uses `category_id` env var as country PK (`paises.numero`) for demo."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Country",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/paises",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "paises"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": 99001,\n  \"nombre\": \"País Demo Postman\",\n  \"nombreCorto\": \"PD\",\n  \"capital\": \"Capital Demo\",\n  \"nacionalidad\": \"Demense\",\n  \"idiomas\": \"Español\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [201, 409]\", function () {",
+                  "  pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Country",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/paises/99001",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "paises",
+                "99001"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"País Demo Postman Actualizado\",\n  \"nombreCorto\": \"PD\",\n  \"capital\": \"Capital Demo\",\n  \"nacionalidad\": \"Demense\",\n  \"idiomas\": \"Español\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Sectors",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sectores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sectores"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Sector",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sectores/{{warehouse_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sectores",
+                "{{warehouse_id}}"
+              ]
+            },
+            "description": "Uses `warehouse_id` as `sectores.identificador` placeholder."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Sector",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sectores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sectores"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreSector\": \"Sector Demo Postman\",\n  \"codigoSector\": \"SDP\",\n  \"responsableSector\": null\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [201, 409]\", function () {",
+                  "  pm.expect([201, 409]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11. Health / Debug",
+      "description": "Unauthenticated health checks (use server root, not `/api` prefix).",
+      "item": [
+        {
+          "name": "Health — API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server_root}}/api/health",
+              "host": [
+                "{{server_root}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "API health. `server_root` defaults to `http://localhost:3000`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Health — DB",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server_root}}/api/health/db",
+              "host": [
+                "{{server_root}}"
+              ],
+              "path": [
+                "api",
+                "health",
+                "db"
+              ]
+            },
+            "description": "Database connectivity check. May return 503 if DB is down."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200, 503]\", function () {",
+                  "  pm.expect([200, 503]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Health — Root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server_root}}/health",
+              "host": [
+                "{{server_root}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}

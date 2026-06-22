@@ -194,7 +194,7 @@ describe("Phase 2 — auction / live / bidding hardening", () => {
 
     expect(() =>
       validateBidAmountRules(limits.minNextBid - 0.01, currentBest, basePrice, "comun")
-    ).toThrow(expect.objectContaining({ code: "BID_TOO_LOW" }));
+    ).toThrow(expect.objectContaining({ code: "BID_BELOW_MIN" }));
     expect(() =>
       validateBidAmountRules(limits.maxNextBid! + 1, currentBest, basePrice, "comun")
     ).toThrow(expect.objectContaining({ code: "BID_TOO_HIGH" }));

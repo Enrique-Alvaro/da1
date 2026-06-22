@@ -41,7 +41,12 @@ export default function PostArticleScreen() {
   const [description, setDescription] = useState('');
   const [acceptedOwner, setAcceptedOwner] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedDocumentation, setAcceptedDocumentation] = useState(false);
+  const [acceptedReturnCost, setAcceptedReturnCost] = useState(false);
+  const [historia, setHistoria] = useState('');
+  const [artistaODisenador, setArtistaODisenador] = useState('');
+  const [fechaOrigen, setFechaOrigen] = useState('');
+  const [componentes, setComponentes] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -71,7 +76,9 @@ export default function PostArticleScreen() {
   const imageError = submitAttempted && images.length < MIN_IMAGES;
   const titleError = submitAttempted && title.trim().length === 0;
   const descriptionError = submitAttempted && description.trim().length < 10;
-  const declarationError = submitAttempted && (!acceptedOwner || !acceptedLegal || !acceptedTerms);
+  const declarationError =
+    submitAttempted &&
+    (!acceptedOwner || !acceptedLegal || !acceptedDocumentation || !acceptedReturnCost);
 
   function collectValidationErrors(): string | null {
     if (images.length < MIN_IMAGES) {
@@ -83,7 +90,7 @@ export default function PostArticleScreen() {
     if (description.trim().length < 10) {
       return 'La descripción debe tener al menos 10 caracteres.';
     }
-    if (!acceptedOwner || !acceptedLegal || !acceptedTerms) {
+    if (!acceptedOwner || !acceptedLegal || !acceptedDocumentation || !acceptedReturnCost) {
       return 'Debés aceptar todas las declaraciones obligatorias.';
     }
     const unsupported = images.find((img) => !isAllowedSubmissionImageMime(img.mimeType));
@@ -169,9 +176,14 @@ export default function PostArticleScreen() {
     const payload = {
       nombre: title.trim(),
       descripcion: description.trim(),
+      historia: historia.trim() || undefined,
+      artistaODisenador: artistaODisenador.trim() || undefined,
+      fechaOrigen: fechaOrigen.trim() || undefined,
+      componentes: componentes.trim() || undefined,
       declaracionPropiedad: true as const,
       declaracionSinImpedimentos: true as const,
       origenLicitoDeclarado: true as const,
+      declaracionDevolucionACargo: true as const,
       fotos: images.map((img) => ({
         filename: img.filename,
         mimeType: normalizeSubmissionImageMime(img.mimeType),
@@ -287,6 +299,44 @@ export default function PostArticleScreen() {
             {descriptionError && (
               <Text style={styles.errorText}>La descripción debe tener al menos 10 caracteres.</Text>
             )}
+
+            <Text style={{ color: '#000000', marginBottom: 6, marginTop: 8 }}>Historia (opcional)</Text>
+            <TextInput
+              style={styles.textArea}
+              value={historia}
+              onChangeText={setHistoria}
+              placeholder="Contexto, propietarios anteriores, curiosidades..."
+              placeholderTextColor="#6B7280"
+              multiline
+              numberOfLines={3}
+            />
+
+            <Text style={{ color: '#000000', marginBottom: 6, marginTop: 8 }}>Artista / diseñador (opcional)</Text>
+            <TextInput
+              style={styles.input}
+              value={artistaODisenador}
+              onChangeText={setArtistaODisenador}
+              placeholder="Nombre del artista o diseñador"
+              placeholderTextColor="#6B7280"
+            />
+
+            <Text style={{ color: '#000000', marginBottom: 6, marginTop: 8 }}>Fecha / origen (opcional)</Text>
+            <TextInput
+              style={styles.input}
+              value={fechaOrigen}
+              onChangeText={setFechaOrigen}
+              placeholder="Ej: 1950, París"
+              placeholderTextColor="#6B7280"
+            />
+
+            <Text style={{ color: '#000000', marginBottom: 6, marginTop: 8 }}>Componentes (opcional)</Text>
+            <TextInput
+              style={styles.input}
+              value={componentes}
+              onChangeText={setComponentes}
+              placeholder="Ej: Juego de té de 18 piezas"
+              placeholderTextColor="#6B7280"
+            />
           </View>
 
           {/* Declaraciones */}
@@ -295,7 +345,8 @@ export default function PostArticleScreen() {
             {[
               { label: 'Declaro que soy el propietario legítimo del artículo *', state: acceptedOwner, setter: setAcceptedOwner },
               { label: 'Declaro que el artículo no posee impedimentos legales para su venta *', state: acceptedLegal, setter: setAcceptedLegal },
-              { label: 'Acepto condiciones de envío y devolución en caso de rechazo *', state: acceptedTerms, setter: setAcceptedTerms },
+              { label: 'Acepto enviar documentación si la empresa la solicita *', state: acceptedDocumentation, setter: setAcceptedDocumentation },
+              { label: 'Acepto que, si la empresa rechaza el artículo enviado a inspección, la devolución será a mi cargo *', state: acceptedReturnCost, setter: setAcceptedReturnCost },
             ].map((item, index) => (
               <View key={index} style={styles.checkboxRow}>
                 <Pressable

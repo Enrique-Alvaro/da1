@@ -1,6 +1,10 @@
 import Constants from 'expo-constants';
 
 import { readStoredToken, writeStoredToken } from './token-storage';
+import {
+  shouldTriggerSessionExpiration,
+  triggerSessionExpired,
+} from './session-auth';
 import { normalizeEmail } from '../utils/email';
 import {
   ApiError,
@@ -55,6 +59,12 @@ export async function setAuthTokenAsync(token: string | null) {
   await persistToken(token);
 }
 
+export async function clearAuthSession(): Promise<void> {
+  authToken = null;
+  tokenHydrated = true;
+  await writeStoredToken(null);
+}
+
 function buildHeaders(contentType?: string) {
   const headers: Record<string, string> = {};
   if (contentType) {
@@ -88,6 +98,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.set('Content-Type', 'application/json');
   }
 
+  const token = getAuthToken();
+  const hadToken = Boolean(token);
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const url = `${API_BASE_URL}${path}`;
   console.log('[CrownBid Request]', url);
 
@@ -112,6 +128,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       statusCode: response.status,
       code: (payload as ApiError & { code?: string })?.code,
     };
+
+    if (shouldTriggerSessionExpiration(path, hadToken, response.status, error.code)) {
+      await triggerSessionExpired(clearAuthSession);
+    }
+
     throw error;
   }
   return parseResponse<T>(response);
@@ -351,9 +372,14 @@ export async function fetchSellerPayoutAccount() {
 export async function createSubmission(payload: {
   nombre: string;
   descripcion: string;
+  historia?: string;
+  artistaODisenador?: string;
+  fechaOrigen?: string;
+  componentes?: string;
   declaracionPropiedad: true;
   declaracionSinImpedimentos: true;
   origenLicitoDeclarado: true;
+  declaracionDevolucionACargo: true;
   fotos: { filename: string; mimeType: string; base64: string }[];
 }) {
   await initAuthToken();
@@ -421,8 +447,12 @@ export async function markAllNotificationsRead(): Promise<{ updated: number }> {
   });
 }
 
-export async function fetchLiveAuctionState(auctionId: number): Promise<LiveAuctionState> {
-  return request(`/subastas/${auctionId}/live`, {
+export async function fetchLiveAuctionState(
+  auctionId: number,
+  watchedItemId?: number
+): Promise<LiveAuctionState> {
+  const query = watchedItemId != null ? `?watchedItemId=${watchedItemId}` : '';
+  return request(`/subastas/${auctionId}/live${query}`, {
     method: 'GET',
     headers: buildHeaders(),
   });

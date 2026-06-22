@@ -31,6 +31,7 @@ import {
   getMaxBidForItem,
   insertAsistenteInTransaction,
   insertBidInTransaction,
+  sumLeadingBidExposureForCliente,
   type AsistenteRow,
   type ItemEnSubastaRow,
 } from "./pujos.repository";
@@ -155,15 +156,15 @@ export function validateBidAmountRules(
   const limits = computeBidLimits(currentBest, basePrice, auctionCategory);
   if (amount <= limits.currentBest) {
     throw new ConflictError(
-      "El importe debe superar la mejor oferta actual.",
-      "BID_TOO_LOW"
+      "Otra oferta superó tu monto antes de registrar la puja.",
+      "BID_NOT_HIGHEST"
     );
   }
   if (limits.maxNextBid === null) {
     if (amount < limits.minNextBid) {
       throw new ConflictError(
         "El importe está por debajo del mínimo permitido para esta subasta.",
-        "BID_TOO_LOW"
+        "BID_BELOW_MIN"
       );
     }
     return;
@@ -171,7 +172,7 @@ export function validateBidAmountRules(
   if (amount < limits.minNextBid) {
     throw new ConflictError(
       "El importe está por debajo del mínimo permitido para esta subasta.",
-      "BID_TOO_LOW"
+      "BID_BELOW_MIN"
     );
   }
   if (amount > limits.maxNextBid) {
@@ -235,7 +236,16 @@ export async function assertCanBid(params: {
   }
 
   const medioPagoRow = await findByIdAndCliente(params.paymentMethodId, cliente.identificador);
-  assertPaymentMethodForBid(medioPagoRow, auctionCurrency, params.amount);
+  let committedExposure = 0;
+  if (medioPagoRow?.tipo === "cheque_certificado") {
+    committedExposure = await sumLeadingBidExposureForCliente(
+      cliente.identificador,
+      params.itemId
+    );
+  }
+  assertPaymentMethodForBid(medioPagoRow, auctionCurrency, params.amount, {
+    committedExposure,
+  });
   if (!medioPagoRow) {
     throw new NotFoundError("Medio de pago no encontrado.", "PAYMENT_METHOD_NOT_FOUND");
   }

@@ -93,6 +93,12 @@ export async function createSubmission(
     catalogDescription: body.catalogDescription,
     fullDescriptionUrl: body.fullDescriptionUrl,
     imageBuffers,
+    numeroPieza: body.submissionMetadata?.nombre?.slice(0, 50) ?? null,
+    artistaODisenador: body.submissionMetadata?.artistaODisenador ?? null,
+    fechaOrigen: body.submissionMetadata?.fechaOrigen ?? null,
+    historia: body.submissionMetadata?.historia ?? null,
+    componentes: body.submissionMetadata?.componentes ?? null,
+    declaracionesJson: body.submissionMetadata?.declaracionesJson ?? null,
   });
 
   const row = await submissionsRepository.findSubmissionById(productId);

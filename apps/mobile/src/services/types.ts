@@ -101,6 +101,18 @@ export interface LiveAuctionState {
   soldItemId: number | null;
   shouldRedirectToResult: boolean;
   serverTime: string;
+  watchedItem?: {
+    id: number;
+    productId: number;
+    catalogDescription: string | null;
+    basePrice: number;
+    currentHighestBid: number;
+    minNextBid: number;
+    maxNextBid: number | null;
+    percentLimitsApply: boolean;
+    isHighestBidder: boolean;
+    isCurrentItem: boolean;
+  } | null;
 }
 
 export interface ItemFinalizationResult {

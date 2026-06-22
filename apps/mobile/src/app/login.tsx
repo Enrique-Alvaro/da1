@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
+import { PasswordInput } from '@/components/PasswordInput';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { login } from '@/services/api';
@@ -126,13 +126,11 @@ export default function LoginScreen() {
           {emailError && <Text style={styles.fieldError}>Email inválido</Text>}
 
           <Text style={styles.label}>Contraseña</Text>
-          <TextInput
+          <PasswordInput
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
-            secureTextEntry
             style={styles.input}
-            placeholderTextColor="#9AA0A6"
           />
 
           <Pressable onPress={() => navigateTo('/recover')} style={styles.forgotLinkWrap}>

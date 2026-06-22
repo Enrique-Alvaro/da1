@@ -113,6 +113,7 @@ describe("Pujas — Fase 4 assertCanBid", () => {
     vi.spyOn(pujosRepository, "findItemInSubasta").mockResolvedValue(item);
     vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(mockMedio());
     vi.spyOn(pujosRepository, "getMaxBidForItem").mockResolvedValue(null);
+    vi.spyOn(pujosRepository, "sumLeadingBidExposureForCliente").mockResolvedValue(0);
     vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([
       {
         identificador: 100,
@@ -252,8 +253,13 @@ describe("Pujas — Fase 4 assertCanBid", () => {
     });
   });
 
-  it("importe bajo → BID_TOO_LOW", async () => {
-    await expect(callBid(10000)).rejects.toMatchObject({ code: "BID_TOO_LOW" });
+  it("importe no supera mejor oferta → BID_NOT_HIGHEST", async () => {
+    await expect(callBid(10000)).rejects.toMatchObject({ code: "BID_NOT_HIGHEST" });
+  });
+
+  it("importe bajo mínimo % → BID_BELOW_MIN", async () => {
+    vi.spyOn(pujosRepository, "getMaxBidForItem").mockResolvedValue(15000);
+    await expect(callBid(15050)).rejects.toMatchObject({ code: "BID_BELOW_MIN" });
   });
 
   it("importe alto (comun) → BID_TOO_HIGH", async () => {
@@ -262,7 +268,9 @@ describe("Pujas — Fase 4 assertCanBid", () => {
 
   it("oro: sin tope 20% pero debe superar mejor oferta", () => {
     expect(() => validateBidAmountRules(500000, 10000, 10000, "oro")).not.toThrow();
-    expect(() => validateBidAmountRules(10000, 10000, 10000, "oro")).toThrow(ConflictError);
+    expect(() => validateBidAmountRules(10000, 10000, 10000, "oro")).toThrow(
+      expect.objectContaining({ code: "BID_NOT_HIGHEST" })
+    );
   });
 
   it("puja válida con medio verificado", async () => {

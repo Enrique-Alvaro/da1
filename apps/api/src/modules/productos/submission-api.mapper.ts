@@ -14,6 +14,14 @@ export type ApiSubmissionListItem = {
   basePrice: number | null;
   commission: number | null;
   createdAt: string | null;
+  depositLocation: string | null;
+  insurancePolicyNumber: string | null;
+  insuranceCompany: string | null;
+  artistOrDesigner: string | null;
+  originDate: string | null;
+  history: string | null;
+  components: string | null;
+  declarationsStored: boolean;
   schemaLimitations: string[];
 };
 
@@ -62,6 +70,14 @@ export function mapRowToApiListItem(row: ProductSubmissionRow): ApiSubmissionLis
     basePrice: row.precioBaseAsignado ?? null,
     commission: row.comisionAsignada ?? null,
     createdAt: formatDate(row.fecha),
+    depositLocation: row.depositoUbicacion ?? null,
+    insurancePolicyNumber: row.seguro ?? null,
+    insuranceCompany: row.seguroCompania ?? null,
+    artistOrDesigner: row.artistaODisenador ?? null,
+    originDate: row.fechaOrigen ?? null,
+    history: row.historia ?? null,
+    components: row.componentes ?? null,
+    declarationsStored: Boolean(row.declaracionesJson?.trim()),
     schemaLimitations: baseLimitations(),
   };
 }
@@ -91,7 +107,7 @@ export function mapRowToApiDetail(
     auctionTime: row.auctionHora ?? null,
     auctionLocation: row.auctionUbicacion ?? null,
     commissionPercent,
-    declarationsStored: false,
+    declarationsStored: Boolean(row.declaracionesJson?.trim()),
     schemaLimitations: [
       ...base.schemaLimitations,
       "PARTIAL_LEGAL_ORIGIN_SUPPORT",

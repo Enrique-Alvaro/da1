@@ -9,6 +9,8 @@ export const BID_DENIAL_MESSAGES: Record<string, string> = {
   LIVE_SESSION_REQUIRED: 'Debés unirte a la sesión en vivo para pujar.',
   LIVE_SESSION_OTHER_AUCTION: 'Tenés una sesión activa en otra subasta.',
   OWNER_CANNOT_BID: 'No podés pujar sobre un artículo propio.',
+  BID_NOT_HIGHEST: 'Otra oferta superó tu monto. Actualizá el importe e intentá de nuevo.',
+  BID_BELOW_MIN: 'El monto está por debajo del mínimo permitido.',
   BID_TOO_LOW: 'El monto está por debajo del mínimo permitido.',
   BID_TOO_HIGH: 'El monto supera el máximo permitido para esta subasta.',
   BID_AMOUNT_INVALID: 'Ingresá un monto numérico válido.',

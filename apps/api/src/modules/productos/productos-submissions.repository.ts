@@ -23,6 +23,14 @@ export type ProductSubmissionRow = ProductoRow & ProductSubmissionFlags & {
   auctionHora: string | null;
   auctionUbicacion: string | null;
   catalogId: number | null;
+  numeroPieza: string | null;
+  artistaODisenador: string | null;
+  fechaOrigen: string | null;
+  historia: string | null;
+  componentes: string | null;
+  depositoUbicacion: string | null;
+  declaracionesJson: string | null;
+  seguroCompania: string | null;
 };
 
 const PRODUCT_SELECT = `
@@ -34,6 +42,14 @@ const PRODUCT_SELECT = `
   p.revisor,
   p.duenio,
   p.seguro,
+  p.numeroPieza,
+  p.artistaODisenador,
+  p.fechaOrigen,
+  p.historia,
+  p.componentes,
+  p.depositoUbicacion,
+  p.declaracionesJson,
+  sg.compania AS seguroCompania,
   (
     SELECT COUNT_BIG(1)
     FROM dbo.fotos AS f
@@ -106,7 +122,7 @@ const PRODUCT_SELECT = `
   ) AS auctionUbicacion
 `;
 
-const PRODUCT_FROM = `FROM dbo.productos AS p`;
+const PRODUCT_FROM = `FROM dbo.productos AS p LEFT JOIN dbo.seguros AS sg ON sg.nroPoliza = p.seguro`;
 
 function mapSubmissionRow(row: Record<string, unknown>): ProductSubmissionRow {
   return {
@@ -129,6 +145,14 @@ function mapSubmissionRow(row: Record<string, unknown>): ProductSubmissionRow {
     auctionHora: (row.auctionHora as string | null) ?? null,
     auctionUbicacion: (row.auctionUbicacion as string | null) ?? null,
     catalogId: row.catalogId != null ? Number(row.catalogId) : null,
+    numeroPieza: (row.numeroPieza as string | null) ?? null,
+    artistaODisenador: (row.artistaODisenador as string | null) ?? null,
+    fechaOrigen: (row.fechaOrigen as string | null) ?? null,
+    historia: (row.historia as string | null) ?? null,
+    componentes: (row.componentes as string | null) ?? null,
+    depositoUbicacion: (row.depositoUbicacion as string | null) ?? null,
+    declaracionesJson: (row.declaracionesJson as string | null) ?? null,
+    seguroCompania: (row.seguroCompania as string | null) ?? null,
   };
 }
 
@@ -188,6 +212,12 @@ export async function insertProductWithPhotos(input: {
   catalogDescription: string;
   fullDescriptionUrl: string;
   imageBuffers: Buffer[];
+  numeroPieza?: string | null;
+  artistaODisenador?: string | null;
+  fechaOrigen?: string | null;
+  historia?: string | null;
+  componentes?: string | null;
+  declaracionesJson?: string | null;
 }): Promise<number> {
   const pool = await getSqlPool();
   const tx = new sql.Transaction(pool);
@@ -198,6 +228,12 @@ export async function insertProductWithPhotos(input: {
     ins.input("descripcionCompleta", sql.NVarChar(300), input.fullDescriptionUrl);
     ins.input("revisor", sql.Int, input.revisorId);
     ins.input("duenio", sql.Int, input.duenioId);
+    ins.input("numeroPieza", sql.NVarChar(50), input.numeroPieza ?? null);
+    ins.input("artistaODisenador", sql.NVarChar(200), input.artistaODisenador ?? null);
+    ins.input("fechaOrigen", sql.NVarChar(50), input.fechaOrigen ?? null);
+    ins.input("historia", sql.NVarChar(2000), input.historia ?? null);
+    ins.input("componentes", sql.NVarChar(1000), input.componentes ?? null);
+    ins.input("declaracionesJson", sql.NVarChar(sql.MAX), input.declaracionesJson ?? null);
     const prodRes = await ins.query<{ identificador: number }>(`
       INSERT INTO dbo.productos (
         fecha,
@@ -206,7 +242,13 @@ export async function insertProductWithPhotos(input: {
         descripcionCompleta,
         revisor,
         duenio,
-        seguro
+        seguro,
+        numeroPieza,
+        artistaODisenador,
+        fechaOrigen,
+        historia,
+        componentes,
+        declaracionesJson
       )
       OUTPUT INSERTED.identificador AS identificador
       VALUES (
@@ -216,7 +258,13 @@ export async function insertProductWithPhotos(input: {
         @descripcionCompleta,
         @revisor,
         @duenio,
-        NULL
+        NULL,
+        @numeroPieza,
+        @artistaODisenador,
+        @fechaOrigen,
+        @historia,
+        @componentes,
+        @declaracionesJson
       )
     `);
     const productId = prodRes.recordset[0]?.identificador;

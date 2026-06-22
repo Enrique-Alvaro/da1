@@ -31,6 +31,12 @@ type ItemDetail = {
   cannotBidReason: string | null;
   isOwner?: boolean;
   imageUrls?: string[];
+  pieceNumber?: number | string;
+  artistOrDesigner?: string | null;
+  originDate?: string | null;
+  history?: string | null;
+  components?: string | null;
+  ownerId?: number | null;
   highestBidderDisplay: { bidderNumber: number } | null;
 };
 
@@ -122,10 +128,26 @@ export default function ItemDetailScreen() {
 
         <View style={styles.contentContainer}>
           <Text style={styles.title}>{item.title}</Text>
+          {item.pieceNumber != null ? (
+            <Text style={styles.metaLine}>Pieza Nº {item.pieceNumber}</Text>
+          ) : null}
+          {item.artistOrDesigner ? (
+            <Text style={styles.metaLine}>Artista / diseñador: {item.artistOrDesigner}</Text>
+          ) : null}
+          {item.originDate ? (
+            <Text style={styles.metaLine}>Fecha / origen: {item.originDate}</Text>
+          ) : null}
+          {item.components ? (
+            <Text style={styles.metaLine}>Componentes: {item.components}</Text>
+          ) : null}
 
-          {item.catalogDescription && (
+          {item.history ? (
+            <Text style={styles.description}>{item.history}</Text>
+          ) : null}
+
+          {item.catalogDescription ? (
             <Text style={styles.description}>{item.catalogDescription}</Text>
-          )}
+          ) : null}
 
           {/* Precios */}
           <View style={styles.priceBox}>
@@ -237,6 +259,7 @@ const styles = StyleSheet.create({
   contentContainer: { padding: 20 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#002855', marginBottom: 8 },
   description: { fontSize: 15, color: '#4A5568', lineHeight: 22, marginBottom: 20 },
+  metaLine: { fontSize: 13, color: '#6B7280', marginBottom: 4 },
 
   priceBox: { backgroundColor: '#F8F9FA', borderRadius: 12, padding: 18, marginBottom: 20, gap: 12 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

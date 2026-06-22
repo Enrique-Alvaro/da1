@@ -15,6 +15,13 @@ export type CatalogItemRow = {
   catalogDescription: string | null;
   isSoldInRegistro: number;
   duenio: number | null;
+  numeroPieza: string | null;
+  artistaODisenador: string | null;
+  fechaOrigen: string | null;
+  historia: string | null;
+  componentes: string | null;
+  depositoUbicacion: string | null;
+  seguroPoliza: string | null;
 };
 
 export type ItemBidSummaryRow = {
@@ -33,6 +40,13 @@ const ITEM_SELECT = `
   p.descripcionCatalogo,
   p.descripcionCompleta,
   p.duenio,
+  p.numeroPieza,
+  p.artistaODisenador,
+  p.fechaOrigen,
+  p.historia,
+  p.componentes,
+  p.depositoUbicacion,
+  p.seguro AS seguroPoliza,
   cat.subasta AS subastaId,
   cat.descripcion AS catalogDescription,
   CASE WHEN EXISTS (

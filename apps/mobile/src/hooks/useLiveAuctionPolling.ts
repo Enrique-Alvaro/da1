@@ -41,7 +41,7 @@ export function useLiveAuctionPolling({
   const sync = useCallback(async () => {
     if (!enabled || !auctionId) return;
     try {
-      const state = await fetchLiveAuctionState(auctionId);
+      const state = await fetchLiveAuctionState(auctionId, watchedItemId);
       setError(null);
       setLiveState(state);
 

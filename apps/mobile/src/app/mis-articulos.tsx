@@ -22,6 +22,12 @@ type Submission = {
   commission: number | null;
   auctionId: number | null;
   rejectionReason: string | null;
+  depositLocation?: string | null;
+  insurancePolicyNumber?: string | null;
+  insuranceCompany?: string | null;
+  artistOrDesigner?: string | null;
+  history?: string | null;
+  components?: string | null;
 };
 
 type AuctionInfo = {
@@ -139,6 +145,19 @@ export default function MisArticulosScreen() {
             ))}
           </View>
         )}
+        {(item.depositLocation || item.insurancePolicyNumber) ? (
+          <View style={styles.consignmentBox}>
+            {item.depositLocation ? (
+              <Text style={styles.consignmentText}>Depósito: {item.depositLocation}</Text>
+            ) : null}
+            {item.insurancePolicyNumber ? (
+              <Text style={styles.consignmentText}>
+                Seguro: {item.insurancePolicyNumber}
+                {item.insuranceCompany ? ` — ${item.insuranceCompany}` : ''}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         {/* ... (resto del renderItem igual que antes) */}
       </View>
     );
@@ -185,6 +204,8 @@ const styles = StyleSheet.create({
   iconText: { fontSize: 20 },
   cardTopInfo: { flex: 1, marginLeft: 10 },
   cardTitle: { fontWeight: 'bold' },
+  consignmentBox: { marginTop: 10, padding: 10, backgroundColor: '#F3F4F6', borderRadius: 8, gap: 4 },
+  consignmentText: { fontSize: 12, color: '#374151' },
   cardDate: { fontSize: 12, color: '#94A3B8' },
   statusPill: { padding: 5, borderRadius: 10 },
   statusPillText: { fontSize: 10 },

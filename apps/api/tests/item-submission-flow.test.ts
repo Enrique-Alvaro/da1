@@ -83,6 +83,7 @@ describe("createSolicitudBodySchema", () => {
       declaracionPropiedad: true,
       declaracionSinImpedimentos: true,
       origenLicitoDeclarado: true,
+      declaracionDevolucionACargo: true,
       fotos: Array.from({ length: MIN_PRODUCT_IMAGES - 1 }, () => baseImage.base64),
     });
     expect(parsed.success).toBe(false);
@@ -107,6 +108,7 @@ describe("createSolicitudBodySchema", () => {
       declaracionPropiedad: true,
       declaracionSinImpedimentos: true,
       origenLicitoDeclarado: true,
+      declaracionDevolucionACargo: true,
       fullDescriptionUrl: "https://example.com/doc.pdf",
       fotos: Array.from({ length: MIN_PRODUCT_IMAGES }, () => baseImage.base64),
     });

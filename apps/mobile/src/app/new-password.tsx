@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PasswordInput } from '@/components/PasswordInput';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { changeInitialPassword, resetPassword } from '@/services/api';
@@ -89,36 +90,30 @@ export default function NewPasswordScreen() {
           ) : (
             <>
               <Text style={styles.label}>Contraseña Temporal Actual</Text>
-              <TextInput 
-                value={currentPassword} 
-                onChangeText={setCurrentPassword} 
-                placeholder="••••••••" 
-                secureTextEntry 
-                style={styles.input} 
-                placeholderTextColor="#9AA0A6"
+              <PasswordInput
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                placeholder="••••••••"
+                style={styles.input}
               />
             </>
           )}
 
           {/* Nuevos campos de contraseña */}
           <Text style={styles.label}>Contraseña</Text>
-          <TextInput 
-            value={newPass} 
-            onChangeText={setNewPass} 
-            placeholder="••••••••" 
-            secureTextEntry 
-            style={styles.input} 
-            placeholderTextColor="#9AA0A6"
+          <PasswordInput
+            value={newPass}
+            onChangeText={setNewPass}
+            placeholder="••••••••"
+            style={styles.input}
           />
 
           <Text style={styles.label}>Confirmar Contraseña</Text>
-          <TextInput 
-            value={confirmPass} 
-            onChangeText={setConfirmPass} 
-            placeholder="••••••••" 
-            secureTextEntry 
-            style={styles.input} 
-            placeholderTextColor="#9AA0A6"
+          <PasswordInput
+            value={confirmPass}
+            onChangeText={setConfirmPass}
+            placeholder="••••••••"
+            style={styles.input}
           />
 
           {/* Caja de Requisitos */}

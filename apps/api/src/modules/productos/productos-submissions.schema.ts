@@ -53,7 +53,16 @@ export const createProductSubmissionBodySchema = z.object({
   declarations: declarationsSchema,
 });
 
-export type CreateProductSubmissionBody = z.infer<typeof createProductSubmissionBodySchema>;
+export type CreateProductSubmissionBody = z.infer<typeof createProductSubmissionBodySchema> & {
+  submissionMetadata?: {
+    nombre: string;
+    historia: string | null;
+    artistaODisenador: string | null;
+    fechaOrigen: string | null;
+    componentes: string | null;
+    declaracionesJson: string;
+  };
+};
 
 export const productSubmissionIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -125,6 +134,10 @@ export const createSolicitudBodySchema = z
     origenLicitoDeclarado: z.literal(true, {
       errorMap: () => ({ message: "origenLicitoDeclarado debe ser true" }),
     }),
+    declaracionDevolucionACargo: z.literal(true, {
+      errorMap: () => ({ message: "declaracionDevolucionACargo debe ser true" }),
+    }),
+    componentes: z.string().trim().max(1000).optional(),
     fotos: z
       .array(z.union([fotoStringSchema, imageSchema]))
       .min(MIN_PRODUCT_IMAGES, `Se requieren al menos ${MIN_PRODUCT_IMAGES} fotos`)
@@ -169,7 +182,21 @@ export const createSolicitudBodySchema = z
         legitimateOwner: data.declaracionPropiedad,
         noLegalRestrictions: data.declaracionSinImpedimentos,
         acceptsDocumentationRequest: data.origenLicitoDeclarado,
-        acceptsReturnCostsIfRejected: true,
+        acceptsReturnCostsIfRejected: data.declaracionDevolucionACargo,
+      },
+      submissionMetadata: {
+        nombre: data.nombre,
+        historia: data.historia ?? null,
+        artistaODisenador: data.artistaODisenador ?? null,
+        fechaOrigen: data.fechaOrigen ?? null,
+        componentes: data.componentes ?? null,
+        declaracionesJson: JSON.stringify({
+          legitimateOwner: data.declaracionPropiedad,
+          noLegalRestrictions: data.declaracionSinImpedimentos,
+          acceptsDocumentationRequest: data.origenLicitoDeclarado,
+          acceptsReturnCostsIfRejected: data.declaracionDevolucionACargo,
+          acceptedAt: new Date().toISOString(),
+        }),
       },
     };
   });

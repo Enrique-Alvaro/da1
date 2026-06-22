@@ -207,7 +207,11 @@ export async function leaveLiveSession(auctionId: number, authUser: AuthUserCont
   };
 }
 
-export async function getLiveAuctionState(auctionId: number, authUser: AuthUserContext) {
+export async function getLiveAuctionState(
+  auctionId: number,
+  authUser: AuthUserContext,
+  watchedItemId?: number
+) {
   const subasta = await subastasRepository.requireSubastaById(auctionId);
   const access = await evaluateAuctionAccess({
     subasta,
@@ -333,6 +337,48 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
     schemaLimitations.push("NO_CURRENT_ITEM_FIELD");
   }
 
+  let watchedItem: {
+    id: number;
+    productId: number;
+    catalogDescription: string | null;
+    basePrice: number;
+    currentHighestBid: number;
+    minNextBid: number;
+    maxNextBid: number | null;
+    percentLimitsApply: boolean;
+    isHighestBidder: boolean;
+    isCurrentItem: boolean;
+  } | null = null;
+
+  if (watchedItemId != null) {
+    const watchedRow =
+      items.find((i) => i.identificador === watchedItemId) ??
+      (await itemsRepository.findCatalogItemById(watchedItemId));
+    if (watchedRow && watchedRow.subastaId === auctionId) {
+      const winning = await liveRepo.findWinningBidForItem(watchedItemId);
+      const basePrice = Number(watchedRow.precioBase);
+      const currentBest = winning != null ? Number(winning.importe) : basePrice;
+      const limits = computeBidLimits(
+        currentBest,
+        basePrice,
+        subasta.categoria ?? "comun"
+      );
+      watchedItem = {
+        id: watchedItemId,
+        productId: watchedRow.producto,
+        catalogDescription: watchedRow.descripcionCatalogo,
+        basePrice,
+        currentHighestBid: currentBest,
+        minNextBid: limits.minNextBid,
+        maxNextBid: limits.maxNextBid,
+        percentLimitsApply: limits.percentLimitsApply,
+        isHighestBidder:
+          cliente != null && winning != null && winning.cliente === cliente.identificador,
+        isCurrentItem: currentItemId === watchedItemId,
+      };
+    }
+  }
+
   return {
     auctionId,
     status: auctionStatus,
@@ -379,6 +425,7 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
     finalAmount,
     soldItemId,
     shouldRedirectToResult,
+    watchedItem,
   };
 }
 

@@ -67,6 +67,12 @@ function ResultPanel({
         <Text style={styles.resultLine}>Comisión: {fmt(result.commissionAmount)}</Text>
         <Text style={styles.resultLine}>Envío: {fmt(result.shippingAmount)}</Text>
         <Text style={styles.resultTotal}>Total a pagar: {fmt(result.totalAmount)}</Text>
+        <Text style={styles.resultNotice}>
+          El cobro de comisiones y envío se coordina por mensaje privado fuera de la app.
+        </Text>
+        <Text style={styles.resultNotice}>
+          Si retirás el artículo en persona, perdés la cobertura del seguro de transporte.
+        </Text>
         <Pressable style={styles.resultBtn} onPress={onViewPurchases}>
           <Text style={styles.resultBtnText}>Ver detalle de compra</Text>
         </Pressable>
@@ -151,6 +157,7 @@ export default function LiveAuctionScreen() {
 
   const sessionEntered = useRef(false);
   const wasHighestRef = useRef<boolean | null>(null);
+  const lastWatchedHighestRef = useRef<number | null>(null);
 
   const loadResult = useCallback(async () => {
     setResultLoading(true);
@@ -194,30 +201,53 @@ export default function LiveAuctionScreen() {
     onItemChanged: handleItemChanged,
   });
 
+  const watchedLive = liveState?.watchedItem ?? null;
+  const bidContextItemId = watchedLive?.id ?? liveState?.currentItem?.id ?? null;
+  const bidContextIsCurrent = watchedLive?.isCurrentItem ?? liveState?.currentItem?.id === itmId;
+
   useEffect(() => {
     if (!liveState) return;
 
-    if (liveState.currentHighestBid != null) {
-      setHighestBid(liveState.currentHighestBid);
-    }
-    if (liveState.minNextBid != null) {
-      setNextMin(liveState.minNextBid);
-      if (!bidAmount) setBidAmount(String(liveState.minNextBid));
-    }
-    if (liveState.maxNextBid != null) {
-      setMaxNext(liveState.maxNextBid);
-    }
+    const itemStats = liveState.watchedItem;
+    if (itemStats && itemStats.id === itmId) {
+      setHighestBid(itemStats.currentHighestBid);
+      setNextMin(itemStats.minNextBid);
+      setMaxNext(itemStats.maxNextBid);
+      if (!bidAmount) setBidAmount(String(itemStats.minNextBid));
 
-    if (wasHighestRef.current === true && liveState.isHighestBidder === false && !itemFinalized) {
-      setShowOutbidBanner(true);
+      const prevHighest = lastWatchedHighestRef.current;
+      const outbidByHigherBid =
+        wasHighestRef.current === true &&
+        !itemStats.isHighestBidder &&
+        prevHighest != null &&
+        itemStats.currentHighestBid > prevHighest;
+
+      if (outbidByHigherBid && !itemFinalized) {
+        setShowOutbidBanner(true);
+      }
+
+      lastWatchedHighestRef.current = itemStats.currentHighestBid;
+      wasHighestRef.current = itemStats.isHighestBidder;
+      setIsHighestBidder(itemStats.isHighestBidder);
+    } else if (liveState.currentItem?.id === itmId) {
+      if (liveState.currentHighestBid != null) {
+        setHighestBid(liveState.currentHighestBid);
+      }
+      if (liveState.minNextBid != null) {
+        setNextMin(liveState.minNextBid);
+        if (!bidAmount) setBidAmount(String(liveState.minNextBid));
+      }
+      if (liveState.maxNextBid != null) {
+        setMaxNext(liveState.maxNextBid);
+      }
+      wasHighestRef.current = liveState.isHighestBidder;
+      setIsHighestBidder(liveState.isHighestBidder);
     }
-    wasHighestRef.current = liveState.isHighestBidder;
-    setIsHighestBidder(liveState.isHighestBidder);
 
     if (liveState.status === 'closed') {
       setAuctionEnded(true);
     }
-  }, [liveState, itemFinalized, bidAmount]);
+  }, [liveState, itemFinalized, bidAmount, itmId]);
 
   useEffect(() => {
     if (auctionEnded && !itemFinalized && !resultLoading) {
@@ -316,19 +346,28 @@ export default function LiveAuctionScreen() {
       void refresh();
     } catch (e: unknown) {
       const message = resolveBidErrorMessage(e);
+      const code =
+        e && typeof e === 'object' && 'code' in e
+          ? String((e as { code?: string }).code ?? '')
+          : '';
+      if (code === 'BID_NOT_HIGHEST' || code === 'BID_CONFLICT') {
+        setShowOutbidBanner(true);
+      }
       const lower = message.toLowerCase();
       if (
         lower.includes('finaliz') ||
         lower.includes('cerrad') ||
         lower.includes('not open') ||
-        lower.includes('auction_not_open')
+        lower.includes('auction_not_open') ||
+        code === 'AUCTION_NOT_OPEN'
       ) {
         setItemFinalized(true);
         void loadResult();
-        setBidError('El artículo ya finalizó y no admite nuevas ofertas.');
+        setBidError('La subasta no está abierta o el artículo ya finalizó.');
       } else {
         setBidError(message);
       }
+      void refresh();
     } finally {
       setBidding(false);
     }
@@ -340,7 +379,8 @@ export default function LiveAuctionScreen() {
     paymentMethods.length === 0 ||
     auctionEnded ||
     liveState?.cannotBidReason === 'OWNER_CANNOT_BID' ||
-    liveState?.canBid === false;
+    (bidContextIsCurrent === false && bidContextItemId === itmId) ||
+    (liveState?.canBid === false && bidContextIsCurrent);
 
   return (
     <View style={styles.container}>
@@ -648,6 +688,7 @@ const styles = StyleSheet.create({
   resultLine: { fontSize: 14, color: '#475569', textAlign: 'center', marginBottom: 4 },
   resultMeta: { fontSize: 12, color: '#64748B', textAlign: 'center', marginBottom: 8 },
   resultTotal: { fontSize: 16, fontWeight: '700', color: '#D35400', textAlign: 'center', marginTop: 8 },
+  resultNotice: { fontSize: 12, color: '#4B5563', textAlign: 'center', marginTop: 6, lineHeight: 18 },
   resultBtn: {
     backgroundColor: '#D35400',
     paddingVertical: 12,
