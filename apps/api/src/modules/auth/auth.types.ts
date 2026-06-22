@@ -33,7 +33,7 @@ export type DbPersonaClienteProfileRow = {
   country_id: number | null;
   country_name: string | null;
   admitted: string;
-  category: string;
+  category: string | null;
   email: string | null;
 };
 
@@ -50,5 +50,5 @@ export type DbClientCredentialLoginRow = {
   country_id: number | null;
   country_name: string | null;
   admitted: string;
-  category: string;
+  category: string | null;
 };

@@ -8,7 +8,7 @@ import type { UserCategory } from "./user.mapper";
 export type ClienteIdentityRow = {
   identificador: number;
   admitido: string;
-  categoria: string;
+  categoria: string | null;
 };
 
 /**
@@ -67,7 +67,7 @@ export type AdminClientDetailRow = {
   full_name: string;
   email: string | null;
   admitido: string;
-  categoria: string;
+  categoria: string | null;
   document_number: string;
   status: string;
   country_name: string | null;

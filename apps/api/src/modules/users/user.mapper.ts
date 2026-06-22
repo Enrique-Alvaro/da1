@@ -16,15 +16,18 @@ export type UserPublic = {
     name: string;
   };
   admitted: "si" | "no";
-  category: UserCategory;
+  category: UserCategory | null;
 };
 
-function parseCategory(value: string): UserCategory {
+function parseCategory(value: string | null | undefined): UserCategory | null {
+  if (!value) {
+    return null;
+  }
   const v = value.trim().toLowerCase();
   if ((CATEGORY_VALUES as readonly string[]).includes(v)) {
     return v as UserCategory;
   }
-  return "comun";
+  return null;
 }
 
 export function mapPersonaClienteToUserPublic(row: DbPersonaClienteProfileRow): UserPublic {

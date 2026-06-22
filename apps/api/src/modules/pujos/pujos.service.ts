@@ -89,7 +89,7 @@ function assertSubastaMoneda(subasta: SubastaRow): string {
   return moneda;
 }
 
-export function assertCategoryAllowed(clientCategory: string, auctionCategory: string | null): void {
+export function assertCategoryAllowed(clientCategory: string | null, auctionCategory: string | null): void {
   if (!auctionCategory) {
     throw new ConflictError("La subasta no tiene categoría válida.", "AUCTION_CATEGORY_INVALID");
   }

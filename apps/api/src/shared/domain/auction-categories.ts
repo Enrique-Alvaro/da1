@@ -19,7 +19,7 @@ export function parseCategoryRank(value: string | null | undefined): number | nu
 
 /** El cliente puede participar si su categoría es >= la de la subasta. */
 export function categoryMeetsMinimum(
-  clientCategory: string,
+  clientCategory: string | null,
   auctionCategory: string
 ): boolean {
   const clientRank = parseCategoryRank(clientCategory);

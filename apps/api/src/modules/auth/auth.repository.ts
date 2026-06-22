@@ -23,7 +23,7 @@ export type PersonaClienteCreated = {
   fullName: string;
   status: string;
   admitted: "si" | "no";
-  category: "comun" | "especial" | "plata" | "oro" | "platino";
+  category: "comun" | "especial" | "plata" | "oro" | "platino" | null;
 };
 
 function sqlErrorInfo(err: unknown): { number?: number } {
@@ -85,7 +85,7 @@ export async function createPersonaClienteCredential(
     insC.input("verificador", sql.Int, getDefaultReviewerEmployeeId());
     await insC.query(`
       INSERT INTO dbo.clientes (identificador, numeroPais, admitido, categoria, verificador)
-      VALUES (@identificador, @numeroPais, N'no', N'comun', @verificador)
+      VALUES (@identificador, @numeroPais, N'no', NULL, @verificador)
     `);
 
     const insCred = new sql.Request(tx);
@@ -105,7 +105,7 @@ export async function createPersonaClienteCredential(
       fullName: input.fullName,
       status: "activo",
       admitted: "no",
-      category: "comun",
+      category: null,
     };
   } catch (err) {
     try {

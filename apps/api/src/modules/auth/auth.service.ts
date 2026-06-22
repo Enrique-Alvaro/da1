@@ -35,7 +35,7 @@ export type RegisterSuccessUser = {
   address: string | null;
   status: string;
   admitted: "si" | "no";
-  category: "comun" | "especial" | "plata" | "oro" | "platino";
+  category: "comun" | "especial" | "plata" | "oro" | "platino" | null;
 };
 
 export type RegisterResult = {

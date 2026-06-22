@@ -51,7 +51,7 @@ export function isAuctionOpen(subasta: SubastaRow): boolean {
 
 async function resolveClienteFromAuth(
   authUser: AuthUserContext | undefined
-): Promise<{ clienteId: number; admitido: string; categoria: string } | null> {
+): Promise<{ clienteId: number; admitido: string; categoria: string | null } | null> {
   if (!authUser?.id || authUser.role === "empleado") {
     return null;
   }
