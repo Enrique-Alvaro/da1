@@ -31,13 +31,20 @@ export function assertNoForbiddenBidBodyKeys(body: unknown): void {
   }
 }
 
+export const MAX_BID_AMOUNT = 999_999_999_999.99;
+
 export const createBidBodySchema = z
   .object({
     itemId: z.coerce.number().int().positive("itemId debe ser un entero positivo"),
     amount: z.coerce
-      .number()
+      .number({ invalid_type_error: "amount debe ser numérico" })
+      .finite("amount inválido")
       .positive("amount debe ser mayor a 0")
-      .refine((n) => Number.isFinite(n), "amount inválido"),
+      .max(MAX_BID_AMOUNT, "amount supera el límite permitido")
+      .refine(
+        (n) => Math.round(n * 100) === n * 100,
+        "amount admite como máximo 2 decimales"
+      ),
     paymentMethodId: z.coerce
       .number()
       .int()

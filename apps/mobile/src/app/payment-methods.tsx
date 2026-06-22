@@ -6,8 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { disablePaymentMethod, fetchPaymentMethods } from '@/services/api';
-import type { PaymentMethod } from '@/services/types';
+import { disablePaymentMethod, fetchPaymentMethods, getCurrentUser } from '@/services/api';
+import type { PaymentMethod, UserProfile } from '@/services/types';
+import { isUserAdmitted } from '@/utils/clientPermissions';
 
 const TYPE_LABELS: Record<string, string> = {
   tarjeta_credito: 'Tarjeta de Crédito',
@@ -54,12 +55,25 @@ export default function PaymentMethodsScreen() {
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [disabling, setDisabling] = useState<number | null>(null);
   const [disableError, setDisableError] = useState<string | null>(null);
+  const [admissionBlocked, setAdmissionBlocked] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetchPaymentMethods()
-      .then((res) => setMethods(res.items))
+    setAdmissionBlocked(false);
+    getCurrentUser()
+      .then((user: UserProfile) => {
+        if (!isUserAdmitted(user)) {
+          setAdmissionBlocked(true);
+          setMethods([]);
+          setLoading(false);
+          return null;
+        }
+        return fetchPaymentMethods();
+      })
+      .then((res) => {
+        if (res) setMethods(res.items);
+      })
       .catch(() => setError('No se pudieron cargar los métodos de pago.'))
       .finally(() => setLoading(false));
   }, []);
@@ -104,25 +118,32 @@ export default function PaymentMethodsScreen() {
             </Pressable>
           </View>
 
-          {loading && (
+          {admissionBlocked ? (
+            <View style={styles.centered}>
+              <Text style={styles.emptyTitle}>Cuenta pendiente de validación</Text>
+              <Text style={styles.emptyText}>
+                Los medios de pago estarán disponibles cuando la empresa apruebe tu registro.
+              </Text>
+            </View>
+          ) : loading ? (
             <View style={styles.centered}>
               <ActivityIndicator size="large" color="#E67E22" />
             </View>
-          )}
+          ) : null}
 
-          {!loading && error && (
+          {!admissionBlocked && !loading && error && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>{error}</Text>
             </View>
           )}
 
-          {!loading && disableError && (
+          {!admissionBlocked && !loading && disableError && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>{disableError}</Text>
             </View>
           )}
 
-          {!loading && !error && methods.length === 0 && (
+          {!admissionBlocked && !loading && !error && methods.length === 0 && (
             <Text style={styles.emptyText}>
               Aún no tienes métodos de pago registrados.
             </Text>
@@ -292,6 +313,13 @@ const styles = StyleSheet.create({
   errorBannerText: {
     color: '#7B241C',
     fontSize: 14,
+  },
+  emptyTitle: {
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#002855',
+    marginBottom: 8,
   },
   emptyText: {
     textAlign: 'center',

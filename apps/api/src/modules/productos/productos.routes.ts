@@ -4,7 +4,7 @@ import { requireAuth } from "../../shared/middlewares/requireAuth";
 import { requireClienteAuth } from "../../shared/middlewares/requireClienteAuth";
 import { requireOperationalUser } from "../../shared/middlewares/requireOperationalUser";
 import { requireAdmittedCliente } from "../../shared/middlewares/requireAdmittedCliente";
-import { getProducto, listProductos } from "./productos.controller";
+import { getProducto, getProductPhoto, listProductos } from "./productos.controller";
 import { createSubmission } from "./productos-submissions.controller";
 import {
   acceptMyTerms,
@@ -40,4 +40,5 @@ productosRoutes.post(
 );
 
 productosRoutes.get("/", listProductos);
+productosRoutes.get("/:id/photos/:photoId", getProductPhoto);
 productosRoutes.get("/:id", getProducto);

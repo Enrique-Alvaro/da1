@@ -14,6 +14,7 @@ import { forgotPassword, logout, resetPassword } from "../src/modules/auth/auth.
 import * as authRepository from "../src/modules/auth/auth.repository";
 import * as passwordResetRepository from "../src/modules/auth/auth-password-reset.repository";
 import type { AuthUserContext } from "../src/shared/types/auth";
+import { liveSubastaRow } from "./helpers/live-subasta";
 
 const authCliente: AuthUserContext = {
   id: "7",
@@ -157,19 +158,7 @@ describe("admission enables bidding guard", () => {
       admitido: "si",
       categoria: "comun",
     });
-    vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue({
-      identificador: 10,
-      fecha: "2026-06-10",
-      hora: "18:00:00",
-      estado: "abierta",
-      subastador: 1,
-      ubicacion: "CABA",
-      capacidadAsistentes: 50,
-      tieneDeposito: "si",
-      seguridadPropia: "no",
-      categoria: "comun",
-      moneda: "ARS",
-    });
+    vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(liveSubastaRow());
     vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue({
       identificador: 3,
       cliente: 7,
@@ -194,11 +183,9 @@ describe("admission enables bidding guard", () => {
     });
     vi.spyOn(pujosRepo, "findItemInSubasta").mockResolvedValue({
       identificador: 20,
-      catalogo: 1,
-      producto: 1,
       precioBase: 1000,
-      comision: 100,
-      subastado: "no",
+      subastaId: 10,
+      ownerPersonId: 99,
     });
     vi.spyOn(pujosRepo, "getMaxBidForItem").mockResolvedValue(null);
 
@@ -216,6 +203,7 @@ describe("admission enables bidding guard", () => {
         subastaId: 10,
         catalogDescription: null,
         isSoldInRegistro: 0,
+        duenio: 99,
       },
     ]);
 

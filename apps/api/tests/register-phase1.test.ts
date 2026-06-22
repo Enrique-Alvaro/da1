@@ -16,7 +16,7 @@ describe("Auth-2 — registerUser", () => {
       fullName: "Juan Pérez",
       status: "activo",
       admitted: "no",
-      category: "comun",
+      category: null,
     });
     const sendSpy = vi.spyOn(emailService, "sendTemporaryPasswordEmail").mockResolvedValue(undefined);
 
@@ -52,7 +52,7 @@ describe("Auth-2 — registerUser", () => {
       fullName: "Juan Pérez",
       email: "juan@example.com",
       admitted: "no",
-      category: "comun",
+      category: null,
     });
     expect(r.message).toContain("contraseña temporal");
   });

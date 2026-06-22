@@ -20,6 +20,7 @@ import {
   verifyAdminPaymentMethod,
 } from "../payment-methods/payment-methods-admin.controller";
 import { admitCliente, getAdminCliente, listAdminClientes } from "./admin-clients.controller";
+import { createAuction, patchAuction } from "./admin-auctions.controller";
 
 export const adminRoutes = Router();
 
@@ -50,3 +51,8 @@ adminRoutes.post("/items/submissions/:id/assign-auction", assignAdminSolicitud);
 adminRoutes.get("/productos/revision", listPendingReview);
 adminRoutes.post("/productos/:id/decision", adminDecision);
 adminRoutes.patch("/productos/:id/auction-assignment", auctionAssignment);
+
+adminRoutes.post("/subastas", createAuction);
+adminRoutes.post("/auctions", createAuction);
+adminRoutes.patch("/subastas/:id", patchAuction);
+adminRoutes.patch("/auctions/:id", patchAuction);

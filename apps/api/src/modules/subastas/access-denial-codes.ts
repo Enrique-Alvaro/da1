@@ -11,6 +11,7 @@ export type PublicAccessDenialCode =
   | "LIVE_SESSION_REQUIRED"
   | "LIVE_SESSION_OTHER_AUCTION"
   | "CLIENT_NOT_FOUND"
+  | "OWNER_CANNOT_BID"
   | "NONE";
 
 export function toPublicAccessDenialCode(

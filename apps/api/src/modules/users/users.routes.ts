@@ -75,16 +75,18 @@ usersRoutes.patch(
   markNotificationRead
 );
 
-usersRoutes.get("/me/payment-methods", ...clientOperationalChain, listMyPaymentMethods);
-usersRoutes.post("/me/payment-methods", ...clientOperationalChain, createPaymentMethod);
+usersRoutes.get("/me/payment-methods", ...clientOperationalChain, requireAdmittedCliente, listMyPaymentMethods);
+usersRoutes.post("/me/payment-methods", ...clientOperationalChain, requireAdmittedCliente, createPaymentMethod);
 usersRoutes.patch(
   "/me/payment-methods/:id/disable",
   ...clientOperationalChain,
+  requireAdmittedCliente,
   disablePaymentMethod
 );
 usersRoutes.patch(
   "/me/payment-methods/:id/guarantee",
   ...clientOperationalChain,
+  requireAdmittedCliente,
   updatePaymentMethodGuarantee
 );
 

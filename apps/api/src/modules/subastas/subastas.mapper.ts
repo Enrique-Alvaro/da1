@@ -3,6 +3,7 @@ import type { CatalogItemRow } from "./subastas-items.repository";
 import { toPublicAccessDenialCode } from "./access-denial-codes";
 import { evaluateAuctionAccess, mapSubastaStatus } from "./subastas-access.service";
 import { computeBidLimits } from "./subastas-bid-limits";
+import { formatTimePart, resolveHoraFin } from "./subastas-schedule";
 import type { SubastaDetailRow, SubastaRow } from "./subastas.repository";
 
 function formatDate(value: Date | string | null): string | null {
@@ -59,6 +60,7 @@ export function mapSubastaSummary(
     id: row.identificador,
     date: formatDate(row.fecha),
     time: formatTime(row.hora),
+    endTime: formatTimePart(resolveHoraFin(row)),
     status,
     category: row.categoria,
     currency: row.moneda ?? "ARS",

@@ -22,7 +22,7 @@ function mapAdminClientListItem(row: usersRepository.AdminClientListRow) {
     documentNumber: row.document_number,
     countryName: row.country_name,
     admitido: row.admitido.trim().toLowerCase() === "si" ? "si" : "no",
-    categoria: row.categoria.trim().toLowerCase() as UserCategory,
+    categoria: row.categoria?.trim().toLowerCase() ?? null,
     registeredAt: formatOptionalDate(row.registered_at),
     paymentMethods: {
       total: Number(row.payment_method_count ?? 0),
@@ -61,7 +61,7 @@ export async function admitCliente(clienteId: number, body: AdmitClienteBody) {
   return {
     clienteId: updated.identificador,
     admitido: updated.admitido.trim().toLowerCase() === "si" ? "si" : "no",
-    categoria: updated.categoria.trim().toLowerCase() as UserCategory,
+    categoria: updated.categoria?.trim().toLowerCase() ?? null,
     updatedAt: new Date().toISOString(),
   };
 }

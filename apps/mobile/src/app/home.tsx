@@ -106,6 +106,7 @@ export default function HomeScreen() {
   const [userLoading, setUserLoading] = useState(!isGuest);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [showLiveOnly, setShowLiveOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'live' | 'closed'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
@@ -130,7 +131,10 @@ export default function HomeScreen() {
       }
 
       try {
-        const auctionsResult = await (fetchAuctions() as Promise<{ items: Auction[] }>);
+        const statusParam = statusFilter === 'all' ? undefined : statusFilter;
+        const auctionsResult = await (fetchAuctions(
+          statusParam ? { status: statusParam } : undefined
+        ) as Promise<{ items: Auction[] }>);
         setAuctions(auctionsResult?.items ?? []);
       } catch (e: any) {
         setError(e?.message || 'Error al cargar las subastas.');
@@ -139,7 +143,7 @@ export default function HomeScreen() {
       }
     }
     load();
-  }, []);
+  }, [statusFilter, isGuest]);
 
   const availableDates = useMemo(() => {
     const dates = auctions.map(a => a.date).filter(Boolean) as string[];
@@ -155,12 +159,13 @@ export default function HomeScreen() {
       return 0;
     });
     return sorted
+      .filter(a => statusFilter === 'all' || a.status === statusFilter)
       .filter(a => !showLiveOnly || a.status === 'live')
       .filter(a => !selectedCategory || a.category === selectedCategory)
       .filter(a => !selectedDate || a.date === selectedDate);
-  }, [auctions, showLiveOnly, selectedCategory, selectedDate]);
+  }, [auctions, showLiveOnly, statusFilter, selectedCategory, selectedDate]);
 
-  const hasActiveFilters = showLiveOnly || !!selectedCategory || !!selectedDate;
+  const hasActiveFilters = showLiveOnly || statusFilter !== 'all' || !!selectedCategory || !!selectedDate;
 
   const noAuctionsMessage = hasActiveFilters
     ? 'No hay subastas para este filtro.'
@@ -294,6 +299,23 @@ export default function HomeScreen() {
 
       <View style={styles.filtersBlock}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
+          {(['all', 'live', 'scheduled', 'closed'] as const).map((status) => (
+            <Pressable
+              key={status}
+              style={[styles.chip, statusFilter === status && styles.chipActive]}
+              onPress={() => setStatusFilter(status)}
+            >
+              <Text style={[styles.chipText, statusFilter === status && styles.chipTextActive]}>
+                {status === 'all'
+                  ? 'Todas'
+                  : status === 'live'
+                  ? 'En vivo'
+                  : status === 'scheduled'
+                  ? 'Próximas'
+                  : 'Cerradas'}
+              </Text>
+            </Pressable>
+          ))}
           <Pressable
             style={[styles.chip, showLiveOnly && styles.chipActive]}
             onPress={() => setShowLiveOnly((prev) => !prev)}

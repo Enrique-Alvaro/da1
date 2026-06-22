@@ -9,6 +9,7 @@ import {
   registerAsistente,
 } from '@/services/api';
 import type { ItemFinalizationResult, LiveAuctionState } from '@/services/types';
+import { resolveBidErrorMessage } from '@/utils/bidErrors';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -133,6 +134,7 @@ export default function LiveAuctionScreen() {
 
   const [highestBid, setHighestBid] = useState<number>(Number(currentBid) || 0);
   const [nextMin, setNextMin] = useState<number | null>(minNextBid ? Number(minNextBid) : null);
+  const [maxNext, setMaxNext] = useState<number | null>(null);
   const [bidAmount, setBidAmount] = useState(minNextBid || '');
   const [isHighestBidder, setIsHighestBidder] = useState(false);
   const [showOutbidBanner, setShowOutbidBanner] = useState(false);
@@ -201,6 +203,9 @@ export default function LiveAuctionScreen() {
     if (liveState.minNextBid != null) {
       setNextMin(liveState.minNextBid);
       if (!bidAmount) setBidAmount(String(liveState.minNextBid));
+    }
+    if (liveState.maxNextBid != null) {
+      setMaxNext(liveState.maxNextBid);
     }
 
     if (wasHighestRef.current === true && liveState.isHighestBidder === false && !itemFinalized) {
@@ -275,13 +280,20 @@ export default function LiveAuctionScreen() {
     setBidError(null);
     setBidSuccess(null);
     setShowOutbidBanner(false);
+    if (bidding) {
+      return;
+    }
     const amount = Number(bidAmount);
-    if (!amount || Number.isNaN(amount) || amount <= 0) {
+    if (!amount || !Number.isFinite(amount) || amount <= 0) {
       setBidError('Ingresá un monto válido.');
       return;
     }
     if (nextMin !== null && amount < nextMin) {
       setBidError(`El monto mínimo es ${displayCurrency} ${nextMin.toLocaleString('es-AR')}.`);
+      return;
+    }
+    if (maxNext !== null && amount > maxNext) {
+      setBidError(`El monto máximo es ${displayCurrency} ${maxNext.toLocaleString('es-AR')}.`);
       return;
     }
     if (!selectedPaymentId) {
@@ -303,9 +315,7 @@ export default function LiveAuctionScreen() {
       wasHighestRef.current = true;
       void refresh();
     } catch (e: unknown) {
-      const message = e && typeof e === 'object' && 'message' in e
-        ? String((e as { message: string }).message)
-        : 'No se pudo registrar la puja.';
+      const message = resolveBidErrorMessage(e);
       const lower = message.toLowerCase();
       if (
         lower.includes('finaliz') ||
@@ -325,7 +335,12 @@ export default function LiveAuctionScreen() {
   }
 
   const biddingDisabled =
-    itemFinalized || bidding || paymentMethods.length === 0 || auctionEnded;
+    itemFinalized ||
+    bidding ||
+    paymentMethods.length === 0 ||
+    auctionEnded ||
+    liveState?.cannotBidReason === 'OWNER_CANNOT_BID' ||
+    liveState?.canBid === false;
 
   return (
     <View style={styles.container}>

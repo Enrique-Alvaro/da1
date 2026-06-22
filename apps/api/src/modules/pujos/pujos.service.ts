@@ -11,16 +11,15 @@ import { findByIdAndCliente } from "../payment-methods/payment-methods.repositor
 import type { MedioPagoRow } from "../payment-methods/payment-methods.repository";
 import {
   requireSubastaById,
-  SUBASTA_ESTADO_ABIERTA,
   type SubastaRow,
 } from "../subastas/subastas.repository";
 import { findClienteByPersonId } from "../users/users.repository";
-import type { CreateBidBody } from "./pujos.schema";
+import { MAX_BID_AMOUNT, type CreateBidBody } from "./pujos.schema";
 import { assertPaymentMethodForBid } from "./pujos-payment-validation";
 import * as liveSessionStore from "../subastas/live-session.store";
 import { computeBidLimits } from "../subastas/subastas-bid-limits";
 import { pickCurrentItemId } from "../subastas/subastas-current-item";
-import { mapSubastaStatus } from "../subastas/subastas-access.service";
+import { mapSubastaStatus, isDbEstadoAbierta } from "../subastas/subastas-access.service";
 import { listCatalogItemsBySubasta } from "../subastas/subastas-items.repository";
 import * as liveRepo from "../subastas/subastas-live.repository";
 import * as closingRepository from "../subastas/subastas-closing.repository";
@@ -73,9 +72,29 @@ function assertClienteAdmitted(admitido: string): void {
 }
 
 function assertSubastaAbierta(subasta: SubastaRow): void {
-  const estado = (subasta.estado ?? "").trim().toLowerCase();
-  if (estado !== SUBASTA_ESTADO_ABIERTA) {
+  if (mapSubastaStatus(subasta) !== "live") {
     throw new ConflictError("La subasta no está abierta.", "AUCTION_NOT_OPEN");
+  }
+  if (!isDbEstadoAbierta(subasta)) {
+    throw new ConflictError("La subasta no está abierta.", "AUCTION_NOT_OPEN");
+  }
+}
+
+function assertNotItemOwner(clienteId: number, ownerPersonId: number | null | undefined): void {
+  if (ownerPersonId != null && clienteId === ownerPersonId) {
+    throw new ForbiddenError(
+      "No podés pujar sobre un artículo propio.",
+      "OWNER_CANNOT_BID"
+    );
+  }
+}
+
+function assertBidAmountFinite(amount: number): void {
+  if (!Number.isFinite(amount) || Number.isNaN(amount) || amount <= 0) {
+    throw new ConflictError("El importe de la puja no es válido.", "BID_AMOUNT_INVALID");
+  }
+  if (amount > MAX_BID_AMOUNT) {
+    throw new ConflictError("El importe supera el máximo permitido.", "BID_TOO_HIGH");
   }
 }
 
@@ -129,6 +148,10 @@ export function validateBidAmountRules(
   basePrice: number,
   auctionCategory: string
 ): void {
+  assertBidAmountFinite(amount);
+  if (!Number.isFinite(currentBest) || !Number.isFinite(basePrice) || basePrice <= 0) {
+    throw new ConflictError("No se pudo validar los límites de puja.", "BID_VALIDATION_ERROR");
+  }
   const limits = computeBidLimits(currentBest, basePrice, auctionCategory);
   if (amount <= limits.currentBest) {
     throw new ConflictError(
@@ -200,6 +223,7 @@ export async function assertCanBid(params: {
   if (!item) {
     throw new NotFoundError("Ítem no encontrado en esta subasta.", "ITEM_NOT_FOUND");
   }
+  assertNotItemOwner(cliente.identificador, item.ownerPersonId);
 
   const catalogItems = await listCatalogItemsBySubasta(params.auctionId);
   const currentItemId = pickCurrentItemId(catalogItems, mapSubastaStatus(subasta));

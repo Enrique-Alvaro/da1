@@ -23,8 +23,15 @@ import sql from "mssql";
 import { loadEnv, getDefaultReviewerEmployeeId } from "../src/config/env";
 import { hashPassword } from "../src/shared/security/passwords";
 
-const DEMO_AUCTION_LOCATION = "CrownBid Demo — Buenos Aires";
-const DEMO_CATALOG_DESC = "CrownBid Demo — Catálogo general";
+const DEMO_AUCTION_LOCATION_LIVE = "CrownBid Demo LIVE — Buenos Aires";
+const DEMO_AUCTION_LOCATION_UPCOMING = "CrownBid Demo UPCOMING — Córdoba";
+const DEMO_AUCTION_LOCATION_CLOSED = "CrownBid Demo CLOSED — Microcentro";
+
+/** Minimal JPEG bytes for demo product photos (upload flow remains client-submission only). */
+const DEMO_JPEG = Buffer.from(
+  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
+  "base64"
+);
 
 /** ISO 3166-1 numeric codes used as dbo.paises.numero (PK). */
 const COUNTRIES: Array<{
@@ -133,6 +140,79 @@ async function ensurePersona(
     `);
 }
 
+async function ensureProductPhotos(pool: sql.ConnectionPool, productId: number): Promise<void> {
+  const count = await pool
+    .request()
+    .input("producto", sql.Int, productId)
+    .query<{ n: number }>(`SELECT COUNT_BIG(1) AS n FROM dbo.fotos WHERE producto = @producto`);
+  if ((count.recordset[0]?.n ?? 0) >= 6) return;
+  for (let i = 0; i < 6; i += 1) {
+    await pool
+      .request()
+      .input("producto", sql.Int, productId)
+      .input("foto", sql.VarBinary(sql.MAX), DEMO_JPEG)
+      .query(`INSERT INTO dbo.fotos (producto, foto) VALUES (@producto, @foto)`);
+  }
+}
+
+async function insertDemoAuction(
+  pool: sql.ConnectionPool,
+  params: {
+    ubicacion: string;
+    fechaSql: string;
+    horaSql: string;
+    horaFinSql: string;
+    estado: string | null;
+    categoria: string;
+    moneda: string;
+    subastador: number;
+    bypassDateCheck?: boolean;
+  }
+): Promise<number | null> {
+  const check = await pool
+    .request()
+    .input("ubicacion", sql.NVarChar(350), params.ubicacion)
+    .query<{ id: number | null }>(`
+      SELECT TOP (1) identificador AS id FROM dbo.subastas WHERE ubicacion = @ubicacion
+    `);
+  if (check.recordset[0]?.id) return check.recordset[0].id;
+
+  if (params.bypassDateCheck) {
+    await pool.request().query(`ALTER TABLE dbo.subastas NOCHECK CONSTRAINT chkFecha`);
+  }
+  const ins = await pool
+    .request()
+    .input("subastador", sql.Int, params.subastador)
+    .input("ubicacion", sql.NVarChar(350), params.ubicacion)
+    .input("estado", sql.VarChar(10), params.estado)
+    .input("categoria", sql.NVarChar(10), params.categoria)
+    .input("moneda", sql.VarChar(3), params.moneda)
+    .query<{ id: number }>(`
+      INSERT INTO dbo.subastas (
+        fecha, hora, horaFin, estado, subastador, ubicacion,
+        capacidadAsistentes, tieneDeposito, seguridadPropia, categoria, moneda
+      )
+      OUTPUT INSERTED.identificador AS id
+      VALUES (
+        ${params.fechaSql},
+        ${params.horaSql},
+        ${params.horaFinSql},
+        @estado,
+        @subastador,
+        @ubicacion,
+        150,
+        N'si',
+        N'si',
+        @categoria,
+        @moneda
+      )
+    `);
+  if (params.bypassDateCheck) {
+    await pool.request().query(`ALTER TABLE dbo.subastas CHECK CONSTRAINT chkFecha`);
+  }
+  return ins.recordset[0]?.id ?? null;
+}
+
 async function seedAuctionDomain(pool: sql.ConnectionPool, reviewerId: number): Promise<void> {
   if (!(await tableExists(pool, "dbo.subastas"))) {
     console.warn("[seed] dbo.subastas not found — skipping auction demo data.");
@@ -169,139 +249,173 @@ async function seedAuctionDomain(pool: sql.ConnectionPool, reviewerId: number): 
         VALUES (@id, 1, 'si', 'si', 2, @verificador);
     `);
 
-  const productCheck = await pool.request().query<{ id: number | null }>(`
-    SELECT TOP (1) identificador AS id
-    FROM dbo.productos
-    WHERE descripcionCompleta LIKE N'CrownBid Demo —%'
-    ORDER BY identificador ASC
-  `);
+  const liveAuctionId = await insertDemoAuction(pool, {
+    ubicacion: DEMO_AUCTION_LOCATION_LIVE,
+    fechaSql: "CAST(GETDATE() AS date)",
+    horaSql: "CAST(DATEADD(minute, -15, GETDATE()) AS time)",
+    horaFinSql: "CAST(DATEADD(minute, 60, GETDATE()) AS time)",
+    estado: "abierta",
+    categoria: "comun",
+    moneda: "ARS",
+    subastador: FIXED_IDS.subastadorPersona,
+    bypassDateCheck: true,
+  });
 
-  let productId = productCheck.recordset[0]?.id ?? null;
-  if (productId == null) {
+  const liveAuctionId2 = await insertDemoAuction(pool, {
+    ubicacion: "CrownBid Demo LIVE — Palermo",
+    fechaSql: "CAST(GETDATE() AS date)",
+    horaSql: "CAST(DATEADD(minute, -10, GETDATE()) AS time)",
+    horaFinSql: "CAST(DATEADD(minute, 70, GETDATE()) AS time)",
+    estado: "abierta",
+    categoria: "plata",
+    moneda: "USD",
+    subastador: FIXED_IDS.subastadorPersona,
+    bypassDateCheck: true,
+  });
+
+  await insertDemoAuction(pool, {
+    ubicacion: DEMO_AUCTION_LOCATION_UPCOMING,
+    fechaSql: "DATEADD(day, 18, CAST(GETDATE() AS date))",
+    horaSql: "'11:00:00'",
+    horaFinSql: "'12:15:00'",
+    estado: null,
+    categoria: "especial",
+    moneda: "ARS",
+    subastador: FIXED_IDS.subastadorPersona,
+  });
+
+  await insertDemoAuction(pool, {
+    ubicacion: "CrownBid Demo UPCOMING — Rosario",
+    fechaSql: "DATEADD(day, 22, CAST(GETDATE() AS date))",
+    horaSql: "'16:00:00'",
+    horaFinSql: "'17:10:00'",
+    estado: null,
+    categoria: "oro",
+    moneda: "ARS",
+    subastador: FIXED_IDS.subastadorPersona,
+  });
+
+  await insertDemoAuction(pool, {
+    ubicacion: DEMO_AUCTION_LOCATION_CLOSED,
+    fechaSql: "CAST(GETDATE() AS date)",
+    horaSql: "'06:00:00'",
+    horaFinSql: "'07:15:00'",
+    estado: "carrada",
+    categoria: "platino",
+    moneda: "USD",
+    subastador: FIXED_IDS.subastadorPersona,
+    bypassDateCheck: true,
+  });
+
+  async function ensureProduct(
+    desc: string,
+    catalogDesc: string,
+    duenioId: number
+  ): Promise<number | null> {
+    const found = await pool
+      .request()
+      .input("desc", sql.NVarChar(300), desc)
+      .query<{ id: number | null }>(`
+        SELECT TOP (1) identificador AS id FROM dbo.productos WHERE descripcionCompleta = @desc
+      `);
+    if (found.recordset[0]?.id) {
+      await ensureProductPhotos(pool, found.recordset[0].id);
+      return found.recordset[0].id;
+    }
     const ins = await pool
       .request()
       .input("revisor", sql.Int, FIXED_IDS.revisorPersona)
-      .input("duenio", sql.Int, FIXED_IDS.duenioPersona)
+      .input("duenio", sql.Int, duenioId)
+      .input("catalogDesc", sql.NVarChar(500), catalogDesc)
+      .input("desc", sql.NVarChar(300), desc)
       .query<{ id: number }>(`
         INSERT INTO dbo.productos (fecha, disponible, descripcionCatalogo, descripcionCompleta, revisor, duenio, seguro)
         OUTPUT INSERTED.identificador AS id
-        VALUES (
-          CAST(GETDATE() AS date),
-          'si',
-          N'CrownBid Demo — Reloj clásico',
-          N'CrownBid Demo — Reloj clásico en excelente estado para pruebas de subasta.',
-          @revisor,
-          @duenio,
-          NULL
-        );
+        VALUES (CAST(GETDATE() AS date), 'si', @catalogDesc, @desc, @revisor, @duenio, NULL)
       `);
-    productId = ins.recordset[0]?.id ?? null;
+    const id = ins.recordset[0]?.id ?? null;
+    if (id != null) await ensureProductPhotos(pool, id);
+    return id;
   }
 
-  const auctionCheck = await pool
+  const sellerProductId = await ensureProduct(
+    "CrownBid Demo — Reloj clásico (vendedor externo)",
+    "CrownBid Demo — Reloj clásico",
+    FIXED_IDS.duenioPersona
+  );
+
+  const buyerPersonaForOwnerItem = await pool
     .request()
-    .input("ubicacion", sql.NVarChar(350), DEMO_AUCTION_LOCATION)
+    .input("email", sql.NVarChar(320), DEMO_BUYER.email)
     .query<{ id: number | null }>(`
-      SELECT TOP (1) identificador AS id
-      FROM dbo.subastas
-      WHERE ubicacion = @ubicacion
-      ORDER BY identificador ASC
+      SELECT TOP (1) persona_id AS id FROM dbo.cliente_credenciales WHERE LOWER(email) = LOWER(@email)
     `);
+  const buyerPersonaId = buyerPersonaForOwnerItem.recordset[0]?.id ?? null;
 
-  let auctionId = auctionCheck.recordset[0]?.id ?? null;
-  if (auctionId == null) {
-    const hasMoneda = await pool.request().query<{ ok: number }>(`
-      SELECT CASE WHEN COL_LENGTH('dbo.subastas', 'moneda') IS NOT NULL THEN 1 ELSE 0 END AS ok
-    `);
-    const insAuction = hasMoneda.recordset[0]?.ok
-      ? await pool
-          .request()
-          .input("subastador", sql.Int, FIXED_IDS.subastadorPersona)
-          .input("ubicacion", sql.NVarChar(350), DEMO_AUCTION_LOCATION)
-          .query<{ id: number }>(`
-            INSERT INTO dbo.subastas (
-              fecha, hora, estado, subastador, ubicacion,
-              capacidadAsistentes, tieneDeposito, seguridadPropia, categoria, moneda
-            )
-            OUTPUT INSERTED.identificador AS id
-            VALUES (
-              DATEADD(day, 15, CAST(GETDATE() AS date)),
-              '18:00:00',
-              'abierta',
-              @subastador,
-              @ubicacion,
-              150,
-              'si',
-              'si',
-              'comun',
-              'ARS'
-            );
-          `)
-      : await pool
-          .request()
-          .input("subastador", sql.Int, FIXED_IDS.subastadorPersona)
-          .input("ubicacion", sql.NVarChar(350), DEMO_AUCTION_LOCATION)
-          .query<{ id: number }>(`
-            INSERT INTO dbo.subastas (
-              fecha, hora, estado, subastador, ubicacion,
-              capacidadAsistentes, tieneDeposito, seguridadPropia, categoria
-            )
-            OUTPUT INSERTED.identificador AS id
-            VALUES (
-              DATEADD(day, 15, CAST(GETDATE() AS date)),
-              '18:00:00',
-              'abierta',
-              @subastador,
-              @ubicacion,
-              150,
-              'si',
-              'si',
-              'comun'
-            );
-          `);
-    auctionId = insAuction.recordset[0]?.id ?? null;
-  }
-
-  if (auctionId == null || productId == null) return;
-
-  const catalogCheck = await pool
-    .request()
-    .input("desc", sql.NVarChar(250), DEMO_CATALOG_DESC)
-    .input("subasta", sql.Int, auctionId)
-    .query<{ id: number | null }>(`
-      SELECT TOP (1) identificador AS id
-      FROM dbo.catalogos
-      WHERE descripcion = @desc AND subasta = @subasta
-    `);
-
-  let catalogId = catalogCheck.recordset[0]?.id ?? null;
-  if (catalogId == null) {
-    const insCat = await pool
+  let ownerProductId: number | null = null;
+  if (buyerPersonaId != null) {
+    await pool
       .request()
-      .input("desc", sql.NVarChar(250), DEMO_CATALOG_DESC)
-      .input("subasta", sql.Int, auctionId)
-      .input("responsable", sql.Int, FIXED_IDS.revisorPersona)
-      .query<{ id: number }>(`
-        INSERT INTO dbo.catalogos (descripcion, subasta, responsable)
-        OUTPUT INSERTED.identificador AS id
-        VALUES (@desc, @subasta, @responsable);
+      .input("id", sql.Int, buyerPersonaId)
+      .input("verificador", sql.Int, reviewerId)
+      .query(`
+        IF NOT EXISTS (SELECT 1 FROM dbo.duenios WHERE identificador = @id)
+          INSERT INTO dbo.duenios (identificador, numeroPais, verificacionFinanciera, verificacionJudicial, calificacionRiesgo, verificador)
+          VALUES (@id, 1, 'si', 'si', 1, @verificador);
       `);
-    catalogId = insCat.recordset[0]?.id ?? null;
+    ownerProductId = await ensureProduct(
+      "CrownBid Demo — Artículo propio del comprador demo",
+      "CrownBid Demo — Artículo propio (owner-bid test)",
+      buyerPersonaId
+    );
   }
 
-  if (catalogId == null) return;
+  async function linkProductToAuction(
+    auctionId: number | null,
+    productId: number | null,
+    catalogLabel: string,
+    precioBase: number
+  ): Promise<void> {
+    if (auctionId == null || productId == null) return;
+    const catalogCheck = await pool
+      .request()
+      .input("desc", sql.NVarChar(250), catalogLabel)
+      .input("subasta", sql.Int, auctionId)
+      .query<{ id: number | null }>(`
+        SELECT TOP (1) identificador AS id FROM dbo.catalogos WHERE descripcion = @desc AND subasta = @subasta
+      `);
+    let catalogId = catalogCheck.recordset[0]?.id ?? null;
+    if (catalogId == null) {
+      const insCat = await pool
+        .request()
+        .input("desc", sql.NVarChar(250), catalogLabel)
+        .input("subasta", sql.Int, auctionId)
+        .input("responsable", sql.Int, FIXED_IDS.revisorPersona)
+        .query<{ id: number }>(`
+          INSERT INTO dbo.catalogos (descripcion, subasta, responsable)
+          OUTPUT INSERTED.identificador AS id
+          VALUES (@desc, @subasta, @responsable)
+        `);
+      catalogId = insCat.recordset[0]?.id ?? null;
+    }
+    if (catalogId == null) return;
+    await pool
+      .request()
+      .input("catalogo", sql.Int, catalogId)
+      .input("producto", sql.Int, productId)
+      .input("precioBase", sql.Decimal(18, 2), precioBase)
+      .query(`
+        IF NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo WHERE catalogo = @catalogo AND producto = @producto)
+          INSERT INTO dbo.itemsCatalogo (catalogo, producto, precioBase, comision, subastado)
+          VALUES (@catalogo, @producto, @precioBase, 100.00, 'no')
+      `);
+  }
 
-  await pool
-    .request()
-    .input("catalogo", sql.Int, catalogId)
-    .input("producto", sql.Int, productId)
-    .query(`
-      IF NOT EXISTS (
-        SELECT 1 FROM dbo.itemsCatalogo WHERE catalogo = @catalogo AND producto = @producto
-      )
-        INSERT INTO dbo.itemsCatalogo (catalogo, producto, precioBase, comision, subastado)
-        VALUES (@catalogo, @producto, 1000.00, 100.00, 'no');
-    `);
+  await linkProductToAuction(liveAuctionId, sellerProductId, "CrownBid Demo LIVE — Catálogo", 10000);
+  await linkProductToAuction(liveAuctionId2, sellerProductId, "CrownBid Demo LIVE 2 — Catálogo", 25000);
+  if (ownerProductId != null) {
+    await linkProductToAuction(liveAuctionId, ownerProductId, "CrownBid Demo LIVE — Catálogo", 5000);
+  }
 }
 
 async function seedDemoBuyer(
@@ -448,11 +562,11 @@ async function main(): Promise<void> {
     await seedReviewerEmployee(pool, reviewerId);
     console.info(`[seed] Reviewer employee id=${reviewerId} ensured.`);
 
-    await seedAuctionDomain(pool, reviewerId);
-    console.info("[seed] Auction demo domain ensured.");
-
     await seedDemoBuyer(pool, reviewerId, passwordHash);
     console.info("[seed] Demo buyer ensured.");
+
+    await seedAuctionDomain(pool, reviewerId);
+    console.info("[seed] Auction demo domain ensured.");
 
     await printSummary(pool);
     console.info("\n[seed] Done (idempotent).");

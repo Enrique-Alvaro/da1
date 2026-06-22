@@ -52,7 +52,7 @@ export default function NewPasswordScreen() {
       } else {
         await changeInitialPassword(currentPassword, newPass);
       }
-      router.push(mode === 'initial' ? '/payment-methods' : '/home');
+      router.push(mode === 'initial' ? '/home' : '/home');
     } catch (error: any) {
       setServerError(error?.message || 'No se pudo actualizar la contraseña.');
     } finally {

@@ -58,3 +58,27 @@ export async function requireProductoById(identificador: number): Promise<Produc
   }
   return row;
 }
+
+export async function findProductPhotoBuffer(
+  productId: number,
+  photoId: number
+): Promise<Buffer | null> {
+  const pool = await getSqlPool();
+  const result = await pool
+    .request()
+    .input("producto", sql.Int, productId)
+    .input("photoId", sql.Int, photoId)
+    .query<{ foto: Buffer }>(`
+      SELECT TOP (1) f.foto
+      FROM dbo.fotos AS f
+      INNER JOIN dbo.productos AS p ON p.identificador = f.producto
+      WHERE f.identificador = @photoId
+        AND f.producto = @producto
+        AND p.disponible = N'si'
+    `);
+  const row = result.recordset[0];
+  if (!row?.foto) {
+    return null;
+  }
+  return Buffer.isBuffer(row.foto) ? row.foto : Buffer.from(row.foto);
+}

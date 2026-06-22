@@ -7,6 +7,7 @@ import * as paymentMethodsRepository from "../payment-methods/payment-methods.re
 import * as usersRepository from "../users/users.repository";
 import { SUBASTA_ESTADO_ABIERTA, type SubastaRow } from "./subastas.repository";
 import * as liveSessionStore from "./live-session.store";
+import { getEffectiveAuctionStatus } from "./subastas-schedule";
 
 export type AccessDenialCode =
   | "USER_NOT_ADMITTED"
@@ -17,7 +18,8 @@ export type AccessDenialCode =
   | "AUTH_REQUIRED"
   | "CLIENT_NOT_FOUND"
   | "LIVE_SESSION_REQUIRED"
-  | "LIVE_SESSION_OTHER_AUCTION";
+  | "LIVE_SESSION_OTHER_AUCTION"
+  | "OWNER_CANNOT_BID";
 
 export type AuctionAccessSnapshot = {
   canView: boolean;
@@ -30,23 +32,16 @@ export type AuctionAccessSnapshot = {
   liveSessionAuctionId: number | null;
 };
 
-function mapDbEstadoToApi(estado: string | null): "scheduled" | "live" | "closed" {
-  const e = (estado ?? "").trim().toLowerCase();
-  if (e === "carrada") {
-    return "closed";
-  }
-  if (e === SUBASTA_ESTADO_ABIERTA) {
-    return "live";
-  }
-  return "scheduled";
-}
-
 export function mapSubastaStatus(subasta: SubastaRow): "scheduled" | "live" | "closed" {
-  return mapDbEstadoToApi(subasta.estado);
+  return getEffectiveAuctionStatus(subasta);
 }
 
 export function isAuctionOpen(subasta: SubastaRow): boolean {
   return mapSubastaStatus(subasta) === "live";
+}
+
+export function isDbEstadoAbierta(subasta: SubastaRow): boolean {
+  return (subasta.estado ?? "").trim().toLowerCase() === SUBASTA_ESTADO_ABIERTA;
 }
 
 async function resolveClienteFromAuth(

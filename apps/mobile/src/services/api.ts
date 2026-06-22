@@ -356,9 +356,25 @@ export async function createSubmission(payload: {
   origenLicitoDeclarado: true;
   fotos: { filename: string; mimeType: string; base64: string }[];
 }) {
+  await initAuthToken();
+  if (!getAuthToken()) {
+    const authError: ApiError = {
+      message: 'Sesión expirada. Volvé a iniciar sesión.',
+      statusCode: 401,
+      code: 'AUTH_REQUIRED',
+    };
+    throw authError;
+  }
+
+  console.log('[CrownBid createSubmission]', {
+    nombre: payload.nombre,
+    descripcionLength: payload.descripcion.length,
+    fotos: payload.fotos.length,
+  });
+
   return request('/items/submissions', {
     method: 'POST',
-    headers: buildHeaders(),
+    headers: buildHeaders('application/json'),
     body: JSON.stringify(payload),
   });
 }

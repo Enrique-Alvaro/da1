@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -18,8 +18,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { createSubmission } from '@/services/api';
+import { createSubmission, getAuthToken } from '@/services/api';
 import { alertLoginRequired, alertPendingAdmission, resolveClientSession } from '@/utils/clientPermissions';
+import { isAllowedSubmissionImageMime, normalizeSubmissionImageMime } from '@/utils/images';
 
 const MIN_IMAGES = 6;
 const MAX_IMAGES = 20;
@@ -72,10 +73,29 @@ export default function PostArticleScreen() {
   const descriptionError = submitAttempted && description.trim().length < 10;
   const declarationError = submitAttempted && (!acceptedOwner || !acceptedLegal || !acceptedTerms);
 
-  const hasErrors = useMemo(
-    () => imageError || titleError || descriptionError || declarationError,
-    [imageError, titleError, descriptionError, declarationError]
-  );
+  function collectValidationErrors(): string | null {
+    if (images.length < MIN_IMAGES) {
+      return `Debés subir al menos ${MIN_IMAGES} imágenes del artículo.`;
+    }
+    if (title.trim().length === 0) {
+      return 'El nombre del artículo es obligatorio.';
+    }
+    if (description.trim().length < 10) {
+      return 'La descripción debe tener al menos 10 caracteres.';
+    }
+    if (!acceptedOwner || !acceptedLegal || !acceptedTerms) {
+      return 'Debés aceptar todas las declaraciones obligatorias.';
+    }
+    const unsupported = images.find((img) => !isAllowedSubmissionImageMime(img.mimeType));
+    if (unsupported) {
+      return 'Una o más imágenes tienen formato no soportado. Usá JPG, PNG o WebP.';
+    }
+    const missingBase64 = images.some((img) => !img.base64?.trim());
+    if (missingBase64) {
+      return 'No se pudieron leer todas las imágenes. Volvé a seleccionarlas.';
+    }
+    return null;
+  }
 
   async function requestPermissions() {
     const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
@@ -105,10 +125,22 @@ export default function PostArticleScreen() {
         .map((a, idx) => ({
           uri: a.uri,
           base64: a.base64!,
-          mimeType: a.mimeType ?? 'image/jpeg',
+          mimeType: normalizeSubmissionImageMime(a.mimeType),
           filename: a.fileName ?? `foto-${Date.now()}-${idx}.jpg`,
         }));
 
+      if (newItems.length === 0) {
+        setApiError('No se pudieron leer las imágenes seleccionadas. Probá con JPG o PNG.');
+        return;
+      }
+
+      const unsupported = newItems.find((item) => !isAllowedSubmissionImageMime(item.mimeType));
+      if (unsupported) {
+        setApiError('Formato no soportado (por ejemplo HEIC). Elegí fotos en JPG, PNG o WebP.');
+        return;
+      }
+
+      setApiError(null);
       setImages((prev) => [...prev, ...newItems].slice(0, MAX_IMAGES));
     } catch (error) {
       console.warn('Image picker error', error);
@@ -122,25 +154,43 @@ export default function PostArticleScreen() {
   async function onSubmit() {
     setSubmitAttempted(true);
     setApiError(null);
-    if (hasErrors) return;
+
+    const validationError = collectValidationErrors();
+    if (validationError) {
+      setApiError(validationError);
+      return;
+    }
+
+    if (!getAuthToken()) {
+      setApiError('Sesión expirada. Volvé a iniciar sesión.');
+      return;
+    }
+
+    const payload = {
+      nombre: title.trim(),
+      descripcion: description.trim(),
+      declaracionPropiedad: true as const,
+      declaracionSinImpedimentos: true as const,
+      origenLicitoDeclarado: true as const,
+      fotos: images.map((img) => ({
+        filename: img.filename,
+        mimeType: normalizeSubmissionImageMime(img.mimeType),
+        base64: img.base64.replace(/^data:[^;]+;base64,/, ''),
+      })),
+    };
+
+    console.log('[post-article] submit', {
+      fotos: payload.fotos.length,
+      hasToken: Boolean(getAuthToken()),
+    });
 
     setIsSubmitting(true);
     try {
-      await createSubmission({
-        nombre: title.trim(),
-        descripcion: description.trim(),
-        declaracionPropiedad: true,
-        declaracionSinImpedimentos: true,
-        origenLicitoDeclarado: true,
-        fotos: images.map((img) => ({
-          filename: img.filename,
-          mimeType: img.mimeType,
-          base64: img.base64,
-        })),
-      });
+      await createSubmission(payload);
       router.push('/post-article-success');
     } catch (e: any) {
-      setApiError(e?.message || 'No se pudo enviar el artículo.');
+      console.warn('[post-article] submit error', e);
+      setApiError(e?.message || 'No se pudo enviar el artículo. Revisá los datos e intentá nuevamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -264,6 +314,12 @@ export default function PostArticleScreen() {
             )}
           </View>
 
+          {apiError ? (
+            <View style={styles.apiErrorBox}>
+              <Text style={styles.apiErrorText}>{apiError}</Text>
+            </View>
+          ) : null}
+
           <Pressable
             style={[styles.primaryButton, { backgroundColor: theme.primary }, isSubmitting && styles.primaryButtonDisabled]}
             onPress={onSubmit}
@@ -301,4 +357,12 @@ const styles = StyleSheet.create({
   primaryButton: { paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   primaryButtonDisabled: { opacity: 0.6 },
   errorText: { color: '#E74C3C', marginTop: 6 },
+  apiErrorBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  apiErrorText: { color: '#B91C1C', fontSize: 14, lineHeight: 20 },
 });

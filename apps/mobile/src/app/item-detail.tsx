@@ -1,8 +1,18 @@
 import { ThemedText } from '@/components/themed-text';
 import { fetchItem } from '@/services/api';
+import { BID_DENIAL_MESSAGES } from '@/utils/bidErrors';
+import { resolveProductImageUrl } from '@/utils/images';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 type ItemDetail = {
   id: number;
@@ -19,16 +29,9 @@ type ItemDetail = {
   canBid: boolean;
   canEnterLive: boolean;
   cannotBidReason: string | null;
+  isOwner?: boolean;
+  imageUrls?: string[];
   highestBidderDisplay: { bidderNumber: number } | null;
-};
-
-const BID_DENIAL_MESSAGES: Record<string, string> = {
-  USER_NOT_ADMITTED:          'Tu cuenta aún no fue aprobada.',
-  CATEGORY_NOT_ALLOWED:       'Tu categoría no alcanza para esta subasta.',
-  PAYMENT_METHOD_REQUIRED:    'Necesitás registrar un medio de pago.',
-  PAYMENT_METHOD_NOT_VERIFIED:'Tu medio de pago aún no fue verificado.',
-  AUCTION_NOT_OPEN:           'La subasta no está abierta en este momento.',
-  LIVE_SESSION_REQUIRED:      'Debés unirte a la sesión en vivo para pujar.',
 };
 
 const ITEM_STATUS_LABEL: Record<string, string> = {
@@ -96,16 +99,20 @@ export default function ItemDetailScreen() {
   }
 
   const effectiveAuctionId = item.auctionId ?? Number(auctionId);
+  const primaryImage = resolveProductImageUrl(item.imageUrls?.[0]);
 
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Imagen placeholder con botón back */}
         <View style={styles.imageContainer}>
           <Pressable style={styles.floatingBackButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/home')}>
             <ThemedText style={styles.backIcon}>←</ThemedText>
           </Pressable>
-          <Text style={styles.bigIcon}>📦</Text>
+          {primaryImage ? (
+            <Image source={{ uri: primaryImage }} style={styles.itemImage} resizeMode="cover" />
+          ) : (
+            <Text style={styles.bigIcon}>📦</Text>
+          )}
           <View style={[styles.itemStatusBadge, { backgroundColor: ITEM_STATUS_BG[item.status] }]}>
             <Text style={[styles.itemStatusText, { color: ITEM_STATUS_COLOR[item.status] }]}>
               {ITEM_STATUS_LABEL[item.status] ?? item.status}
@@ -159,7 +166,7 @@ export default function ItemDetailScreen() {
           )}
 
           {/* Mensaje si no puede pujar */}
-          {!item.canBid && item.cannotBidReason && item.auctionStatus === 'live' && (
+          {!item.canBid && item.cannotBidReason && (
             <View style={styles.warningBox}>
               <Text style={styles.warningText}>
                 {BID_DENIAL_MESSAGES[item.cannotBidReason] ?? 'No podés pujar en este momento.'}
@@ -191,7 +198,9 @@ export default function ItemDetailScreen() {
         ) : (
           <View style={[styles.actionButton, styles.actionButtonDisabled]}>
             <Text style={styles.actionButtonText}>
-              {item.auctionStatus === 'closed'
+              {item.isOwner
+                ? 'No podés pujar sobre un artículo propio.'
+                : item.auctionStatus === 'closed'
                 ? 'Subasta finalizada'
                 : item.auctionStatus === 'scheduled'
                 ? 'Subasta aún no comenzó'
@@ -219,6 +228,7 @@ const styles = StyleSheet.create({
   retryBtnText: { color: '#FFF', fontWeight: 'bold' },
 
   imageContainer: { width: '100%', height: 280, backgroundColor: '#D0D4DC', justifyContent: 'center', alignItems: 'center' },
+  itemImage: { width: '100%', height: '100%' },
   bigIcon: { fontSize: 80, opacity: 0.7 },
   floatingBackButton: { position: 'absolute', top: 50, left: 20, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
   itemStatusBadge: { position: 'absolute', bottom: 14, right: 14, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },

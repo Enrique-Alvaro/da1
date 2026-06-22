@@ -18,6 +18,7 @@ export type ItemEnSubastaRow = {
   identificador: number;
   precioBase: number;
   subastaId: number;
+  ownerPersonId: number | null;
 };
 
 export type PujoRow = {
@@ -164,9 +165,11 @@ export async function findItemInSubasta(
       SELECT TOP (1)
         ic.identificador,
         ic.precioBase,
-        cat.subasta AS subastaId
+        cat.subasta AS subastaId,
+        p.duenio AS ownerPersonId
       FROM dbo.itemsCatalogo AS ic
       INNER JOIN dbo.catalogos AS cat ON cat.identificador = ic.catalogo
+      INNER JOIN dbo.productos AS p ON p.identificador = ic.producto
       WHERE ic.identificador = @itemId AND cat.subasta = @subastaId
     `);
   return result.recordset[0] ?? null;

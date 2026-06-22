@@ -28,19 +28,9 @@ const authCliente: AuthUserContext = {
   expiresAt: new Date(),
 };
 
-const subastaAbierta = {
-  identificador: 10,
-  fecha: "2026-06-10",
-  hora: "18:00:00",
-  estado: "abierta",
-  subastador: 1,
-  ubicacion: "CABA",
-  capacidadAsistentes: 50,
-  tieneDeposito: "si",
-  seguridadPropia: "no",
-  categoria: "comun",
-  moneda: "ARS",
-};
+import { liveSubastaRow } from "./helpers/live-subasta";
+
+const subastaAbierta = liveSubastaRow();
 
 beforeEach(() => {
   liveSessionStore.clearAllLiveSessions();

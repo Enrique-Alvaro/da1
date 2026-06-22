@@ -1,4 +1,4 @@
-import { categoryMeetsMinimum } from "../../shared/domain/auction-categories";
+import { categoryMeetsMinimum, parseCategoryRank } from "../../shared/domain/auction-categories";
 import { UnauthorizedError } from "../../shared/errors/httpErrors";
 import type { AuthUserContext } from "../../shared/types/auth";
 import * as paymentMethodsRepository from "../payment-methods/payment-methods.repository";
@@ -16,7 +16,7 @@ export type CannotBidReasonCode =
 export type MyOperationalStatus = {
   clienteId: number;
   admitido: "si" | "no";
-  categoria: UserCategory;
+  categoria: UserCategory | null;
   hasVerifiedPaymentMethod: boolean;
   canBid: boolean;
   cannotBidReason: Exclude<CannotBidReasonCode, "NONE"> | null;
@@ -46,7 +46,7 @@ export async function getMyOperationalStatus(
   }
 
   const admitido = cliente.admitido.trim().toLowerCase() === "si" ? "si" : "no";
-  const categoria = cliente.categoria.trim().toLowerCase() as UserCategory;
+  const categoria = parseCategoryRank(cliente.categoria) as UserCategory | null;
 
   const medios = await paymentMethodsRepository.listByCliente(cliente.identificador);
   const hasVerifiedPaymentMethod = medios.some((m) => m.estado === "verificado");
@@ -55,6 +55,8 @@ export async function getMyOperationalStatus(
 
   if (admitido !== "si") {
     cannotBidReason = "USER_NOT_ADMITTED";
+  } else if (!categoria) {
+    cannotBidReason = "CATEGORY_NOT_ALLOWED";
   } else if (medios.length === 0) {
     cannotBidReason = "PAYMENT_METHOD_REQUIRED";
   } else if (!hasVerifiedPaymentMethod) {

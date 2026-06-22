@@ -14,6 +14,7 @@ export type CatalogItemRow = {
   subastaId: number | null;
   catalogDescription: string | null;
   isSoldInRegistro: number;
+  duenio: number | null;
 };
 
 export type ItemBidSummaryRow = {
@@ -31,6 +32,7 @@ const ITEM_SELECT = `
   ic.subastado,
   p.descripcionCatalogo,
   p.descripcionCompleta,
+  p.duenio,
   cat.subasta AS subastaId,
   cat.descripcion AS catalogDescription,
   CASE WHEN EXISTS (

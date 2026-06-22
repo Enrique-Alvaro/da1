@@ -45,7 +45,7 @@ function mockMedio(overrides: Partial<paymentMethodsRepository.MedioPagoRow> = {
 
 const clienteIdentity = {
   identificador: 7,
-  admitido: "no",
+  admitido: "si",
   categoria: "comun",
 };
 

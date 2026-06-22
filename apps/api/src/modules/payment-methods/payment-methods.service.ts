@@ -40,6 +40,12 @@ export async function resolveClienteId(authUser: AuthUserContext): Promise<numbe
       "CLIENT_NOT_FOUND"
     );
   }
+  if (cliente.admitido.trim().toLowerCase() !== "si") {
+    throw new ForbiddenError(
+      "El cliente no está admitido por la empresa para registrar medios de pago.",
+      "USER_NOT_ADMITTED"
+    );
+  }
 
   return cliente.identificador;
 }

@@ -5,6 +5,7 @@ import { registerAsistenteForAuction } from "../pujos/pujos.service";
 import * as usersRepository from "../users/users.repository";
 import { evaluateAuctionAccess, mapSubastaStatus } from "./subastas-access.service";
 import { computeBidLimits } from "./subastas-bid-limits";
+import { getEffectiveAuctionStatus } from "./subastas-schedule";
 import * as itemsRepository from "./subastas-items.repository";
 import { mapCatalogItem, mapSubastaDetail, mapSubastaSummary, resolveItemStatus } from "./subastas.mapper";
 import * as closingRepository from "./subastas-closing.repository";
@@ -40,8 +41,11 @@ export async function listAuctions(
     limit: query.featured ? FEATURED_DEFAULT_LIMIT : undefined,
   };
   const rows = await subastasRepository.listSubastas(filters);
+  const effectiveRows = query.status
+    ? rows.filter((row) => getEffectiveAuctionStatus(row) === query.status)
+    : rows;
   const summaries = await Promise.all(
-    rows.map(async (row) => {
+    effectiveRows.map(async (row) => {
       const [access, currentHighestBid, itemCount] = await Promise.all([
         evaluateAuctionAccess({ subasta: row, authUser }),
         liveRepo.getMaxBidForAuction(row.identificador),
@@ -113,6 +117,18 @@ export async function getCatalogItemDetail(itemId: number, authUser?: AuthUserCo
   const showBasePrice = canShowBasePrice(authUser);
   const photoIds = await itemsRepository.listPhotoIdsByProduct(row.producto);
   const access = await evaluateAuctionAccess({ subasta, authUser });
+  const personId = authUser?.id ? Number.parseInt(authUser.id, 10) : null;
+  const cliente =
+    personId != null && Number.isFinite(personId)
+      ? await usersRepository.findClienteByPersonId(personId)
+      : null;
+  const isOwner = cliente != null && row.duenio != null && cliente.identificador === row.duenio;
+  let cannotBidReason = toPublicAccessDenialCode(access.cannotBidReason);
+  let canBid = access.canBid;
+  if (isOwner) {
+    canBid = false;
+    cannotBidReason = "OWNER_CANNOT_BID";
+  }
 
   const base = mapCatalogItem(row, {
     showBasePrice,
@@ -128,10 +144,11 @@ export async function getCatalogItemDetail(itemId: number, authUser?: AuthUserCo
     ...base,
     auctionStatus,
     canAccess: access.canAccess,
-    canBid: access.canBid,
-    canEnterLive: access.canAccess && auctionStatus === "live",
+    canBid,
+    isOwner,
+    canEnterLive: access.canAccess && auctionStatus === "live" && !isOwner,
     cannotAccessReason: toPublicAccessDenialCode(access.cannotAccessReason),
-    cannotBidReason: toPublicAccessDenialCode(access.cannotBidReason),
+    cannotBidReason,
     highestBidderDisplay: winning
       ? { bidderNumber: winning.numeroPostor, clientId: winning.cliente }
       : null,
@@ -264,6 +281,12 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
     requireLiveSession: true,
   });
 
+  let ownerBlocksBid = false;
+  if (currentItem && cliente != null) {
+    const ownerId = items.find((i) => i.identificador === currentItem!.identificador)?.duenio ?? null;
+    ownerBlocksBid = ownerId != null && ownerId === cliente.identificador;
+  }
+
   let isFinalized = false;
   let resultType: string | null = null;
   let winnerDisplayName: string | null = null;
@@ -314,11 +337,13 @@ export async function getLiveAuctionState(auctionId: number, authUser: AuthUserC
     auctionId,
     status: auctionStatus,
     canAccess: access.canAccess,
-    canBid: isFinalized ? false : bidAccess.canBid,
+    canBid: isFinalized ? false : bidAccess.canBid && !ownerBlocksBid,
     cannotAccessReason: toPublicAccessDenialCode(access.cannotAccessReason),
     cannotBidReason: isFinalized
       ? "AUCTION_NOT_OPEN"
-      : toPublicAccessDenialCode(bidAccess.cannotBidReason),
+      : ownerBlocksBid
+        ? "OWNER_CANNOT_BID"
+        : toPublicAccessDenialCode(bidAccess.cannotBidReason),
     currentItem: currentItem
       ? {
           id: currentItem.identificador,
