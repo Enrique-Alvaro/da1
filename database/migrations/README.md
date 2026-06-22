@@ -5,12 +5,32 @@ Scripts **aditivos** posteriores a `database/schema.sql` del profesor. Ejecutar 
 | Archivo | Descripción |
 |---------|-------------|
 | `001_medios_pago_subasta_moneda.sql` | Fase 1 — medios de pago, moneda de subasta, índices únicos en `asistentes` |
+| `002_notificaciones.sql` | Tabla `notificaciones` |
+| `003_password_reset_tokens.sql` | Tokens de restablecimiento de contraseña |
+| `004_subastas_hora_fin.sql` | Columna `subastas.horaFin` |
+| `005_productos_submission_metadata.sql` | Metadatos de envío en `productos` / `itemsCatalogo` |
+| `006_productos_rejection_review.sql` | `motivoRechazo` y `notasRevision` en `productos` |
 
 ## Cómo aplicar
 
+Desde la raíz del monorepo (lee `apps/api/.env`):
+
 ```bash
-# Ejemplo (sqlcmd; ajustar servidor y base)
-sqlcmd -S localhost -d CrownBid -i database/migrations/001_medios_pago_subasta_moneda.sql
+npm run db:migrate
+```
+
+O manualmente con `sqlcmd` (ajustar servidor y credenciales):
+
+```bash
+# Todas en orden
+for f in database/migrations/00*.sql; do
+  sqlcmd -S localhost,1433 -d CrownBid -U sa -P "<password>" -C -i "$f"
+done
+```
+
+```bash
+# Ejemplo (un solo archivo)
+sqlcmd -S localhost -d CrownBid -i database/migrations/006_productos_rejection_review.sql
 ```
 
 O ejecutar el archivo desde SSMS / Azure Data Studio contra la misma BD que usa la API.

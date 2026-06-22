@@ -10,6 +10,7 @@ export type ApiSubmissionListItem = {
   status: ReturnType<typeof toApiSubmissionStatus>;
   photoCount: number;
   rejectionReason: string | null;
+  reviewNotes: string | null;
   auctionId: number | null;
   basePrice: number | null;
   commission: number | null;
@@ -47,13 +48,16 @@ function formatDate(value: Date | string | null): string | null {
   return String(value);
 }
 
-function baseLimitations(): string[] {
-  return [
+function baseLimitations(row: ProductSubmissionRow): string[] {
+  const limitations = [
     "DERIVED_SUBMISSION_STATUS",
-    "NO_REJECTION_REASON_SUPPORT",
     "NO_EXPLICIT_INSPECTION_STATUS",
     "NO_RETURN_CHARGE_SUPPORT",
   ];
+  if (!row.motivoRechazo?.trim()) {
+    limitations.unshift("NO_REJECTION_REASON_SUPPORT");
+  }
+  return limitations;
 }
 
 export function mapRowToApiListItem(row: ProductSubmissionRow): ApiSubmissionListItem {
@@ -65,7 +69,8 @@ export function mapRowToApiListItem(row: ProductSubmissionRow): ApiSubmissionLis
     descripcion: row.descripcionCatalogo,
     status: toApiSubmissionStatus(derived),
     photoCount: row.imageCount,
-    rejectionReason: null,
+    rejectionReason: row.motivoRechazo ?? null,
+    reviewNotes: row.notasRevision ?? null,
     auctionId: row.auctionId,
     basePrice: row.precioBaseAsignado ?? null,
     commission: row.comisionAsignada ?? null,
@@ -78,7 +83,7 @@ export function mapRowToApiListItem(row: ProductSubmissionRow): ApiSubmissionLis
     history: row.historia ?? null,
     components: row.componentes ?? null,
     declarationsStored: Boolean(row.declaracionesJson?.trim()),
-    schemaLimitations: baseLimitations(),
+    schemaLimitations: baseLimitations(row),
   };
 }
 

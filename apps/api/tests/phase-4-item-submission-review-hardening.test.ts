@@ -55,6 +55,16 @@ const sampleRow = {
   auctionHora: null,
   auctionUbicacion: null,
   catalogId: null,
+  depositoUbicacion: null,
+  declaracionesJson: null,
+  seguroCompania: null,
+  motivoRechazo: null,
+  notasRevision: null,
+  numeroPieza: null,
+  artistaODisenador: null,
+  fechaOrigen: null,
+  historia: null,
+  componentes: null,
 };
 
 beforeEach(() => {
@@ -104,10 +114,20 @@ describe("Phase 4 — item submission / review / assignment", () => {
     ).rejects.toMatchObject({ code: "ITEM_ALREADY_ASSIGNED" });
   });
 
-  it("reject returns REJECTION_NOT_SUPPORTED_BY_SCHEMA", async () => {
-    await expect(
-      rejectSolicitudApi(2, 100, { reason: "No califica" })
-    ).rejects.toMatchObject({ code: "REJECTION_NOT_SUPPORTED_BY_SCHEMA" });
+  it("reject persists rejection for pending submission", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById").mockResolvedValue({
+      ...sampleRow,
+      motivoRechazo: null,
+    });
+    vi.spyOn(submissionsRepository, "applyAdminRejection").mockResolvedValue({
+      ...sampleRow,
+      motivoRechazo: "No califica",
+    });
+    vi.spyOn(submissionsRepository, "listPhotoIdsByProduct").mockResolvedValue([]);
+
+    const result = await rejectSolicitudApi(2, 100, { reason: "No califica" });
+    expect(result.status).toBe("REJECTED");
+    expect(result.rejectionReason).toBe("No califica");
   });
 
   it("assigned catalog item appears in auction items list", async () => {

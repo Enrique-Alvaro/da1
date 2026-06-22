@@ -174,13 +174,26 @@ export async function acceptSolicitudApi(
 }
 
 export async function rejectSolicitudApi(
-  _employeeId: number,
-  _productId: number,
-  _body: AdminRejectSubmissionBody
-): Promise<never> {
-  throw new ConflictError(
-    "El esquema académico no permite persistir motivos de rechazo ni distinguir rechazo de pendiente.",
-    "REJECTION_NOT_SUPPORTED_BY_SCHEMA"
+  employeeId: number,
+  productId: number,
+  body: AdminRejectSubmissionBody
+): Promise<ApiSubmissionDetail> {
+  const row = await submissionsRepository.findSubmissionById(productId);
+  if (!row) {
+    throw new NotFoundError("Solicitud no encontrada.", "SUBMISSION_NOT_FOUND");
+  }
+
+  const updated = await submissionsRepository.applyAdminRejection({
+    productId,
+    employeeId,
+    reason: body.reason,
+    notes: body.notes ?? null,
+  });
+
+  const photos = await submissionsRepository.listPhotoIdsByProduct(productId);
+  return mapRowToApiDetail(
+    updated,
+    photos.map((p) => p.identificador)
   );
 }
 

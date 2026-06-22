@@ -213,6 +213,7 @@ export type AdminAcceptSubmissionBody = z.infer<typeof adminAcceptSubmissionBody
 
 export const adminRejectSubmissionBodySchema = z.object({
   reason: z.string().trim().min(1, "reason es obligatorio").max(1000),
+  notes: z.string().trim().max(1000).optional(),
   returnChargeAmount: z.coerce.number().nonnegative().optional(),
 });
 
@@ -262,7 +263,7 @@ export const assignSolicitudBodySchema = z
   });
 
 export const adminSubmissionsQuerySchema = z.object({
-  status: z.enum(["pending", "accepted", "assigned", "all"]).optional(),
+  status: z.enum(["pending", "accepted", "assigned", "rejected", "all"]).optional(),
   search: z.string().trim().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),

@@ -5,6 +5,7 @@
 
 export type DerivedProductStatus =
   | "pending_review"
+  | "rejected"
   | "approved"
   | "scheduled"
   | "sold";
@@ -13,6 +14,7 @@ export type ProductAvailabilityFlags = {
   disponible: string | null;
   isScheduled: boolean;
   isSold: boolean;
+  motivoRechazo?: string | null;
 };
 
 export function deriveProductStatus(flags: ProductAvailabilityFlags): DerivedProductStatus {
@@ -26,6 +28,9 @@ export function deriveProductStatus(flags: ProductAvailabilityFlags): DerivedPro
   if (avail === "si") {
     return "approved";
   }
+  if (flags.motivoRechazo?.trim()) {
+    return "rejected";
+  }
   return "pending_review";
 }
 
@@ -34,6 +39,8 @@ export function derivedStatusLabel(status: DerivedProductStatus): string {
   switch (status) {
     case "pending_review":
       return "Pendiente de revisión";
+    case "rejected":
+      return "Rechazado";
     case "approved":
       return "Aprobado";
     case "scheduled":

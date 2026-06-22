@@ -209,8 +209,50 @@
     },
     {
       "name": "2. Employee / Profile",
-      "description": "Employee directory endpoints. `/api/users/me` is NOT usable with employee tokens (401).",
+      "description": "Employee directory and session validation via GET /empleados/me.",
       "item": [
+        {
+          "name": "Get Current Employee (me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/empleados/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "empleados",
+                "me"
+              ]
+            },
+            "description": "Returns the logged-in employee profile from JWT + dbo.empleados.\n\n**Response:** `{ employeeId, email, role, cargo, sector }`"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "List Employees",
           "request": {
@@ -330,10 +372,10 @@
                 "subastas"
               ]
             },
-            "description": "Creates a new auction. Employee-only (`requireEmployeeAuth`).\n\n**Response 201:** auction summary with `id`.",
+            "description": "Creates a new auction. Employee-only (`requireEmployeeAuth`).\n\n**Schedule rules:** start must be in the future and at least 10 calendar days ahead; `horaFin` after `hora`; duration 15–240 min.\n\n**Response 201:** auction summary with `id`. Invalid schedule returns **400** (does not crash the server).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fecha\": \"2026-07-15\",\n  \"hora\": \"18:00\",\n  \"horaFin\": \"22:00\",\n  \"ubicacion\": \"Salón Principal CrownBid\",\n  \"capacidadAsistentes\": 120,\n  \"tieneDeposito\": \"si\",\n  \"seguridadPropia\": \"si\",\n  \"categoria\": \"platino\",\n  \"moneda\": \"ARS\"\n}"
+              "raw": "{\n  \"fecha\": \"2026-07-03\",\n  \"hora\": \"18:00\",\n  \"horaFin\": \"22:00\",\n  \"ubicacion\": \"Salón Principal CrownBid\",\n  \"capacidadAsistentes\": 120,\n  \"tieneDeposito\": \"si\",\n  \"seguridadPropia\": \"si\",\n  \"categoria\": \"platino\",\n  \"moneda\": \"ARS\"\n}"
             }
           },
           "response": [],
@@ -389,6 +431,58 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"estado\": \"abierta\",\n  \"ubicacion\": \"Salón Principal — actualizado\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Auction Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/subastas/{{auction_id}}/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "subastas",
+                "{{auction_id}}",
+                "estado"
+              ]
+            },
+            "description": "Dedicated status endpoint. DB values: `abierta` | `carrada`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"carrada\"\n}"
             }
           },
           "response": [],
@@ -659,11 +753,11 @@
       ]
     },
     {
-      "name": "4. Bids (Client-only — reference)",
-      "description": "These endpoints exist but return **403** for employee tokens (`requireClienteAuth`). Included for negative testing only.",
+      "name": "4. Bids (Employee read-only)",
+      "description": "Employees can read bid history and live state but cannot place bids.",
       "item": [
         {
-          "name": "[403 expected] Bid History",
+          "name": "Bid History",
           "request": {
             "method": "GET",
             "header": [
@@ -690,7 +784,7 @@
                 }
               ]
             },
-            "description": "Client-only. Employees receive 403."
+            "description": "Operational bid history for employees (read-only)."
           },
           "response": [],
           "event": [
@@ -699,8 +793,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status code is one of [403]\", function () {",
-                  "  pm.expect([403]).to.include(pm.response.code);",
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
                   "});",
                   "pm.test(\"Response is JSON when body present\", function () {",
                   "  if (pm.response.text() && pm.response.text().length > 0) {",
@@ -713,7 +807,7 @@
           ]
         },
         {
-          "name": "[403 expected] Live Auction State",
+          "name": "Live Auction State",
           "request": {
             "method": "GET",
             "header": [
@@ -739,7 +833,7 @@
                 }
               ]
             },
-            "description": "Client-only live session state."
+            "description": "Operational live auction data for employees. `canBid` is always false."
           },
           "response": [],
           "event": [
@@ -748,8 +842,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status code is one of [403]\", function () {",
-                  "  pm.expect([403]).to.include(pm.response.code);",
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
                   "});",
                   "pm.test(\"Response is JSON when body present\", function () {",
                   "  if (pm.response.text() && pm.response.text().length > 0) {",
@@ -948,7 +1042,7 @@
           ]
         },
         {
-          "name": "Reject Submission (schema limitation)",
+          "name": "Reject Submission",
           "request": {
             "method": "POST",
             "header": [
@@ -974,10 +1068,10 @@
                 "rechazar"
               ]
             },
-            "description": "Rejection endpoint exists but currently returns **409** `REJECTION_NOT_SUPPORTED_BY_SCHEMA` until DB schema supports it.",
+            "description": "Reject a pending submission. Persists `motivoRechazo` + `notasRevision` (migration 006).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reason\": \"Documentación insuficiente\"\n}"
+              "raw": "{\n  \"reason\": \"El artículo no cumple con los criterios de aceptación.\",\n  \"notes\": \"Fotos insuficientes / documentación incompleta.\"\n}"
             }
           },
           "response": [],
@@ -987,8 +1081,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status code is one of [409]\", function () {",
-                  "  pm.expect([409]).to.include(pm.response.code);",
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
                   "});",
                   "pm.test(\"Response is JSON when body present\", function () {",
                   "  if (pm.response.text() && pm.response.text().length > 0) {",
@@ -1587,7 +1681,117 @@
       ]
     },
     {
-      "name": "8. Payment Methods (Admin)",
+      "name": "8. Warehouse / Insurance",
+      "description": "Assign deposit location and insurance policy to consigned products.",
+      "item": [
+        {
+          "name": "Assign Deposit Location",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{article_id}}/deposito",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{article_id}}",
+                "deposito"
+              ]
+            },
+            "description": "Updates `dbo.productos.depositoUbicacion`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"depositoUbicacion\": \"Depósito Central - Sector A - Estante 4\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assign Insurance Policy",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{article_id}}/seguro",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{article_id}}",
+                "seguro"
+              ]
+            },
+            "description": "Upserts `dbo.seguros` and links `dbo.productos.seguro`. Optional `descripcion` / vigencia fields are accepted but not persisted.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seguro\": \"POL-123456\",\n  \"compania\": \"Sancor Seguros\",\n  \"descripcion\": \"Cobertura contra daño, robo o extravío durante custodia\",\n  \"importe\": 1000,\n  \"polizaCombinada\": \"no\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is one of [200]\", function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Response is JSON when body present\", function () {",
+                  "  if (pm.response.text() && pm.response.text().length > 0) {",
+                  "    pm.response.to.be.json;",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Payment Methods (Admin)",
       "description": "Verify or reject client payment methods.",
       "item": [
         {
@@ -1752,7 +1956,7 @@
       ]
     },
     {
-      "name": "9. Post-auction / Winners",
+      "name": "10. Post-auction / Winners",
       "description": "Employee can close items and read finalization results.",
       "item": [
         {
@@ -1803,7 +2007,7 @@
       ]
     },
     {
-      "name": "10. Reference Data",
+      "name": "11. Reference Data",
       "description": "Países and sectores CRUD — any authenticated token (including employee).",
       "item": [
         {
@@ -2123,7 +2327,7 @@
       ]
     },
     {
-      "name": "11. Health / Debug",
+      "name": "12. Health / Debug",
       "description": "Unauthenticated health checks (use server root, not `/api` prefix).",
       "item": [
         {

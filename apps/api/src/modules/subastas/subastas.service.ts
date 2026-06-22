@@ -3,7 +3,7 @@ import type { AuthUserContext } from "../../shared/types/auth";
 import { ConflictError, ForbiddenError, UnauthorizedError } from "../../shared/errors/httpErrors";
 import { registerAsistenteForAuction } from "../pujos/pujos.service";
 import * as usersRepository from "../users/users.repository";
-import { evaluateAuctionAccess, mapSubastaStatus } from "./subastas-access.service";
+import { evaluateAuctionAccess, employeeOperationalAccessSnapshot, mapSubastaStatus } from "./subastas-access.service";
 import { computeBidLimits } from "./subastas-bid-limits";
 import { getEffectiveAuctionStatus } from "./subastas-schedule";
 import * as itemsRepository from "./subastas-items.repository";
@@ -213,12 +213,15 @@ export async function getLiveAuctionState(
   watchedItemId?: number
 ) {
   const subasta = await subastasRepository.requireSubastaById(auctionId);
-  const access = await evaluateAuctionAccess({
-    subasta,
-    authUser,
-    requireLiveSession: false,
-  });
-  if (!access.canAccess) {
+  const isEmployeeViewer = authUser.role === "empleado";
+  const access = isEmployeeViewer
+    ? employeeOperationalAccessSnapshot()
+    : await evaluateAuctionAccess({
+        subasta,
+        authUser,
+        requireLiveSession: false,
+      });
+  if (!isEmployeeViewer && !access.canAccess) {
     throw new ForbiddenError(
       "No tenés acceso a esta subasta en vivo.",
       access.cannotAccessReason ?? "CATEGORY_NOT_ALLOWED"
@@ -274,16 +277,21 @@ export async function getLiveAuctionState(
     auctionId,
     currentItemId ?? undefined
   );
-  const personId = Number.parseInt(authUser.id, 10);
-  const cliente = await usersRepository.findClienteByPersonId(personId);
+  const personId = isEmployeeViewer ? NaN : Number.parseInt(authUser.id, 10);
+  const cliente =
+    !isEmployeeViewer && Number.isFinite(personId)
+      ? await usersRepository.findClienteByPersonId(personId)
+      : null;
   const isHighestBidder =
     cliente != null && highestBidderId !== null && cliente.identificador === highestBidderId;
 
-  const bidAccess = await evaluateAuctionAccess({
-    subasta,
-    authUser,
-    requireLiveSession: true,
-  });
+  const bidAccess = isEmployeeViewer
+    ? employeeOperationalAccessSnapshot()
+    : await evaluateAuctionAccess({
+        subasta,
+        authUser,
+        requireLiveSession: true,
+      });
 
   let ownerBlocksBid = false;
   if (currentItem && cliente != null) {
@@ -383,7 +391,7 @@ export async function getLiveAuctionState(
     auctionId,
     status: auctionStatus,
     canAccess: access.canAccess,
-    canBid: isFinalized ? false : bidAccess.canBid && !ownerBlocksBid,
+    canBid: isEmployeeViewer ? false : isFinalized ? false : bidAccess.canBid && !ownerBlocksBid,
     cannotAccessReason: toPublicAccessDenialCode(access.cannotAccessReason),
     cannotBidReason: isFinalized
       ? "AUCTION_NOT_OPEN"
@@ -435,12 +443,14 @@ export async function getBidHistory(
   itemId?: number
 ) {
   const subasta = await subastasRepository.requireSubastaById(auctionId);
-  const access = await evaluateAuctionAccess({ subasta, authUser });
-  if (!access.canAccess) {
-    throw new ForbiddenError(
-      "No tenés acceso al historial de esta subasta.",
-      access.cannotAccessReason ?? "CATEGORY_NOT_ALLOWED"
-    );
+  if (authUser.role !== "empleado") {
+    const access = await evaluateAuctionAccess({ subasta, authUser });
+    if (!access.canAccess) {
+      throw new ForbiddenError(
+        "No tenés acceso al historial de esta subasta.",
+        access.cannotAccessReason ?? "CATEGORY_NOT_ALLOWED"
+      );
+    }
   }
 
   const rows = await liveRepo.listBidHistoryBySubasta(auctionId, itemId);

@@ -76,6 +76,20 @@ export async function hasVerifiedPaymentForCurrency(
   );
 }
 
+/** Lectura operativa para empleados (sin pujar ni sesión live de cliente). */
+export function employeeOperationalAccessSnapshot(): AuctionAccessSnapshot {
+  return {
+    canView: true,
+    canAccess: true,
+    canBid: false,
+    cannotAccessReason: null,
+    cannotBidReason: null,
+    hasVerifiedPaymentMethod: false,
+    liveSessionActive: false,
+    liveSessionAuctionId: null,
+  };
+}
+
 export async function evaluateAuctionAccess(params: {
   subasta: SubastaRow;
   authUser?: AuthUserContext;

@@ -13,6 +13,8 @@ export function toApiSubmissionStatus(derived: DerivedProductStatus): ApiSubmiss
   switch (derived) {
     case "pending_review":
       return "PENDING_REVIEW";
+    case "rejected":
+      return "REJECTED";
     case "approved":
       return "ACCEPTED";
     case "scheduled":

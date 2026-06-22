@@ -109,14 +109,6 @@ export default function PaymentMethodsScreen() {
               Administra tus garantías de pago
             </Text>
           </View>
-          <View style={styles.backActionRow}>
-            <Pressable
-              style={styles.backActionButton}
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
-            >
-              <Text style={styles.backActionText}>Volver</Text>
-            </Pressable>
-          </View>
 
           {admissionBlocked ? (
             <View style={styles.centered}>
@@ -286,21 +278,6 @@ const styles = StyleSheet.create({
   centered: {
     paddingVertical: Spacing.six,
     alignItems: 'center',
-  },
-  backActionRow: {
-    marginTop: 18,
-    marginBottom: 12,
-    alignItems: 'flex-start',
-  },
-  backActionButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#F3F4F6',
-  },
-  backActionText: {
-    color: '#1D4ED8',
-    fontWeight: '700',
   },
   errorBanner: {
     backgroundColor: '#FFECEC',

@@ -46,14 +46,17 @@ Default credentials (from `.env.example`): `admin@crownbid.local` / `EmpleadoAdm
 
 1. **11. Health / Debug** — confirm API + DB are up.
 2. **1. Auth → Employee Login** — stores `access_token`.
-3. **3. Auctions → List Auctions** — sets `auction_id` from first result (or create one).
-4. **5. Submitted Articles → List Submissions** — sets `article_id`.
-5. **5. Submitted Articles → Get Submission Detail** — sets `image_id` from first photo.
-6. **5. Accept Submission** → **Assign Submission to Auction** (needs valid pending/accepted row).
-7. **3. List Auction Catalog Items** — sets `item_id`.
-8. **7. Clients** — list/admit clients (`client_id`).
-9. **8. Payment Methods** — verify/reject (`payment_method_id`).
-10. **3. Close Auction Item** / **9. Post-auction** — needs live auction data and bids (client-side).
+3. **2. Employee / Profile → Get Current Employee (me)** — validates employee session.
+4. **3. Auctions → List Auctions** — sets `auction_id` from first result (or create one).
+5. **5. Submitted Articles → List Submissions** — sets `article_id`.
+6. **5. Submitted Articles → Get Submission Detail** — sets `image_id` from first photo.
+7. **5. Accept Submission** → **Assign Submission to Auction** (needs valid pending/accepted row).
+8. **8. Warehouse / Insurance** — assign deposit + insurance on accepted product.
+9. **3. List Auction Catalog Items** — sets `item_id`.
+10. **4. Bids** — read-only bid history / live state for operators.
+11. **7. Clients** — list/admit clients (`client_id`).
+12. **9. Payment Methods** — verify/reject (`payment_method_id`).
+13. **3. Close Auction Item** / **10. Post-auction** — needs live auction data and bids (client-side).
 
 ## Environment variables
 
@@ -87,13 +90,23 @@ Default credentials (from `.env.example`): `admin@crownbid.local` / `EmpleadoAdm
 
 ## Missing endpoints
 
-See [MISSING_EMPLOYEE_ENDPOINTS.md](./MISSING_EMPLOYEE_ENDPOINTS.md) for features without API support, including:
+See [MISSING_EMPLOYEE_ENDPOINTS.md](./MISSING_EMPLOYEE_ENDPOINTS.md). Summary of what was added in the latest backend pass:
 
-- Warehouse/deposit assignment
-- Insurance policy assignment
-- Full submission rejection (409 schema limitation)
-- Employee bid history / live operator view
-- Auction delete, refresh tokens, employee `/me` profile
+- `GET /api/empleados/me`
+- `PATCH /api/admin/productos/:id/deposito`
+- `PATCH /api/admin/productos/:id/seguro`
+- Fixed `POST .../rechazar` (migration 006)
+- `PATCH /api/admin/subastas/:id/estado`
+- Employee read-only `GET .../pujos/history` and `GET .../live`
+
+Still deferred: image upload by employee, auction delete, bulk winners list, payment/shipping updates.
+
+Apply migration before testing rejection:
+
+```bash
+sqlcmd -S localhost,1433 -d CrownBid -U sa -P "<password>" -C \
+  -i database/migrations/006_productos_rejection_review.sql
+```
 
 ## Regenerate collection
 

@@ -2,6 +2,11 @@ import { Router } from "express";
 import { requireAccessToken } from "../../shared/middlewares/requireAccessToken";
 import { requireAuth } from "../../shared/middlewares/requireAuth";
 import { requireClienteAuth } from "../../shared/middlewares/requireClienteAuth";
+import { requireClienteOrEmployeeAuth } from "../../shared/middlewares/requireClienteOrEmployeeAuth";
+import {
+  requireAdmittedClienteUnlessEmployee,
+  requireOperationalUserUnlessEmployee,
+} from "../../shared/middlewares/requireOperationalUnlessEmployee";
 import { requireOperationalUser } from "../../shared/middlewares/requireOperationalUser";
 import { requireAdmittedCliente } from "../../shared/middlewares/requireAdmittedCliente";
 import { optionalAuth } from "../../shared/middlewares/optionalAuth";
@@ -40,11 +45,19 @@ const clientAdmittedOperationalChain = [
   requireAdmittedCliente,
 ] as const;
 
+const operationalReadChain = [
+  requireAuth,
+  requireAccessToken,
+  requireClienteOrEmployeeAuth,
+  requireOperationalUserUnlessEmployee,
+  requireAdmittedClienteUnlessEmployee,
+] as const;
+
 subastasRoutes.post("/:id/asistentes", ...clientAdmittedOperationalChain, registerAsistente);
 subastasRoutes.post("/:id/pujos", ...clientAdmittedOperationalChain, postBid);
-subastasRoutes.get("/:id/pujos/history", ...clientAdmittedOperationalChain, getBidHistory);
-subastasRoutes.get("/:id/bids/history", ...clientAdmittedOperationalChain, getBidHistory);
+subastasRoutes.get("/:id/pujos/history", ...operationalReadChain, getBidHistory);
+subastasRoutes.get("/:id/bids/history", ...operationalReadChain, getBidHistory);
 
 subastasRoutes.post("/:id/live/session", ...clientAdmittedOperationalChain, enterLiveSession);
 subastasRoutes.delete("/:id/live/session", ...clientAdmittedOperationalChain, leaveLiveSession);
-subastasRoutes.get("/:id/live", ...clientAdmittedOperationalChain, getLiveState);
+subastasRoutes.get("/:id/live", ...operationalReadChain, getLiveState);

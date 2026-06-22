@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { fetchRegisterCountries, registerUser } from '@/services/api';
@@ -230,6 +231,10 @@ export default function RegisterScreen() {
                 {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
               </Text>
             </Pressable>
+
+            <Pressable style={styles.secondaryButton} onPress={() => router.push('/')}>
+              <ThemedText>Volver al inicio de sesión</ThemedText>
+            </Pressable>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -386,10 +391,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
+    marginBottom: Spacing.two,
   },
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  secondaryButton: {
+    backgroundColor: '#F6F6F6',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: Spacing.two,
   },
 });

@@ -81,3 +81,7 @@ function formatTime(value: Date | string | null): string {
   }
   return s.length >= 8 ? s.slice(0, 8) : `${s}:00`;
 }
+
+export async function updateAdminAuctionEstado(auctionId: number, estado: "abierta" | "carrada") {
+  return updateAdminAuction(auctionId, { estado });
+}

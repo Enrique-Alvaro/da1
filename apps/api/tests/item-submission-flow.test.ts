@@ -69,6 +69,16 @@ const sampleRow = {
   auctionHora: null,
   auctionUbicacion: null,
   catalogId: null,
+  depositoUbicacion: null,
+  declaracionesJson: null,
+  seguroCompania: null,
+  motivoRechazo: null,
+  notasRevision: null,
+  numeroPieza: null,
+  artistaODisenador: null,
+  fechaOrigen: null,
+  historia: null,
+  componentes: null,
 };
 
 beforeEach(() => {
@@ -200,14 +210,25 @@ describe("Item submission API service", () => {
     expect(result.basePrice).toBe(500);
   });
 
-  it("rejectSolicitud returns REJECTION_NOT_SUPPORTED_BY_SCHEMA", async () => {
+  it("rejectSolicitud persists rejection reason", async () => {
+    vi.spyOn(submissionsRepository, "findSubmissionById").mockResolvedValue(sampleRow);
+    vi.spyOn(submissionsRepository, "applyAdminRejection").mockResolvedValue({
+      ...sampleRow,
+      motivoRechazo: "No cumple requisitos",
+      notasRevision: "Fotos insuficientes",
+    });
+    vi.spyOn(submissionsRepository, "listPhotoIdsByProduct").mockResolvedValue([
+      { identificador: 1, producto: 100 },
+    ]);
+
     const body = adminRejectSubmissionBodySchema.parse({
       reason: "No cumple requisitos",
-      returnChargeAmount: 50,
+      notes: "Fotos insuficientes",
     });
-    await expect(rejectSolicitudApi(2, 100, body)).rejects.toMatchObject({
-      code: "REJECTION_NOT_SUPPORTED_BY_SCHEMA",
-    });
+    const result = await rejectSolicitudApi(2, 100, body);
+    expect(result.status).toBe("REJECTED");
+    expect(result.rejectionReason).toBe("No cumple requisitos");
+    expect(result.reviewNotes).toBe("Fotos insuficientes");
   });
 
   it("assignSolicitud blocks when already scheduled", async () => {

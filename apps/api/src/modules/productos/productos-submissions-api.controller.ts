@@ -105,7 +105,8 @@ export const rejectAdminSolicitud: RequestHandler = asyncHandler(async (req, res
     throw new ValidationError("No autorizado.");
   }
   const employeeId = submissionsService.assertEmployeeId(req.authUser);
-  await apiService.rejectSolicitudApi(employeeId, parsedParams.data.id, parsedBody.data);
+  const result = await apiService.rejectSolicitudApi(employeeId, parsedParams.data.id, parsedBody.data);
+  res.status(200).json(result);
 });
 
 export const assignAdminSolicitud: RequestHandler = asyncHandler(async (req, res) => {

@@ -31,6 +31,8 @@ export type ProductSubmissionRow = ProductoRow & ProductSubmissionFlags & {
   depositoUbicacion: string | null;
   declaracionesJson: string | null;
   seguroCompania: string | null;
+  motivoRechazo: string | null;
+  notasRevision: string | null;
 };
 
 const PRODUCT_SELECT = `
@@ -49,6 +51,8 @@ const PRODUCT_SELECT = `
   p.componentes,
   p.depositoUbicacion,
   p.declaracionesJson,
+  p.motivoRechazo,
+  p.notasRevision,
   sg.compania AS seguroCompania,
   (
     SELECT COUNT_BIG(1)
@@ -153,11 +157,13 @@ function mapSubmissionRow(row: Record<string, unknown>): ProductSubmissionRow {
     depositoUbicacion: (row.depositoUbicacion as string | null) ?? null,
     declaracionesJson: (row.declaracionesJson as string | null) ?? null,
     seguroCompania: (row.seguroCompania as string | null) ?? null,
+    motivoRechazo: (row.motivoRechazo as string | null) ?? null,
+    notasRevision: (row.notasRevision as string | null) ?? null,
   };
 }
 
 export type ListAdminSubmissionsQuery = {
-  status?: "pending" | "accepted" | "assigned" | "all";
+  status?: "pending" | "accepted" | "assigned" | "rejected" | "all";
   search?: string;
   limit?: number;
   offset?: number;
@@ -171,11 +177,17 @@ export async function listAdminSubmissions(
   const filters: string[] = ["1 = 1"];
 
   if (query.status === "pending") {
-    filters.push("p.disponible = N'no' AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+    filters.push(
+      "p.disponible = N'no' AND (p.motivoRechazo IS NULL OR LTRIM(RTRIM(p.motivoRechazo)) = N'') AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)"
+    );
   } else if (query.status === "accepted") {
     filters.push("p.disponible = N'si' AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
   } else if (query.status === "assigned") {
     filters.push("EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)");
+  } else if (query.status === "rejected") {
+    filters.push(
+      "p.disponible = N'no' AND p.motivoRechazo IS NOT NULL AND LTRIM(RTRIM(p.motivoRechazo)) <> N'' AND NOT EXISTS (SELECT 1 FROM dbo.itemsCatalogo ic WHERE ic.producto = p.identificador)"
+    );
   }
 
   if (query.search?.trim()) {
@@ -371,6 +383,7 @@ export async function listPendingReviewProducts(): Promise<ProductSubmissionRow[
     SELECT ${PRODUCT_SELECT}
     ${PRODUCT_FROM}
     WHERE p.disponible = N'no'
+      AND (p.motivoRechazo IS NULL OR LTRIM(RTRIM(p.motivoRechazo)) = N'')
       AND NOT EXISTS (
         SELECT 1 FROM dbo.itemsCatalogo AS ic WHERE ic.producto = p.identificador
       )
@@ -413,9 +426,12 @@ export async function applyAdminDecision(input: {
     .input("id", sql.Int, input.productId)
     .input("disponible", sql.NVarChar(2), input.approve ? "si" : "no")
     .input("revisor", sql.Int, input.employeeId)
-    .query(`
+  .query(`
       UPDATE dbo.productos
-      SET disponible = @disponible, revisor = @revisor
+      SET disponible = @disponible,
+          revisor = @revisor,
+          motivoRechazo = CASE WHEN @disponible = N'si' THEN NULL ELSE motivoRechazo END,
+          notasRevision = CASE WHEN @disponible = N'si' THEN NULL ELSE notasRevision END
       WHERE identificador = @id
     `);
 
@@ -604,7 +620,141 @@ export function toDerivedStatus(row: ProductSubmissionRow): DerivedProductStatus
     disponible: row.disponible,
     isScheduled: row.isScheduled,
     isSold: row.isSold,
+    motivoRechazo: row.motivoRechazo,
   });
+}
+
+export async function applyAdminRejection(input: {
+  productId: number;
+  employeeId: number;
+  reason: string;
+  notes?: string | null;
+}): Promise<ProductSubmissionRow> {
+  await assertEmployeeExists(input.employeeId);
+
+  const current = await findSubmissionById(input.productId);
+  if (!current) {
+    throw new NotFoundError("Producto no encontrado.", "PRODUCT_NOT_FOUND");
+  }
+  if (current.isScheduled) {
+    throw new ConflictError(
+      "El producto ya está asignado a un catálogo.",
+      "ITEM_ALREADY_ASSIGNED"
+    );
+  }
+  if (current.isSold) {
+    throw new ConflictError("El producto ya fue vendido.");
+  }
+  const avail = (current.disponible ?? "no").trim().toLowerCase();
+  if (avail === "si") {
+    throw new ConflictError(
+      "No se puede rechazar un producto ya aprobado.",
+      "SUBMISSION_ALREADY_ACCEPTED"
+    );
+  }
+  if (current.motivoRechazo?.trim()) {
+    throw new ConflictError("La solicitud ya fue rechazada.", "SUBMISSION_ALREADY_REJECTED");
+  }
+
+  const pool = await getSqlPool();
+  await pool
+    .request()
+    .input("id", sql.Int, input.productId)
+    .input("revisor", sql.Int, input.employeeId)
+    .input("motivoRechazo", sql.NVarChar(1000), input.reason.trim())
+    .input("notasRevision", sql.NVarChar(1000), input.notes?.trim() ?? null)
+    .query(`
+      UPDATE dbo.productos
+      SET disponible = N'no',
+          revisor = @revisor,
+          motivoRechazo = @motivoRechazo,
+          notasRevision = @notasRevision
+      WHERE identificador = @id
+    `);
+
+  const updated = await findSubmissionById(input.productId);
+  if (!updated) {
+    throw new NotFoundError("Producto no encontrado.");
+  }
+  return updated;
+}
+
+export async function updateProductDepositoUbicacion(
+  productId: number,
+  depositoUbicacion: string
+): Promise<ProductSubmissionRow> {
+  const current = await findSubmissionById(productId);
+  if (!current) {
+    throw new NotFoundError("Producto no encontrado.", "PRODUCT_NOT_FOUND");
+  }
+
+  const pool = await getSqlPool();
+  await pool
+    .request()
+    .input("id", sql.Int, productId)
+    .input("depositoUbicacion", sql.NVarChar(250), depositoUbicacion.trim())
+    .query(`
+      UPDATE dbo.productos
+      SET depositoUbicacion = @depositoUbicacion
+      WHERE identificador = @id
+    `);
+
+  const updated = await findSubmissionById(productId);
+  if (!updated) {
+    throw new NotFoundError("Producto no encontrado.");
+  }
+  return updated;
+}
+
+export async function upsertProductInsurance(input: {
+  productId: number;
+  nroPoliza: string;
+  compania: string;
+  importe?: number;
+  polizaCombinada?: "si" | "no";
+}): Promise<ProductSubmissionRow> {
+  const current = await findSubmissionById(input.productId);
+  if (!current) {
+    throw new NotFoundError("Producto no encontrado.", "PRODUCT_NOT_FOUND");
+  }
+
+  const pool = await getSqlPool();
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    const segReq = new sql.Request(tx);
+    segReq.input("nroPoliza", sql.NVarChar(30), input.nroPoliza.trim());
+    segReq.input("compania", sql.NVarChar(150), input.compania.trim());
+    segReq.input("importe", sql.Decimal(18, 2), input.importe ?? 1);
+    segReq.input("polizaCombinada", sql.NVarChar(2), input.polizaCombinada ?? "no");
+    await segReq.query(`
+      IF EXISTS (SELECT 1 FROM dbo.seguros WHERE nroPoliza = @nroPoliza)
+        UPDATE dbo.seguros
+        SET compania = @compania, importe = @importe, polizaCombinada = @polizaCombinada
+        WHERE nroPoliza = @nroPoliza
+      ELSE
+        INSERT INTO dbo.seguros (nroPoliza, compania, polizaCombinada, importe)
+        VALUES (@nroPoliza, @compania, @polizaCombinada, @importe)
+    `);
+
+    const prodReq = new sql.Request(tx);
+    prodReq.input("id", sql.Int, input.productId);
+    prodReq.input("seguro", sql.NVarChar(30), input.nroPoliza.trim());
+    await prodReq.query(`
+      UPDATE dbo.productos SET seguro = @seguro WHERE identificador = @id
+    `);
+
+    await tx.commit();
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
+
+  const updated = await findSubmissionById(input.productId);
+  if (!updated) {
+    throw new NotFoundError("Producto no encontrado.");
+  }
+  return updated;
 }
 
 export async function assertEmployeeExists(employeeId: number): Promise<void> {

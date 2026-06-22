@@ -1,85 +1,79 @@
 # Missing Employee Endpoints
 
-Endpoints expected for employee/operator workflows but **not implemented** in the current CrownBid API (as of this audit).
+Updated after implementing Priority 0/1 employee API endpoints.
 
-## Warehouse / deposit location
+## Implemented (no longer missing)
 
-| Expected capability | Status |
-|---------------------|--------|
-| Assign `depositoUbicacion` to a consigned product | **Missing** — field exists in DB (`dbo.productos.depositoUbicacion`) and is returned in submission/detail mappers, but no `PATCH`/`POST` admin route updates it |
-| Update warehouse/deposit location | **Missing** |
-| List warehouses | **Missing** — `sectores` CRUD exists but is unrelated to product deposit assignment |
+| Capability | Endpoint |
+|------------|----------|
+| Employee profile | `GET /api/empleados/me` |
+| Assign deposit location | `PATCH /api/admin/productos/:id/deposito` |
+| Assign insurance policy | `PATCH /api/admin/productos/:id/seguro` |
+| Reject submission | `POST /api/admin/productos/solicitudes/:id/rechazar` (requires migration `006_productos_rejection_review.sql`) |
+| Auction status change | `PATCH /api/admin/subastas/:id/estado` (also via `PATCH /api/admin/subastas/:id`) |
+| Employee read-only bids | `GET /api/subastas/:id/pujos/history`, `GET /api/subastas/:id/live` |
 
-**Workaround:** direct SQL update on `dbo.productos.depositoUbicacion`.
+## Still missing / deferred
 
-## Insurance policy
+### Insurance metadata (partial)
 
-| Expected capability | Status |
-|---------------------|--------|
-| Assign insurance policy number (`productos.seguro`) | **Missing** |
-| Update insurance company (`dbo.seguros`) | **Missing** |
-| Link policy to consigned item via API | **Missing** |
+| Field | Status |
+|-------|--------|
+| `descripcion`, `vigenciaDesde`, `vigenciaHasta` in request body | Accepted but **not persisted** — `dbo.seguros` only has `nroPoliza`, `compania`, `polizaCombinada`, `importe` |
 
-**Workaround:** direct SQL on `dbo.productos.seguro` and `dbo.seguros`.
+### Bids (write)
 
-## Article rejection
+| Capability | Status |
+|------------|--------|
+| Employee place bid | **Intentionally client-only** — `POST /api/subastas/:id/pujos` still requires `requireClienteAuth` |
 
-| Expected capability | Status |
-|---------------------|--------|
-| `POST /api/admin/productos/solicitudes/:id/rechazar` | **Exists but returns 409** `REJECTION_NOT_SUPPORTED_BY_SCHEMA` |
-| `POST /api/admin/items/submissions/:id/reject` | **Same 409** |
-| Legacy `POST /api/admin/productos/:id/decision` with `reject` | May work via legacy flow — prefer testing against pending legacy rows |
+### Auction lifecycle
 
-## Bids (employee operations)
-
-| Expected capability | Status |
-|---------------------|--------|
-| List bids as employee | **Client-only** — `GET /api/subastas/:id/pujos/history` returns **403** for `empleado` |
-| Place bid as employee | **Client-only** — `POST /api/subastas/:id/pujos` returns **403** |
-| Live auction operator console | **Client-only** — `GET /api/subastas/:id/live` returns **403** |
-
-## Auction lifecycle
-
-| Expected capability | Status |
-|---------------------|--------|
+| Capability | Status |
+|------------|--------|
 | Delete/cancel auction | **Missing** |
-| Dedicated “change status” endpoint | **Partial** — use `PATCH /api/admin/subastas/:id` with `estado` (`abierta` \| `carrada`) |
-| Close entire auction in one call | **Missing** — only per-item close: `POST /api/subastas/:id/items/:itemId/cerrar` |
+| Close entire auction in one call | **Missing** — use per-item `POST /api/subastas/:id/items/:itemId/cerrar` |
 
-## Employee profile / session
+### Employee profile (legacy)
 
-| Expected capability | Status |
-|---------------------|--------|
-| `GET /api/users/me` for employee | **Not usable** — returns **401** (JWT `sub` is employee id, not `personas` id) |
-| `GET /api/users/me/metrics` | **403** for employees |
-| Dedicated `GET /api/empleados/me` | **Missing** — use `GET /api/empleados/:id` with known `employee_id` |
-| Refresh token | **Missing** — stateless JWT only; re-login via `POST /api/auth/employee/login` |
+| Capability | Status |
+|------------|--------|
+| `GET /api/users/me` for employee | **Not usable** (401) — use `GET /api/empleados/me` |
+| Refresh token | **Missing by design** — stateless JWT |
 
-## Item images (employee upload)
+### Item images
 
-| Expected capability | Status |
-|---------------------|--------|
-| Upload photos to existing product | **Missing** — photos are created during client submission |
-| Employee associate/replace images | **Missing** — read-only `GET /api/productos/:id/photos/:photoId` |
+| Capability | Status |
+|------------|--------|
+| Employee upload/replace photos | **Deferred** — photos created on client submission; read via `GET /api/productos/:id/photos/:photoId` |
 
-## Inspection / review status
+### Inspection workflow
 
-| Expected capability | Status |
-|---------------------|--------|
-| Request inspection workflow | **Missing** |
-| Separate inspection status field API | **Missing** — review is modeled via submission `status` and legacy `revision` list |
-| Employee notes on submission (standalone) | **Partial** — `notes` on accept endpoint only |
+| Capability | Status |
+|------------|--------|
+| Dedicated inspection status | **Deferred** — use submission `status` + `notasRevision` on reject / `notes` on accept |
+| Request inspection endpoint | **Missing** |
 
-## Post-auction payments (employee)
+### Post-auction payments
 
-| Expected capability | Status |
-|---------------------|--------|
-| List all winners for an auction | **Missing** — per-item `GET .../resultado` only |
+| Capability | Status |
+|------------|--------|
+| List all winners for auction | **Missing** — per-item `GET .../resultado` only |
 | Update payment/shipping as employee | **Missing** |
-| Payment summary across auction | **Missing** |
 
-## User blocking
+### User blocking
 
-| Expected capability | Status |
-|---------------------|--------|
-| Block/reject user beyond admission | **Partial** — `PATCH /api/admin/clientes/:id/admitir` with `admitido: "no"` only |
+| Capability | Status |
+|------------|--------|
+| Block beyond admission | **Partial** — `PATCH /api/admin/clientes/:id/admitir` with `admitido: "no"` |
+
+## Database migration required
+
+Apply before rejection works against SQL Server:
+
+```bash
+sqlcmd -S localhost,1433 -d CrownBid -U sa -P "<password>" -C \
+  -i database/migrations/006_productos_rejection_review.sql
+```
+
+Adds `motivoRechazo` and `notasRevision` to `dbo.productos`.

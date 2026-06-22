@@ -5,6 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/** At least 11 days ahead — API requires 10+ days notice for new auctions. */
+function defaultAuctionDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 11);
+  return d.toISOString().slice(0, 10);
+}
+
 const COMMON_JSON_TEST = [
   'pm.test("Response is JSON when body present", function () {',
   '  if (pm.response.text() && pm.response.text().length > 0) {',
@@ -179,8 +186,12 @@ const collection = {
     ),
     folder(
       '2. Employee / Profile',
-      'Employee directory endpoints. `/api/users/me` is NOT usable with employee tokens (401).',
+      'Employee directory and session validation via GET /empleados/me.',
       [
+        req('Get Current Employee (me)', 'GET', ['empleados', 'me'], {
+          description:
+            'Returns the logged-in employee profile from JWT + dbo.empleados.\n\n**Response:** `{ employeeId, email, role, cargo, sector }`',
+        }),
         req('List Employees', 'GET', ['empleados'], {
           description: 'Lists employees from `dbo.empleados`.\n\n**Response:** `{ items: [{ identificador, cargo, sector }] }`',
           extraTests: [
@@ -203,10 +214,13 @@ const collection = {
       [
         req('Create Auction (Admin)', 'POST', ['admin', 'subastas'], {
           status: 201,
-          description: 'Creates a new auction. Employee-only (`requireEmployeeAuth`).\n\n**Response 201:** auction summary with `id`.',
+          description:
+            'Creates a new auction. Employee-only (`requireEmployeeAuth`).\n\n' +
+            '**Schedule rules:** start must be in the future and at least 10 calendar days ahead; `horaFin` after `hora`; duration 15–240 min.\n\n' +
+            '**Response 201:** auction summary with `id`. Invalid schedule returns **400** (does not crash the server).',
           body: JSON.stringify(
             {
-              fecha: '2026-07-15',
+              fecha: defaultAuctionDate(),
               hora: '18:00',
               horaFin: '22:00',
               ubicacion: 'Salón Principal CrownBid',
@@ -229,6 +243,10 @@ const collection = {
         req('Update Auction (Admin)', 'PATCH', ['admin', 'subastas', '{{auction_id}}'], {
           description: 'Partial update of auction fields.',
           body: JSON.stringify({ estado: 'abierta', ubicacion: 'Salón Principal — actualizado' }, null, 2),
+        }),
+        req('Change Auction Status', 'PATCH', ['admin', 'subastas', '{{auction_id}}', 'estado'], {
+          description: 'Dedicated status endpoint. DB values: `abierta` | `carrada`.',
+          body: JSON.stringify({ estado: 'carrada' }, null, 2),
         }),
         req('List Auctions', 'GET', ['subastas'], {
           auth: false,
@@ -277,17 +295,15 @@ const collection = {
       ],
     ),
     folder(
-      '4. Bids (Client-only — reference)',
-      'These endpoints exist but return **403** for employee tokens (`requireClienteAuth`). Included for negative testing only.',
+      '4. Bids (Employee read-only)',
+      'Employees can read bid history and live state but cannot place bids.',
       [
-        req('[403 expected] Bid History', 'GET', ['subastas', '{{auction_id}}', 'pujos', 'history'], {
-          status: 403,
-          description: 'Client-only. Employees receive 403.',
+        req('Bid History', 'GET', ['subastas', '{{auction_id}}', 'pujos', 'history'], {
+          description: 'Operational bid history for employees (read-only).',
           query: [{ key: 'itemId', value: '{{item_id}}' }],
         }),
-        req('[403 expected] Live Auction State', 'GET', ['subastas', '{{auction_id}}', 'live'], {
-          status: 403,
-          description: 'Client-only live session state.',
+        req('Live Auction State', 'GET', ['subastas', '{{auction_id}}', 'live'], {
+          description: 'Operational live auction data for employees. `canBid` is always false.',
           query: [{ key: 'watchedItemId', value: '{{item_id}}' }],
         }),
       ],
@@ -342,11 +358,16 @@ const collection = {
             '}',
           ],
         }),
-        req('Reject Submission (schema limitation)', 'POST', ['admin', 'productos', 'solicitudes', '{{article_id}}', 'rechazar'], {
-          status: 409,
-          description:
-            'Rejection endpoint exists but currently returns **409** `REJECTION_NOT_SUPPORTED_BY_SCHEMA` until DB schema supports it.',
-          body: JSON.stringify({ reason: 'Documentación insuficiente' }, null, 2),
+        req('Reject Submission', 'POST', ['admin', 'productos', 'solicitudes', '{{article_id}}', 'rechazar'], {
+          description: 'Reject a pending submission. Persists `motivoRechazo` + `notasRevision` (migration 006).',
+          body: JSON.stringify(
+            {
+              reason: 'El artículo no cumple con los criterios de aceptación.',
+              notes: 'Fotos insuficientes / documentación incompleta.',
+            },
+            null,
+            2,
+          ),
         }),
         req('Assign Submission to Auction', 'POST', ['admin', 'productos', 'solicitudes', '{{article_id}}', 'asignar-subasta'], {
           description: 'Assign accepted product to auction or existing catalog.',
@@ -423,7 +444,36 @@ const collection = {
       ],
     ),
     folder(
-      '8. Payment Methods (Admin)',
+      '8. Warehouse / Insurance',
+      'Assign deposit location and insurance policy to consigned products.',
+      [
+        req('Assign Deposit Location', 'PATCH', ['admin', 'productos', '{{article_id}}', 'deposito'], {
+          description: 'Updates `dbo.productos.depositoUbicacion`.',
+          body: JSON.stringify(
+            { depositoUbicacion: 'Depósito Central - Sector A - Estante 4' },
+            null,
+            2,
+          ),
+        }),
+        req('Assign Insurance Policy', 'PATCH', ['admin', 'productos', '{{article_id}}', 'seguro'], {
+          description:
+            'Upserts `dbo.seguros` and links `dbo.productos.seguro`. Optional `descripcion` / vigencia fields are accepted but not persisted.',
+          body: JSON.stringify(
+            {
+              seguro: 'POL-123456',
+              compania: 'Sancor Seguros',
+              descripcion: 'Cobertura contra daño, robo o extravío durante custodia',
+              importe: 1000,
+              polizaCombinada: 'no',
+            },
+            null,
+            2,
+          ),
+        }),
+      ],
+    ),
+    folder(
+      '9. Payment Methods (Admin)',
       'Verify or reject client payment methods.',
       [
         req('List Payment Methods for Review', 'GET', ['admin', 'payment-methods'], {
@@ -449,7 +499,7 @@ const collection = {
       ],
     ),
     folder(
-      '9. Post-auction / Winners',
+      '10. Post-auction / Winners',
       'Employee can close items and read finalization results.',
       [
         req('Get Item Finalization Result', 'GET', ['subastas', '{{auction_id}}', 'items', '{{item_id}}', 'resultado'], {
@@ -458,7 +508,7 @@ const collection = {
       ],
     ),
     folder(
-      '10. Reference Data',
+      '11. Reference Data',
       'Países and sectores CRUD — any authenticated token (including employee).',
       [
         req('List Countries', 'GET', ['paises'], { description: 'List countries.' }),
@@ -508,7 +558,7 @@ const collection = {
       ],
     ),
     folder(
-      '11. Health / Debug',
+      '12. Health / Debug',
       'Unauthenticated health checks (use server root, not `/api` prefix).',
       [
         {

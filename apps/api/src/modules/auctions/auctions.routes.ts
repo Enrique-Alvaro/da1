@@ -3,6 +3,11 @@ import { normalizeAuctionIdParam } from "../../shared/middlewares/normalizeAucti
 import { requireAccessToken } from "../../shared/middlewares/requireAccessToken";
 import { requireAuth } from "../../shared/middlewares/requireAuth";
 import { requireClienteAuth } from "../../shared/middlewares/requireClienteAuth";
+import { requireClienteOrEmployeeAuth } from "../../shared/middlewares/requireClienteOrEmployeeAuth";
+import {
+  requireAdmittedClienteUnlessEmployee,
+  requireOperationalUserUnlessEmployee,
+} from "../../shared/middlewares/requireOperationalUnlessEmployee";
 import { requireOperationalUser } from "../../shared/middlewares/requireOperationalUser";
 import { requireAdmittedCliente } from "../../shared/middlewares/requireAdmittedCliente";
 import { optionalAuth } from "../../shared/middlewares/optionalAuth";
@@ -49,11 +54,19 @@ const clientAdmittedOperationalChain = [
   requireAdmittedCliente,
 ] as const;
 
+const operationalReadChain = [
+  requireAuth,
+  requireAccessToken,
+  requireClienteOrEmployeeAuth,
+  requireOperationalUserUnlessEmployee,
+  requireAdmittedClienteUnlessEmployee,
+] as const;
+
 auctionsRoutes.post("/:auctionId/asistentes", ...clientAdmittedOperationalChain, registerAsistente);
 auctionsRoutes.post("/:auctionId/bids", ...clientAdmittedOperationalChain, postBid);
 auctionsRoutes.post("/:auctionId/pujos", ...clientAdmittedOperationalChain, postBid);
-auctionsRoutes.get("/:auctionId/bids/history", ...clientAdmittedOperationalChain, getBidHistory);
+auctionsRoutes.get("/:auctionId/bids/history", ...operationalReadChain, getBidHistory);
 
 auctionsRoutes.post("/:auctionId/live/session", ...clientAdmittedOperationalChain, enterLiveSession);
 auctionsRoutes.delete("/:auctionId/live/session", ...clientAdmittedOperationalChain, leaveLiveSession);
-auctionsRoutes.get("/:auctionId/live", ...clientAdmittedOperationalChain, getLiveState);
+auctionsRoutes.get("/:auctionId/live", ...operationalReadChain, getLiveState);

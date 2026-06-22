@@ -35,5 +35,11 @@ export const auctionIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
+export const patchAuctionEstadoBodySchema = z.object({
+  estado: z.enum(["abierta", "carrada"]),
+});
+
+export type PatchAuctionEstadoBody = z.infer<typeof patchAuctionEstadoBodySchema>;
+
 export type CreateAuctionBody = z.infer<typeof createAuctionBodySchema>;
 export type UpdateAuctionBody = z.infer<typeof updateAuctionBodySchema>;

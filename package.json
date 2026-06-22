@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "db:schema": "echo \"Run database/schema.sql in SQL Server\"",
+    "db:migrate": "node scripts/run-migrations.mjs",
     "dev:api": "npm --workspace @crownbid/api run dev",
     "dev:mobile": "npm --workspace @crownbid/mobile run start",
     "start": "npm --workspace @crownbid/mobile run start",
