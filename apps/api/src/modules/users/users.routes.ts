@@ -3,6 +3,7 @@ import { requireAccessToken } from "../../shared/middlewares/requireAccessToken"
 import { requireAuth } from "../../shared/middlewares/requireAuth";
 import { requireClienteAuth } from "../../shared/middlewares/requireClienteAuth";
 import { requireOperationalUser } from "../../shared/middlewares/requireOperationalUser";
+import { requireAdmittedCliente } from "../../shared/middlewares/requireAdmittedCliente";
 import {
   cancelMySubmission,
   getMySubmission,
@@ -87,18 +88,26 @@ usersRoutes.patch(
   updatePaymentMethodGuarantee
 );
 
-const submissionChain = [
+const submissionReadChain = [
   requireAuth,
   requireAccessToken,
   requireClienteAuth,
   requireOperationalUser,
 ] as const;
 
-usersRoutes.get("/me/item-submissions", ...submissionChain, listMySubmissions);
+const submissionWriteChain = [
+  requireAuth,
+  requireAccessToken,
+  requireClienteAuth,
+  requireOperationalUser,
+  requireAdmittedCliente,
+] as const;
+
+usersRoutes.get("/me/item-submissions", ...submissionReadChain, listMySubmissions);
 usersRoutes.get(
   "/me/item-submissions/:id/photos/:photoId",
-  ...submissionChain,
+  ...submissionReadChain,
   getMySubmissionPhoto
 );
-usersRoutes.get("/me/item-submissions/:id", ...submissionChain, getMySubmission);
-usersRoutes.delete("/me/item-submissions/:id", ...submissionChain, cancelMySubmission);
+usersRoutes.get("/me/item-submissions/:id", ...submissionReadChain, getMySubmission);
+usersRoutes.delete("/me/item-submissions/:id", ...submissionWriteChain, cancelMySubmission);

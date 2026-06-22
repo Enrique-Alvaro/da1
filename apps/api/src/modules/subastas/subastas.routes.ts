@@ -3,6 +3,7 @@ import { requireAccessToken } from "../../shared/middlewares/requireAccessToken"
 import { requireAuth } from "../../shared/middlewares/requireAuth";
 import { requireClienteAuth } from "../../shared/middlewares/requireClienteAuth";
 import { requireOperationalUser } from "../../shared/middlewares/requireOperationalUser";
+import { requireAdmittedCliente } from "../../shared/middlewares/requireAdmittedCliente";
 import { optionalAuth } from "../../shared/middlewares/optionalAuth";
 import { postBid, registerAsistente } from "../pujos/pujos.controller";
 import { requireEmployeeAuth } from "../../shared/middlewares/requireEmployeeAuth";
@@ -31,25 +32,19 @@ const employeeChain = [requireAuth, requireAccessToken, requireEmployeeAuth] as 
 subastasRoutes.post("/:id/items/:itemId/cerrar", ...employeeChain, closeAuctionItem);
 subastasRoutes.get("/:id/items/:itemId/resultado", requireAuth, requireAccessToken, getAuctionItemResult);
 
-const clientOperationalChain = [
+const clientAdmittedOperationalChain = [
   requireAuth,
   requireAccessToken,
   requireClienteAuth,
   requireOperationalUser,
+  requireAdmittedCliente,
 ] as const;
 
-const clientBidChain = [
-  requireAuth,
-  requireAccessToken,
-  requireClienteAuth,
-  requireOperationalUser,
-] as const;
+subastasRoutes.post("/:id/asistentes", ...clientAdmittedOperationalChain, registerAsistente);
+subastasRoutes.post("/:id/pujos", ...clientAdmittedOperationalChain, postBid);
+subastasRoutes.get("/:id/pujos/history", ...clientAdmittedOperationalChain, getBidHistory);
+subastasRoutes.get("/:id/bids/history", ...clientAdmittedOperationalChain, getBidHistory);
 
-subastasRoutes.post("/:id/asistentes", ...clientBidChain, registerAsistente);
-subastasRoutes.post("/:id/pujos", ...clientBidChain, postBid);
-subastasRoutes.get("/:id/pujos/history", ...clientOperationalChain, getBidHistory);
-subastasRoutes.get("/:id/bids/history", ...clientOperationalChain, getBidHistory);
-
-subastasRoutes.post("/:id/live/session", ...clientOperationalChain, enterLiveSession);
-subastasRoutes.delete("/:id/live/session", ...clientOperationalChain, leaveLiveSession);
-subastasRoutes.get("/:id/live", ...clientOperationalChain, getLiveState);
+subastasRoutes.post("/:id/live/session", ...clientAdmittedOperationalChain, enterLiveSession);
+subastasRoutes.delete("/:id/live/session", ...clientAdmittedOperationalChain, leaveLiveSession);
+subastasRoutes.get("/:id/live", ...clientAdmittedOperationalChain, getLiveState);

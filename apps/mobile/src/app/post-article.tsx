@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createSubmission } from '@/services/api';
+import { alertLoginRequired, alertPendingAdmission, resolveClientSession } from '@/utils/clientPermissions';
 
 const MIN_IMAGES = 6;
 const MAX_IMAGES = 20;
@@ -43,6 +44,28 @@ export default function PostArticleScreen() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const session = await resolveClientSession();
+      if (!active) return;
+      if (session.isGuest) {
+        alertLoginRequired(() => router.replace('/login'));
+        return;
+      }
+      if (!session.isAdmitted) {
+        alertPendingAdmission();
+        router.replace('/home');
+        return;
+      }
+      setAccessChecked(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const imageError = submitAttempted && images.length < MIN_IMAGES;
   const titleError = submitAttempted && title.trim().length === 0;
@@ -117,10 +140,18 @@ export default function PostArticleScreen() {
       });
       router.push('/post-article-success');
     } catch (e: any) {
-      router.push('/post-article-error');
+      setApiError(e?.message || 'No se pudo enviar el artículo.');
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (!accessChecked) {
+    return (
+      <ThemedView style={[styles.container, { backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#D35400" />
+      </ThemedView>
+    );
   }
 
   return (

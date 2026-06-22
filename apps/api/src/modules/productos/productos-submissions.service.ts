@@ -1,5 +1,6 @@
 import { getDefaultReviewerEmployeeId } from "../../config/env";
-import { NotFoundError, UnauthorizedError } from "../../shared/errors/httpErrors";
+import { CLIENT_NOT_ADMITTED_MESSAGE } from "../../shared/middlewares/requireAdmittedCliente";
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "../../shared/errors/httpErrors";
 import { parseProductImages } from "../../shared/validation/productImages";
 import type { AuthUserContext } from "../../shared/types/auth";
 import type { UserPublic } from "../users/user.mapper";
@@ -68,11 +69,19 @@ async function mapRowWithPhotos(
   return mapToDetail(row, photos.map((p) => p.identificador));
 }
 
+async function assertClienteAdmittedForSubmission(personaId: number): Promise<void> {
+  const cliente = await usersRepository.findClienteByPersonId(personaId);
+  if (!cliente || cliente.admitido.trim().toLowerCase() !== "si") {
+    throw new ForbiddenError(CLIENT_NOT_ADMITTED_MESSAGE, "USER_NOT_ADMITTED");
+  }
+}
+
 export async function createSubmission(
   authUser: AuthUserContext,
   body: CreateProductSubmissionBody
 ): Promise<ItemSubmissionDetail> {
   const personaId = parsePersonaId(authUser);
+  await assertClienteAdmittedForSubmission(personaId);
   const duenioId = await resolveDuenioForCliente(personaId);
   const imageBuffers = parseProductImages(body.images);
   const revisorId = getDefaultReviewerEmployeeId();

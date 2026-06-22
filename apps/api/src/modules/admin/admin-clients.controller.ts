@@ -5,8 +5,18 @@ import {
   admitClienteBodySchema,
   clientIdParamSchema,
   formatZodError,
+  listAdminClientsQuerySchema,
 } from "./admin-clients.schema";
 import * as adminClientsService from "./admin-clients.service";
+
+export const listAdminClientes: RequestHandler = asyncHandler(async (req, res) => {
+  const parsed = listAdminClientsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new ValidationError(formatZodError(parsed.error));
+  }
+  const result = await adminClientsService.listAdminClients(parsed.data);
+  res.status(200).json(result);
+});
 
 export const getAdminCliente: RequestHandler = asyncHandler(async (req, res) => {
   const parsed = clientIdParamSchema.safeParse(req.params);

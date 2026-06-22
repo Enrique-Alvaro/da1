@@ -3,6 +3,7 @@ import { requireAccessToken } from "../../shared/middlewares/requireAccessToken"
 import { requireAuth } from "../../shared/middlewares/requireAuth";
 import { requireClienteAuth } from "../../shared/middlewares/requireClienteAuth";
 import { requireOperationalUser } from "../../shared/middlewares/requireOperationalUser";
+import { requireAdmittedCliente } from "../../shared/middlewares/requireAdmittedCliente";
 import { optionalAuth } from "../../shared/middlewares/optionalAuth";
 import { getItem } from "./items.controller";
 import {
@@ -20,6 +21,7 @@ const clientSubmissionChain = [
   requireAccessToken,
   requireClienteAuth,
   requireOperationalUser,
+  requireAdmittedCliente,
 ] as const;
 
 itemsRoutes.post("/submissions", ...clientSubmissionChain, createSolicitud);

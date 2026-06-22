@@ -90,6 +90,7 @@ describe("Phase 2 — auction / live / bidding hardening", () => {
     const detail = await getAuctionDetail(10, authCliente);
     expect(detail.canBid).toBe(false);
     expect(detail.cannotBidReason).toBe("USER_NOT_ADMITTED");
+    expect(detail.canAccess).toBe(true);
   });
 
   it("category restriction blocks bidding on detail", async () => {

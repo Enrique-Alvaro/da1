@@ -3,7 +3,11 @@ import { NotFoundError, UnauthorizedError } from "../src/shared/errors/httpError
 import * as usersRepository from "../src/modules/users/users.repository";
 import * as paymentMethodsRepository from "../src/modules/payment-methods/payment-methods.repository";
 import * as subastasRepository from "../src/modules/subastas/subastas.repository";
-import { admitCliente, getAdminClientDetail } from "../src/modules/admin/admin-clients.service";
+import {
+  admitCliente,
+  getAdminClientDetail,
+  listAdminClients,
+} from "../src/modules/admin/admin-clients.service";
 import { getMyOperationalStatus } from "../src/modules/users/users-me-status.service";
 import { assertCanBid } from "../src/modules/pujos/pujos.service";
 import { forgotPassword, logout, resetPassword } from "../src/modules/auth/auth.service";
@@ -54,6 +58,28 @@ describe("admin client admission", () => {
       new NotFoundError("Cliente no encontrado.", "CLIENT_NOT_FOUND")
     );
     await expect(admitCliente(999, { admitido: "si" })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("lists clients with admission filter", async () => {
+    vi.spyOn(usersRepository, "listAdminClients").mockResolvedValue([
+      {
+        identificador: 7,
+        full_name: "Juan",
+        email: "juan@example.com",
+        admitido: "no",
+        categoria: "comun",
+        document_number: "40123456",
+        country_name: "Argentina",
+        registered_at: new Date("2026-01-01"),
+        payment_method_count: 1,
+        verified_payment_method_count: 0,
+      },
+    ]);
+
+    const result = await listAdminClients({ admitido: "no", limit: 50, offset: 0 });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.admitido).toBe("no");
+    expect(result.items[0]?.clienteId).toBe(7);
   });
 
   it("admin detail includes admission and payment summary", async () => {

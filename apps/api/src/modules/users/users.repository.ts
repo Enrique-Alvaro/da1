@@ -76,6 +76,70 @@ export type AdminClientDetailRow = {
   verified_payment_method_count: number;
 };
 
+export type ListAdminClientsQuery = {
+  admitido?: "si" | "no" | "all";
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type AdminClientListRow = Omit<AdminClientDetailRow, "status">;
+
+export async function listAdminClients(
+  query: ListAdminClientsQuery = {}
+): Promise<AdminClientListRow[]> {
+  const pool = await getSqlPool();
+  const request = pool.request();
+  const filters: string[] = ["1 = 1"];
+
+  const admitido = query.admitido ?? "all";
+  if (admitido === "si") {
+    filters.push("LOWER(LTRIM(RTRIM(c.admitido))) = N'si'");
+  } else if (admitido === "no") {
+    filters.push("LOWER(LTRIM(RTRIM(c.admitido))) <> N'si'");
+  }
+
+  if (query.search?.trim()) {
+    request.input("search", sql.NVarChar(200), `%${query.search.trim()}%`);
+    filters.push(
+      "(cc.email LIKE @search OR p.nombre LIKE @search OR p.documento LIKE @search)"
+    );
+  }
+
+  const limit = Math.min(query.limit ?? 50, 100);
+  const offset = query.offset ?? 0;
+
+  const result = await request.query<AdminClientListRow>(`
+    SELECT
+      c.identificador,
+      p.nombre AS full_name,
+      cc.email,
+      c.admitido,
+      c.categoria,
+      p.documento AS document_number,
+      pa.nombre AS country_name,
+      cc.created_at AS registered_at,
+      (
+        SELECT COUNT_BIG(1)
+        FROM dbo.mediosPago AS mp
+        WHERE mp.cliente = c.identificador
+      ) AS payment_method_count,
+      (
+        SELECT COUNT_BIG(1)
+        FROM dbo.mediosPago AS mp
+        WHERE mp.cliente = c.identificador AND mp.estado = N'verificado'
+      ) AS verified_payment_method_count
+    FROM dbo.clientes AS c
+    INNER JOIN dbo.personas AS p ON p.identificador = c.identificador
+    LEFT JOIN dbo.cliente_credenciales AS cc ON cc.persona_id = c.identificador
+    LEFT JOIN dbo.paises AS pa ON pa.numero = c.numeroPais
+    WHERE ${filters.join(" AND ")}
+    ORDER BY cc.created_at DESC, c.identificador DESC
+    OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+  `);
+  return result.recordset;
+}
+
 export async function findAdminClientDetail(clienteId: number): Promise<AdminClientDetailRow | null> {
   const pool = await getSqlPool();
   const result = await pool.request().input("id", sql.Int, clienteId).query<AdminClientDetailRow>(`

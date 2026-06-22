@@ -19,12 +19,14 @@ import {
   rejectAdminPaymentMethod,
   verifyAdminPaymentMethod,
 } from "../payment-methods/payment-methods-admin.controller";
-import { admitCliente, getAdminCliente } from "./admin-clients.controller";
+import { admitCliente, getAdminCliente, listAdminClientes } from "./admin-clients.controller";
 
 export const adminRoutes = Router();
 
 adminRoutes.use(requireAuth, requireAccessToken, requireEmployeeAuth);
 
+adminRoutes.get("/clientes", listAdminClientes);
+adminRoutes.get("/clients", listAdminClientes);
 adminRoutes.get("/clientes/:id", getAdminCliente);
 adminRoutes.patch("/clientes/:id/admitir", admitCliente);
 adminRoutes.patch("/clients/:id/admit", admitCliente);

@@ -4,6 +4,7 @@ import { requireAccessToken } from "../../shared/middlewares/requireAccessToken"
 import { requireAuth } from "../../shared/middlewares/requireAuth";
 import { requireClienteAuth } from "../../shared/middlewares/requireClienteAuth";
 import { requireOperationalUser } from "../../shared/middlewares/requireOperationalUser";
+import { requireAdmittedCliente } from "../../shared/middlewares/requireAdmittedCliente";
 import { optionalAuth } from "../../shared/middlewares/optionalAuth";
 import { requireEmployeeAuth } from "../../shared/middlewares/requireEmployeeAuth";
 import { postBid, registerAsistente } from "../pujos/pujos.controller";
@@ -40,25 +41,19 @@ auctionsRoutes.get(
   getAuctionItemResult
 );
 
-const clientOperationalChain = [
+const clientAdmittedOperationalChain = [
   requireAuth,
   requireAccessToken,
   requireClienteAuth,
   requireOperationalUser,
+  requireAdmittedCliente,
 ] as const;
 
-const clientBidChain = [
-  requireAuth,
-  requireAccessToken,
-  requireClienteAuth,
-  requireOperationalUser,
-] as const;
+auctionsRoutes.post("/:auctionId/asistentes", ...clientAdmittedOperationalChain, registerAsistente);
+auctionsRoutes.post("/:auctionId/bids", ...clientAdmittedOperationalChain, postBid);
+auctionsRoutes.post("/:auctionId/pujos", ...clientAdmittedOperationalChain, postBid);
+auctionsRoutes.get("/:auctionId/bids/history", ...clientAdmittedOperationalChain, getBidHistory);
 
-auctionsRoutes.post("/:auctionId/asistentes", ...clientBidChain, registerAsistente);
-auctionsRoutes.post("/:auctionId/bids", ...clientBidChain, postBid);
-auctionsRoutes.post("/:auctionId/pujos", ...clientBidChain, postBid);
-auctionsRoutes.get("/:auctionId/bids/history", ...clientOperationalChain, getBidHistory);
-
-auctionsRoutes.post("/:auctionId/live/session", ...clientOperationalChain, enterLiveSession);
-auctionsRoutes.delete("/:auctionId/live/session", ...clientOperationalChain, leaveLiveSession);
-auctionsRoutes.get("/:auctionId/live", ...clientOperationalChain, getLiveState);
+auctionsRoutes.post("/:auctionId/live/session", ...clientAdmittedOperationalChain, enterLiveSession);
+auctionsRoutes.delete("/:auctionId/live/session", ...clientAdmittedOperationalChain, leaveLiveSession);
+auctionsRoutes.get("/:auctionId/live", ...clientAdmittedOperationalChain, getLiveState);

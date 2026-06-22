@@ -1,10 +1,17 @@
 import { ThemedText } from '@/components/themed-text';
 import { getAuthToken } from '@/services/api';
+import {
+  alertLoginRequired,
+  alertPendingAdmission,
+  isUserAdmitted,
+  resolveClientSession,
+} from '@/utils/clientPermissions';
 import { usePathname, useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-const PROTECTED_PATHS = new Set(['/mis-articulos', '/perfil', '/post-article', '/payment-methods']);
+const PROTECTED_PATHS = new Set(['/mis-articulos', '/perfil', '/payment-methods']);
+const ADMISSION_REQUIRED_PATHS = new Set(['/post-article']);
 
 export function CustomNavBar() {
   const router = useRouter();
@@ -17,18 +24,33 @@ export function CustomNavBar() {
     { label: 'Vender', path: '/post-article' },
   ];
 
-  function onNavigate(path: string) {
-    if (PROTECTED_PATHS.has(path) && !getAuthToken()) {
-      Alert.alert(
-        'Inicio de sesión requerido',
-        'Debes iniciar sesión para acceder a esta sección.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Iniciar sesión', onPress: () => router.push('/login') },
-        ]
-      );
+  async function onNavigate(path: string) {
+    if (!getAuthToken()) {
+      if (PROTECTED_PATHS.has(path) || ADMISSION_REQUIRED_PATHS.has(path)) {
+        alertLoginRequired(() => router.push('/login'));
+        return;
+      }
+      router.push(path as never);
       return;
     }
+
+    if (ADMISSION_REQUIRED_PATHS.has(path)) {
+      const session = await resolveClientSession();
+      if (session.isGuest) {
+        alertLoginRequired(() => router.push('/login'));
+        return;
+      }
+      if (!isUserAdmitted(session.user)) {
+        alertPendingAdmission();
+        return;
+      }
+    }
+
+    if (PROTECTED_PATHS.has(path) && !getAuthToken()) {
+      alertLoginRequired(() => router.push('/login'));
+      return;
+    }
+
     router.push(path as never);
   }
 
@@ -37,7 +59,7 @@ export function CustomNavBar() {
       {navItems.map((item) => (
         <Pressable
           key={item.path}
-          onPress={() => onNavigate(item.path)}
+          onPress={() => void onNavigate(item.path)}
           style={styles.navButton}
         >
           <ThemedText style={pathname === item.path ? styles.active : styles.inactive}>

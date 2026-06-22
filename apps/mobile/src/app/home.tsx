@@ -3,6 +3,8 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { fetchAuctions, getAuthToken, getCurrentUser, logout } from '@/services/api';
+import type { UserProfile } from '@/services/types';
+import { isUserAdmitted, PENDING_ADMISSION_BANNER } from '@/utils/clientPermissions';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, Text } from 'react-native';
@@ -21,18 +23,8 @@ type Auction = {
   cannotAccessReason: string | null;
 };
 
-const ACCESS_DENIAL_MESSAGES: Record<string, string> = {
-  USER_NOT_ADMITTED:          'Tu cuenta aún no fue aprobada por el equipo.',
-  CATEGORY_NOT_ALLOWED:       'Tu categoría no alcanza para esta subasta.',
-  PAYMENT_METHOD_REQUIRED:    'Necesitás registrar un medio de pago.',
-  PAYMENT_METHOD_NOT_VERIFIED:'Tu medio de pago aún no fue verificado.',
-  CLIENT_NOT_FOUND:           'No se encontró tu perfil de cliente.',
-};
 
-type ApiUser = {
-  fullName: string;
-  category: string;
-};
+type ApiUser = Pick<UserProfile, 'fullName' | 'category' | 'admitted'>;
 
 const CATEGORY_LABELS: Record<string, string> = {
   comun: 'Común',
@@ -170,28 +162,22 @@ export default function HomeScreen() {
 
   const hasActiveFilters = showLiveOnly || !!selectedCategory || !!selectedDate;
 
-  const noAuctionsMessage = 'No hay subastas disponibles con los filtros seleccionados.';
+  const noAuctionsMessage = hasActiveFilters
+    ? 'No hay subastas para este filtro.'
+    : 'No hay subastas disponibles en este momento.';
 
-  function formatDateChip(dateStr: string): string {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
-  }
+  const isNotAdmitted = !isGuest && user != null && !isUserAdmitted(user);
 
   const renderAuctionCard = ({ item }: { item: Auction }) => {
     const categoryLabel = CATEGORY_LABELS[item.category] ?? item.category;
     const statusLabel = STATUS_LABELS[item.status] ?? item.status;
     const isLive = item.status === 'live';
-    const locked = isGuest || !item.canAccess;
 
     return (
       <Pressable
         style={styles.card}
         onPress={() => {
-          if (isGuest) {
-            router.push('/login');
-          } else if (item.canAccess) {
-            router.push({ pathname: '/catalog', params: { catalogId: String(item.id) } });
-          }
+          router.push({ pathname: '/catalog', params: { catalogId: String(item.id) } });
         }}
       >
         <View style={styles.cardHeader}>
@@ -223,17 +209,14 @@ export default function HomeScreen() {
             Mejor oferta: {item.currency} {item.currentHighestBid.toLocaleString()}
           </ThemedText>
         )}
-
-        {locked && (
-          <ThemedText style={styles.locked}>
-            {isGuest
-              ? 'Iniciá sesión para participar'
-              : (ACCESS_DENIAL_MESSAGES[item.cannotAccessReason ?? ''] ?? 'No podés participar en esta subasta.')}
-          </ThemedText>
-        )}
       </Pressable>
     );
   };
+
+  function formatDateChip(dateStr: string): string {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  }
 
   async function onLogout() {
     try {
@@ -291,42 +274,47 @@ export default function HomeScreen() {
         )}
       </View>
 
+      {isNotAdmitted && (
+        <View style={styles.pendingBanner}>
+          <Text style={styles.pendingBannerText}>{PENDING_ADMISSION_BANNER}</Text>
+        </View>
+      )}
+
       <View style={styles.sectionHeader}>
         <ThemedText style={styles.sectionTitle}>Subastas</ThemedText>
-        <View style={styles.sectionHeaderRight}>
+        {hasActiveFilters && (
           <Pressable
-            style={[styles.filterButton, showLiveOnly && styles.filterButtonActive]}
+            style={styles.clearButton}
+            onPress={() => { setShowLiveOnly(false); setSelectedCategory(null); setSelectedDate(null); }}
+          >
+            <Text style={styles.clearButtonText}>Limpiar filtros</Text>
+          </Pressable>
+        )}
+      </View>
+
+      <View style={styles.filtersBlock}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
+          <Pressable
+            style={[styles.chip, showLiveOnly && styles.chipActive]}
             onPress={() => setShowLiveOnly((prev) => !prev)}
           >
-            <Text style={[styles.filterButtonText, showLiveOnly && styles.filterButtonTextActive]}>
+            <Text style={[styles.chipText, showLiveOnly && styles.chipTextActive]}>
               {showLiveOnly ? '● En vivo' : 'En vivo'}
             </Text>
           </Pressable>
-          {hasActiveFilters && (
+          {[null, 'comun', 'especial', 'plata', 'oro', 'platino'].map((cat) => (
             <Pressable
-              style={styles.clearButton}
-              onPress={() => { setShowLiveOnly(false); setSelectedCategory(null); setSelectedDate(null); }}
+              key={cat ?? 'all'}
+              style={[styles.chip, selectedCategory === cat && styles.chipActive]}
+              onPress={() => setSelectedCategory(cat)}
             >
-              <Text style={styles.clearButtonText}>Limpiar</Text>
+              <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
+                {cat ? (CATEGORY_LABELS[cat] ?? cat) : 'Todas'}
+              </Text>
             </Pressable>
-          )}
-        </View>
+          ))}
+        </ScrollView>
       </View>
-
-      {/* Filtro por categoría */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow} contentContainerStyle={styles.chipsContent}>
-        {[null, 'comun', 'especial', 'plata', 'oro', 'platino'].map((cat) => (
-          <Pressable
-            key={cat ?? 'all'}
-            style={[styles.chip, selectedCategory === cat && styles.chipActive]}
-            onPress={() => setSelectedCategory(cat)}
-          >
-            <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
-              {cat ? (CATEGORY_LABELS[cat] ?? cat) : 'Todas'}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
 
       {/* Filtro por fecha — botón que abre calendario */}
       <View style={styles.dateFilterRow}>
@@ -436,22 +424,35 @@ const styles = StyleSheet.create({
   guestAlertBox: { backgroundColor: '#A04000', padding: 12, borderRadius: 8, marginTop: 15 },
   guestAlertText: { color: '#FFF', fontSize: 14 },
 
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 20, paddingBottom: 8 },
-  sectionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 16, paddingBottom: 8 },
   sectionTitle: { fontSize: 18, color: '#002855', fontWeight: 'bold' },
-  filterButton: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#F3F4F6', borderRadius: 999 },
-  filterButtonActive: { backgroundColor: '#D35400' },
-  filterButtonText: { fontSize: 12, color: '#334155', fontWeight: '700' },
-  filterButtonTextActive: { color: '#FFFFFF' },
   clearButton: { paddingVertical: 6, paddingHorizontal: 10 },
-  clearButtonText: { fontSize: 12, color: '#D35400', fontWeight: '600' },
-  chipsRow: { maxHeight: 44, marginBottom: 4 },
-  chipsContent: { paddingHorizontal: 15, gap: 8, alignItems: 'center' },
-  chip: { paddingVertical: 6, paddingHorizontal: 14, backgroundColor: '#F3F4F6', borderRadius: 999 },
-  chipActive: { backgroundColor: '#D35400' },
-  chipDateActive: { backgroundColor: '#002855' },
-  chipText: { fontSize: 12, color: '#334155', fontWeight: '600' },
+  clearButtonText: { fontSize: 13, color: '#D35400', fontWeight: '600' },
+  filtersBlock: { marginBottom: 6 },
+  chipsContent: { paddingHorizontal: 15, paddingVertical: 4, gap: 8, alignItems: 'center', flexDirection: 'row' },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    minHeight: 36,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+  },
+  chipActive: { backgroundColor: '#D35400', borderColor: '#D35400' },
+  chipDateActive: { backgroundColor: '#002855', borderColor: '#002855' },
+  chipText: { fontSize: 13, color: '#1E293B', fontWeight: '600' },
   chipTextActive: { color: '#FFFFFF' },
+
+  pendingBanner: {
+    backgroundColor: '#FFF7ED',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FED7AA',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  pendingBannerText: { color: '#9A3412', fontSize: 14, lineHeight: 20 },
 
   dateFilterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, marginBottom: 4, gap: 6 },
   dateChipClear: { paddingHorizontal: 8, paddingVertical: 4 },
@@ -506,5 +507,4 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', justifyContent: 'space-between' },
   meta: { fontSize: 13, color: '#666' },
   bid: { fontSize: 14, color: '#D35400', fontWeight: '600' },
-  locked: { fontSize: 12, color: '#E74C3C', fontWeight: '500' },
 });

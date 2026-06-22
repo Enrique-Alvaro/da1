@@ -125,7 +125,6 @@ export async function evaluateAuctionAccess(params: {
   let cannotBidReason: AccessDenialCode | null = null;
 
   if (cliente.admitido.trim().toLowerCase() !== "si") {
-    cannotAccessReason = "USER_NOT_ADMITTED";
     cannotBidReason = "USER_NOT_ADMITTED";
   } else if (
     !subasta.categoria ||
@@ -133,7 +132,6 @@ export async function evaluateAuctionAccess(params: {
     !parseCategoryRank(subasta.categoria) ||
     !categoryMeetsMinimum(cliente.categoria, subasta.categoria)
   ) {
-    cannotAccessReason = "CATEGORY_NOT_ALLOWED";
     cannotBidReason = "CATEGORY_NOT_ALLOWED";
   }
 

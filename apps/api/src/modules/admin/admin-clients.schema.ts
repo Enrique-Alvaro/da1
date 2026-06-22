@@ -17,3 +17,12 @@ export const admitClienteBodySchema = z.object({
 });
 
 export type AdmitClienteBody = z.infer<typeof admitClienteBodySchema>;
+
+export const listAdminClientsQuerySchema = z.object({
+  admitido: z.enum(["si", "no", "all"]).optional().default("all"),
+  search: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+export type ListAdminClientsQuery = z.infer<typeof listAdminClientsQuerySchema>;

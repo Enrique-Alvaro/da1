@@ -99,13 +99,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
   } catch (error) {
     console.warn('[CrownBid Request failed]', url, error);
-    throw error;
+    const networkError: ApiError = {
+      message: 'No se pudo conectar con el servidor. Verificá tu conexión.',
+      statusCode: 0,
+    };
+    throw networkError;
   }
   if (!response.ok) {
     const payload = await parseResponse<ApiError>(response);
     const error: ApiError = {
-      message: payload?.message || response.statusText,
+      message: payload?.message || response.statusText || 'Error en la solicitud.',
       statusCode: response.status,
+      code: (payload as ApiError & { code?: string })?.code,
     };
     throw error;
   }
