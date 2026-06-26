@@ -11,9 +11,12 @@ export type MedioPagoBidRow = {
   montoDisponible: number | null;
 };
 
+export const INSUFFICIENT_FUNDS_MESSAGE =
+  "No tenés fondos suficientes para realizar esta puja.";
+
 /**
- * Valida un medio de pago cargado (p. ej. dentro de transacción con bloqueo).
- * Mismos códigos que la validación previa a insertar la puja.
+ * Fondos disponibles = mediosPago.montoDisponible − pujas líderes activas en otros ítems.
+ * El ítem en curso se excluye del compromiso porque la nueva puja reemplaza la exposición local.
  */
 export function assertPaymentMethodForBid(
   medio: MedioPagoBidRow | null,
@@ -48,21 +51,17 @@ export function assertPaymentMethodForBid(
       "PAYMENT_METHOD_CURRENCY_MISMATCH"
     );
   }
-  if (medio.tipo === "cheque_certificado") {
-    if (medio.montoDisponible == null) {
-      throw new ConflictError(
-        "El cheque certificado no tiene monto disponible configurado.",
-        "PAYMENT_METHOD_INSUFFICIENT_FUNDS"
-      );
-    }
-    const exposure = options?.committedExposure ?? 0;
-    const totalCommitted = exposure + bidAmount;
-    if (Number(medio.montoDisponible) < totalCommitted) {
-      throw new ConflictError(
-        "El monto comprometido supera tu garantía disponible.",
-        "GUARANTEE_LIMIT_EXCEEDED"
-      );
-    }
+  if (medio.montoDisponible == null) {
+    throw new ConflictError(INSUFFICIENT_FUNDS_MESSAGE, "PAYMENT_METHOD_INSUFFICIENT_FUNDS");
+  }
+  const available = Number(medio.montoDisponible);
+  if (!Number.isFinite(available) || available <= 0) {
+    throw new ConflictError(INSUFFICIENT_FUNDS_MESSAGE, "PAYMENT_METHOD_INSUFFICIENT_FUNDS");
+  }
+  const exposure = options?.committedExposure ?? 0;
+  const totalCommitted = exposure + bidAmount;
+  if (totalCommitted > available) {
+    throw new ConflictError(INSUFFICIENT_FUNDS_MESSAGE, "PAYMENT_METHOD_INSUFFICIENT_FUNDS");
   }
   return medio;
 }

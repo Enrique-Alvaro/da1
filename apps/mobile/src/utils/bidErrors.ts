@@ -15,7 +15,8 @@ export const BID_DENIAL_MESSAGES: Record<string, string> = {
   BID_TOO_HIGH: 'El monto supera el máximo permitido para esta subasta.',
   BID_AMOUNT_INVALID: 'Ingresá un monto numérico válido.',
   ITEM_NOT_CURRENT: 'Solo podés pujar por el artículo en curso.',
-  GUARANTEE_LIMIT_EXCEEDED: 'El monto supera tu garantía disponible.',
+  GUARANTEE_LIMIT_EXCEEDED: 'No tenés fondos suficientes para realizar esta puja.',
+  PAYMENT_METHOD_INSUFFICIENT_FUNDS: 'No tenés fondos suficientes para realizar esta puja.',
   PAYMENT_METHOD_CURRENCY_MISMATCH: 'El medio de pago no coincide con la moneda de la subasta.',
   BID_CONFLICT: 'Otra puja se registró primero. Actualizá el monto e intentá de nuevo.',
 };

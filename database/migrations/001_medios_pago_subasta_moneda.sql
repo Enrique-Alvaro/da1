@@ -3,6 +3,10 @@
 -- Aditivo: no modifica tablas requeridas por el profesor salvo ADD COLUMN en subastas.
 -- Idempotente: puede re-ejecutarse sin fallar si los objetos ya existen.
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
 /* -------------------------------------------------------------------------- */
 /* A. subastas.moneda (subastas no bimonetarias: ARS o USD)                   */
 /* -------------------------------------------------------------------------- */

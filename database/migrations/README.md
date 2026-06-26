@@ -22,9 +22,19 @@ npm run db:migrate
 O manualmente con `sqlcmd` (ajustar servidor y credenciales):
 
 ```bash
-# Todas en orden
+# Todas en orden ( -I = QUOTED_IDENTIFIER ON, needed for filtered indexes )
 for f in database/migrations/00*.sql; do
-  sqlcmd -S localhost,1433 -d CrownBid -U sa -P "<password>" -C -i "$f"
+  sqlcmd -S localhost,1433 -d CrownBid -U sa -P "<password>" -C -I -i "$f"
+done
+```
+
+**Docker (crownbid-sqlserver):** SQL escucha en `localhost` dentro del contenedor; en el host CrownBid publica **`127.0.0.1:1436`** (no 1433).
+
+```bash
+source .env
+for file in $(ls -1 database/migrations/00*.sql | sort); do
+  docker exec -i crownbid-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -I -d CrownBid -b -i /dev/stdin < "$file" || exit 1
 done
 ```
 

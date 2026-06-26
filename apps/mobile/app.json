@@ -12,7 +12,6 @@
     },
     "android": {
       "package": "com.crownbid.mobile",
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -53,9 +52,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "5de14bf6-0968-4862-8ce8-d60cdc6c7778"
+        "projectId": "e57ccfcf-7a22-4530-ad4d-4423ad762b39"
       }
     },
-    "owner": "nasserelbacha2002"
+    "owner": "nasserelbacha"
   }
 }

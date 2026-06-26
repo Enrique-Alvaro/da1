@@ -18,7 +18,7 @@ import {
 import { mapSubastaStatus } from "../src/modules/subastas/subastas-access.service";
 import { areAllCatalogItemsSold } from "../src/modules/subastas/subastas-current-item";
 import { assertCategoryAllowed, assertCanBid } from "../src/modules/pujos/pujos.service";
-import { assertPaymentMethodForBid } from "../src/modules/pujos/pujos-payment-validation";
+import { assertPaymentMethodForBid, INSUFFICIENT_FUNDS_MESSAGE } from "../src/modules/pujos/pujos-payment-validation";
 import * as liveSessionStore from "../src/modules/subastas/live-session.store";
 import { getMyMetrics } from "../src/modules/users/users-metrics.service";
 import type { AuthUserContext } from "../src/shared/types/auth";
@@ -157,6 +157,21 @@ describe("Live auction flow", () => {
 
   it("live session: enter then block second auction", async () => {
     vi.spyOn(subastasRepository, "requireSubastaById").mockResolvedValue(subastaAbierta);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([
+      {
+        identificador: 100,
+        catalogo: 1,
+        producto: 1,
+        precioBase: 10000,
+        comision: 1000,
+        subastado: "no",
+        descripcionCatalogo: "Reloj",
+        descripcionCompleta: "http://x",
+        subastaId: 10,
+        catalogDescription: null,
+        isSoldInRegistro: 0,
+      },
+    ]);
     vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
       identificador: 7,
       admitido: "si",
@@ -182,6 +197,7 @@ describe("Live auction flow", () => {
         verificadoEn: new Date(),
       },
     ]);
+    vi.spyOn(pujosRepository, "findAsistenteByClienteAndSubasta").mockResolvedValue(null);
     vi.spyOn(pujosRepository, "findAsistenteByClienteAndSubasta").mockResolvedValue(null);
     vi.spyOn(pujosRepository, "countAsistentesBySubasta").mockResolvedValue(0);
     vi.spyOn(pujosRepository, "insertAsistenteInTransaction").mockResolvedValue({
@@ -273,7 +289,7 @@ describe("Live auction flow", () => {
     ).rejects.toMatchObject({ code: "LIVE_SESSION_REQUIRED" });
   });
 
-  it("guarantee exceeded uses GUARANTEE_LIMIT_EXCEEDED", () => {
+  it("fondos insuficientes usa PAYMENT_METHOD_INSUFFICIENT_FUNDS", () => {
     expect(() =>
       assertPaymentMethodForBid(
         {
@@ -288,7 +304,10 @@ describe("Live auction flow", () => {
         500
       )
     ).toThrow(
-      expect.objectContaining({ code: "GUARANTEE_LIMIT_EXCEEDED" })
+      expect.objectContaining({
+        code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+        message: INSUFFICIENT_FUNDS_MESSAGE,
+      })
     );
   });
 

@@ -13,7 +13,7 @@ import {
   registerAsistenteForAuction,
   validateBidAmountRules,
 } from "../src/modules/pujos/pujos.service";
-import { assertPaymentMethodForBid } from "../src/modules/pujos/pujos-payment-validation";
+import { assertPaymentMethodForBid, INSUFFICIENT_FUNDS_MESSAGE } from "../src/modules/pujos/pujos-payment-validation";
 import type { AuthUserContext } from "../src/shared/types/auth";
 import * as liveSessionStore from "../src/modules/subastas/live-session.store";
 import {
@@ -91,8 +91,8 @@ function mockMedio(
     entidad: "Visa",
     ultimosDigitos: "3456",
     aliasOCbu: null,
-    montoGarantia: null,
-    montoDisponible: null,
+    montoGarantia: 500000,
+    montoDisponible: 500000,
     motivoRechazo: null,
     verificador: 1,
     creadoEn: now,
@@ -241,7 +241,7 @@ describe("Pujas — Fase 4 assertCanBid", () => {
     });
   });
 
-  it("cheque sin fondos → GUARANTEE_LIMIT_EXCEEDED", async () => {
+  it("cheque sin fondos → PAYMENT_METHOD_INSUFFICIENT_FUNDS", async () => {
     vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
       mockMedio({
         tipo: "cheque_certificado",
@@ -249,7 +249,82 @@ describe("Pujas — Fase 4 assertCanBid", () => {
       })
     );
     await expect(callBid(20000)).rejects.toMatchObject({
-      code: "GUARANTEE_LIMIT_EXCEEDED",
+      code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+      message: INSUFFICIENT_FUNDS_MESSAGE,
+    });
+  });
+
+  it("tarjeta con fondos insuficientes → PAYMENT_METHOD_INSUFFICIENT_FUNDS", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({
+        tipo: "tarjeta_credito",
+        montoDisponible: 1000,
+      })
+    );
+    await expect(callBid(10100)).rejects.toMatchObject({
+      code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+      message: INSUFFICIENT_FUNDS_MESSAGE,
+    });
+  });
+
+  it("permite puja cuando amount <= fondos disponibles", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({
+        tipo: "tarjeta_credito",
+        montoDisponible: 50000,
+      })
+    );
+    const ctx = await callBid(10100);
+    expect(ctx.medioPago.montoDisponible).toBe(50000);
+  });
+
+  it("rechaza puja con fondos en cero", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({ montoDisponible: 0 })
+    );
+    await expect(callBid(10100)).rejects.toMatchObject({
+      code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+    });
+  });
+
+  it("rechaza puja sin montoDisponible configurado", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({ montoDisponible: null })
+    );
+    await expect(callBid(10100)).rejects.toMatchObject({
+      code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+    });
+  });
+
+  it("rechaza por 1 peso sobre fondos disponibles", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({ montoDisponible: 10099 })
+    );
+    await expect(callBid(10100)).rejects.toMatchObject({
+      code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+    });
+  });
+
+  it("permite puja igual a fondos disponibles", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({ montoDisponible: 10100 })
+    );
+    await expect(callBid(10100)).resolves.toMatchObject({
+      medioPago: expect.objectContaining({ montoDisponible: 10100 }),
+    });
+  });
+
+  it("resta pujas líderes activas en otros ítems del compromiso", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({ montoDisponible: 20000 })
+    );
+    vi.spyOn(pujosRepository, "sumLeadingBidExposureForCliente").mockResolvedValue(8000);
+    await expect(callBid(10100)).resolves.toBeDefined();
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({ montoDisponible: 15000 })
+    );
+    await expect(callBid(10100)).rejects.toMatchObject({
+      code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
     });
   });
 
@@ -280,6 +355,28 @@ describe("Pujas — Fase 4 assertCanBid", () => {
 });
 
 describe("Pujas — revalidación de medio en transacción", () => {
+  it("assertPaymentMethodForBid rechaza fondos insuficientes en cualquier medio", () => {
+    expect(() =>
+      assertPaymentMethodForBid(
+        {
+          identificador: 3,
+          cliente: 7,
+          tipo: "tarjeta_credito",
+          estado: "verificado",
+          moneda: "ARS",
+          montoDisponible: 1000,
+        },
+        "ARS",
+        10000
+      )
+    ).toThrow(
+      expect.objectContaining({
+        code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS",
+        message: INSUFFICIENT_FUNDS_MESSAGE,
+      })
+    );
+  });
+
   it("assertPaymentMethodForBid rechaza deshabilitado (misma lógica que UPDLOCK en insert)", () => {
     try {
       assertPaymentMethodForBid(
@@ -371,6 +468,7 @@ describe("Pujas — createBid pasa revalidación de medio a transacción", () =>
     vi.spyOn(pujosRepository, "findItemInSubasta").mockResolvedValue(item);
     vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(mockMedio());
     vi.spyOn(pujosRepository, "getMaxBidForItem").mockResolvedValue(null);
+    vi.spyOn(pujosRepository, "sumLeadingBidExposureForCliente").mockResolvedValue(0);
     vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([
       {
         identificador: 100,
@@ -411,6 +509,20 @@ describe("Pujas — createBid pasa revalidación de medio a transacción", () =>
         importe: 10100,
       })
     );
+  });
+
+  it("createBid no inserta puja si fondos insuficientes", async () => {
+    vi.spyOn(paymentMethodsRepository, "findByIdAndCliente").mockResolvedValue(
+      mockMedio({ montoDisponible: 1000 })
+    );
+    await expect(
+      createBid(authCliente, 10, {
+        itemId: 100,
+        amount: 10100,
+        paymentMethodId: 3,
+      })
+    ).rejects.toMatchObject({ code: "PAYMENT_METHOD_INSUFFICIENT_FUNDS" });
+    expect(pujosRepository.insertBidInTransaction).not.toHaveBeenCalled();
   });
 });
 

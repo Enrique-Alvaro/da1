@@ -237,13 +237,10 @@ export async function assertCanBid(params: {
   }
 
   const medioPagoRow = await findByIdAndCliente(params.paymentMethodId, cliente.identificador);
-  let committedExposure = 0;
-  if (medioPagoRow?.tipo === "cheque_certificado") {
-    committedExposure = await sumLeadingBidExposureForCliente(
-      cliente.identificador,
-      params.itemId
-    );
-  }
+  const committedExposure = await sumLeadingBidExposureForCliente(
+    cliente.identificador,
+    params.itemId
+  );
   assertPaymentMethodForBid(medioPagoRow, auctionCurrency, params.amount, {
     committedExposure,
   });

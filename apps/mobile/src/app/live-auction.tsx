@@ -26,14 +26,7 @@ import {
   View,
 } from 'react-native';
 
-type PaymentMethod = {
-  id: number;
-  type: string;
-  lastDigits: string | null;
-  entity: string | null;
-  currency: string;
-  status: string;
-};
+import type { PaymentMethod } from '@/services/types';
 
 type BidResult = {
   currentHighestBid: number;
@@ -357,6 +350,15 @@ export default function LiveAuctionScreen() {
       setBidError('Seleccioná un medio de pago.');
       return;
     }
+    const selectedPayment = paymentMethods.find((pm) => pm.id === selectedPaymentId);
+    if (
+      selectedPayment?.availableAmount != null &&
+      Number.isFinite(selectedPayment.availableAmount) &&
+      amount > selectedPayment.availableAmount
+    ) {
+      setBidError('No tenés fondos suficientes para realizar esta puja.');
+      return;
+    }
     setBidding(true);
     try {
       const result = await (placeBid(aucId, {
@@ -572,6 +574,9 @@ export default function LiveAuctionScreen() {
                         >
                           {pm.entity ?? pm.type}
                           {pm.lastDigits ? ` •••• ${pm.lastDigits}` : ''}
+                          {pm.availableAmount != null
+                            ? ` · disp. ${displayCurrency} ${pm.availableAmount.toLocaleString('es-AR')}`
+                            : ''}
                         </Text>
                       </Pressable>
                     ))}

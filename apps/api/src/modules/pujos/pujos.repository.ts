@@ -140,36 +140,57 @@ export async function insertAsistenteInTransaction(
   }
 }
 
+const LEADING_BID_EXPOSURE_SQL = `
+  WITH item_best AS (
+    SELECT pu.item, MAX(pu.importe) AS importe
+    FROM dbo.pujos AS pu
+    GROUP BY pu.item
+  ),
+  leading AS (
+    SELECT DISTINCT ib.item, ib.importe
+    FROM item_best AS ib
+    INNER JOIN dbo.pujos AS pu ON pu.item = ib.item AND pu.importe = ib.importe
+    INNER JOIN dbo.asistentes AS a ON a.identificador = pu.asistente
+    WHERE a.cliente = @clienteId
+  )
+  SELECT COALESCE(SUM(l.importe), 0) AS total
+  FROM leading AS l
+  INNER JOIN dbo.itemsCatalogo AS ic ON ic.identificador = l.item
+  WHERE (ic.subastado IS NULL OR LOWER(LTRIM(RTRIM(ic.subastado))) <> 'si')
+`;
+
 export async function sumLeadingBidExposureForCliente(
   clienteId: number,
   excludeItemId?: number
 ): Promise<number> {
   const pool = await getSqlPool();
   const req = pool.request().input("clienteId", sql.Int, clienteId);
+  const excludeClause =
+    excludeItemId != null ? "AND ic.identificador <> @excludeItemId" : "";
   if (excludeItemId != null) {
     req.input("excludeItemId", sql.Int, excludeItemId);
   }
+  const result = await req.query<{ total: number | null }>(
+    `${LEADING_BID_EXPOSURE_SQL} ${excludeClause}`
+  );
+  return Number(result.recordset[0]?.total ?? 0);
+}
+
+export async function sumLeadingBidExposureForClienteInTransaction(
+  tx: sql.Transaction,
+  clienteId: number,
+  excludeItemId?: number
+): Promise<number> {
+  const req = new sql.Request(tx);
+  req.input("clienteId", sql.Int, clienteId);
   const excludeClause =
     excludeItemId != null ? "AND ic.identificador <> @excludeItemId" : "";
-  const result = await req.query<{ total: number | null }>(`
-    WITH item_best AS (
-      SELECT pu.item, MAX(pu.importe) AS importe
-      FROM dbo.pujos AS pu
-      GROUP BY pu.item
-    ),
-    leading AS (
-      SELECT DISTINCT ib.item, ib.importe
-      FROM item_best AS ib
-      INNER JOIN dbo.pujos AS pu ON pu.item = ib.item AND pu.importe = ib.importe
-      INNER JOIN dbo.asistentes AS a ON a.identificador = pu.asistente
-      WHERE a.cliente = @clienteId
-    )
-    SELECT COALESCE(SUM(l.importe), 0) AS total
-    FROM leading AS l
-    INNER JOIN dbo.itemsCatalogo AS ic ON ic.identificador = l.item
-    WHERE (ic.subastado IS NULL OR LOWER(LTRIM(RTRIM(ic.subastado))) <> 'si')
-      ${excludeClause}
-  `);
+  if (excludeItemId != null) {
+    req.input("excludeItemId", sql.Int, excludeItemId);
+  }
+  const result = await req.query<{ total: number | null }>(
+    `${LEADING_BID_EXPOSURE_SQL} ${excludeClause}`
+  );
   return Number(result.recordset[0]?.total ?? 0);
 }
 
@@ -254,13 +275,11 @@ export async function insertBidInTransaction(input: InsertBidInput): Promise<Puj
       input.paymentMethodId,
       input.clienteId
     );
-    let committedExposure = 0;
-    if (medioRow?.tipo === "cheque_certificado") {
-      committedExposure = await sumLeadingBidExposureForCliente(
-        input.clienteId,
-        input.itemId
-      );
-    }
+    const committedExposure = await sumLeadingBidExposureForClienteInTransaction(
+      tx,
+      input.clienteId,
+      input.itemId
+    );
     assertPaymentMethodForBid(medioRow, input.auctionCurrency, input.importe, {
       committedExposure,
     });

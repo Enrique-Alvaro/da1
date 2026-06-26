@@ -54,6 +54,7 @@ describe("Phase 2 — auction / live / bidding hardening", () => {
     });
     vi.spyOn(liveRepo, "getMaxBidForAuction").mockResolvedValue(null);
     vi.spyOn(itemsRepository, "countCatalogItemsBySubasta").mockResolvedValue(3);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([]);
 
     const detail = await getAuctionDetail(10, undefined);
     expect(detail.itemCount).toBe(3);
@@ -70,6 +71,7 @@ describe("Phase 2 — auction / live / bidding hardening", () => {
     });
     vi.spyOn(liveRepo, "getMaxBidForAuction").mockResolvedValue(null);
     vi.spyOn(itemsRepository, "countCatalogItemsBySubasta").mockResolvedValue(0);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([]);
     vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
       identificador: 7,
       admitido: "no",
@@ -93,6 +95,7 @@ describe("Phase 2 — auction / live / bidding hardening", () => {
     });
     vi.spyOn(liveRepo, "getMaxBidForAuction").mockResolvedValue(null);
     vi.spyOn(itemsRepository, "countCatalogItemsBySubasta").mockResolvedValue(0);
+    vi.spyOn(itemsRepository, "listCatalogItemsBySubasta").mockResolvedValue([]);
     vi.spyOn(usersRepository, "findClienteByPersonId").mockResolvedValue({
       identificador: 7,
       admitido: "si",

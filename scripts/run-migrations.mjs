@@ -83,7 +83,20 @@ function listMigrationFiles() {
 function runSqlcmd(config, inputFile) {
   const result = spawnSync(
     'sqlcmd',
-    ['-S', config.server, '-d', config.database, '-U', config.user, '-P', config.password, '-C', '-i', inputFile],
+    [
+      '-S',
+      config.server,
+      '-d',
+      config.database,
+      '-U',
+      config.user,
+      '-P',
+      config.password,
+      '-C',
+      '-I', // SET QUOTED_IDENTIFIER ON (required for filtered indexes)
+      '-i',
+      inputFile,
+    ],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
   );
   if (result.status !== 0) {

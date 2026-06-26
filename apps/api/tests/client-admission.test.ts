@@ -168,8 +168,8 @@ describe("admission enables bidding guard", () => {
       titular: "Juan",
       entidad: "Visa",
       ultimosDigitos: "1234",
-      montoGarantia: null,
-      montoDisponible: null,
+      montoGarantia: 50000,
+      montoDisponible: 50000,
       verificador: 1,
       motivoRechazo: null,
     });
@@ -188,6 +188,7 @@ describe("admission enables bidding guard", () => {
       ownerPersonId: 99,
     });
     vi.spyOn(pujosRepo, "getMaxBidForItem").mockResolvedValue(null);
+    vi.spyOn(pujosRepo, "sumLeadingBidExposureForCliente").mockResolvedValue(0);
 
     const itemsRepo = await import("../src/modules/subastas/subastas-items.repository");
     vi.spyOn(itemsRepo, "listCatalogItemsBySubasta").mockResolvedValue([

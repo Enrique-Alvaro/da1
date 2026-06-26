@@ -1,6 +1,10 @@
 -- Notificaciones in-app para clientes (aditivo, idempotente).
 -- Ejecutar en la misma base que schema.sql / 001_medios_pago_subasta_moneda.sql.
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
 IF OBJECT_ID(N'dbo.notificaciones', N'U') IS NULL
 BEGIN
   CREATE TABLE dbo.notificaciones (
