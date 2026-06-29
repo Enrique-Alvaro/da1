@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { fetchPaymentMethods, updatePaymentMethodGuarantee } from '@/services/api';
 import type { PaymentMethod } from '@/services/types';
 
@@ -70,9 +70,9 @@ export default function ReserveFundsScreen() {
         }
       } catch {
         if (!cancelled) setError('No se pudo cargar el método de pago.');
-      } finally {
+      } function load_finally() {
         if (!cancelled) setLoading(false);
-      }
+      } load_finally();
     }
     void load();
     return () => {
@@ -101,11 +101,11 @@ export default function ReserveFundsScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScreenHeader title="Reservar Fondos" fallbackRoute="/payment-methods" />
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <ThemedView style={styles.mainWrapper}>
         <ScrollView
-          style={{ width: '100%' }}
+          style={{ width: '100%', flex: 1 }}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
@@ -173,28 +173,32 @@ export default function ReserveFundsScreen() {
                   Podés modificar el monto reservado en cualquier momento desde métodos de pago.
                 </Text>
               </View>
-
-              <Pressable
-                style={[styles.primaryButton, submitting && { opacity: 0.6 }]}
-                onPress={() => void onContinue()}
-                disabled={submitting}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {submitting ? 'Guardando...' : 'Continuar'}
-                </Text>
-              </Pressable>
             </>
           )}
         </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+
+        {!loading && method && (
+          <View style={styles.bottomBar}>
+            <Pressable
+              style={[styles.primaryButton, submitting && { opacity: 0.6 }]}
+              onPress={() => void onContinue()}
+              disabled={submitting}
+            >
+              <Text style={styles.primaryButtonText}>
+                {submitting ? 'Guardando...' : 'Continuar'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  safeArea: { flex: 1, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
-  content: { paddingHorizontal: Spacing.four, paddingBottom: BottomTabInset + Spacing.three },
+  mainWrapper: { flex: 1, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  content: { paddingHorizontal: Spacing.four, paddingTop: 16, paddingBottom: 20 },
   headerContainer: { marginBottom: Spacing.three, marginTop: Spacing.two },
   subtitle: { fontSize: 15, color: '#6B7280', lineHeight: 22 },
   centered: { paddingVertical: 40, alignItems: 'center' },
@@ -247,6 +251,13 @@ const styles = StyleSheet.create({
   },
   infoText: { fontSize: 13, color: '#1E3A8A', lineHeight: 20 },
   infoTextBold: { fontWeight: '700' },
+  bottomBar: {
+    width: '100%',
+    paddingHorizontal: Spacing.four,
+    paddingTop: 10,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+  },
   primaryButton: {
     backgroundColor: '#E67E22',
     paddingVertical: 16,

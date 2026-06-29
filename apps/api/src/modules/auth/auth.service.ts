@@ -267,17 +267,19 @@ export async function forgotPassword(input: ForgotPasswordBodyInput): Promise<{ 
     return { message: PASSWORD_RESET_GENERIC_MESSAGE };
   }
 
-  const token = randomBytes(32).toString("hex");
+  const token = Math.floor(100000 + Math.random() * 900000).toString();
+  
   const tokenHash = hashPasswordResetToken(token);
   const expiresAt = new Date(Date.now() + getPasswordResetTtlMinutes() * 60 * 1000);
-
+  
   await passwordResetRepository.createPasswordResetToken({
     personaId: row.persona_id,
     tokenHash,
     expiresAt,
   });
 
-  const resetUrl = `${getFrontendUrl()}/new-password?mode=reset&token=${encodeURIComponent(token)}`;
+  const resetUrl = token; 
+  
   await sendPasswordResetEmail({
     to: email,
     firstName: resolveFirstName(row.full_name),

@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   fetchNotifications,
   getAuthToken,
@@ -67,7 +67,6 @@ export default function NotificationsScreen() {
           prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
         );
       } catch {
-        // ignore — navigation still useful
       }
     }
 
@@ -106,94 +105,96 @@ export default function NotificationsScreen() {
   const unreadCount = items.filter((n) => !n.read).length;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topBar}>
-        <Pressable
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
-          style={styles.backBtn}
-        >
-          <Text style={styles.backText}>←</Text>
-        </Pressable>
-        <Text style={styles.topBarTitle}>Notificaciones</Text>
-        {unreadCount > 0 ? (
-          <Pressable onPress={() => void onMarkAllRead()} style={styles.markAllBtn}>
-            <Text style={styles.markAllText}>Leer todo</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <View style={styles.container}>
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
+            style={styles.backBtn}
+          >
+            <Text style={styles.backText}>←</Text>
           </Pressable>
-        ) : (
-          <View style={{ width: 72 }} />
-        )}
+          <Text style={styles.topBarTitle}>Notificaciones</Text>
+          {unreadCount > 0 ? (
+            <Pressable onPress={() => void onMarkAllRead()} style={styles.markAllBtn}>
+              <Text style={styles.markAllText}>Leer todo</Text>
+            </Pressable>
+          ) : (
+            <View style={{ width: 72 }} />
+          )}
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
+        >
+          <Text style={styles.subtitle}>Tus últimas actividades</Text>
+
+          {loading && (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color="#E67E22" />
+            </View>
+          )}
+
+          {!loading && error && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+              {!getAuthToken() && (
+                <Pressable style={styles.loginBtn} onPress={() => router.replace('/login')}>
+                  <Text style={styles.loginBtnText}>Iniciar sesión</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {!loading && !error && items.length === 0 && (
+            <Text style={styles.emptyText}>No tenés notificaciones por ahora.</Text>
+          )}
+
+          {!loading &&
+            !error &&
+            items.map((n) => {
+              const visual = getNotificationVisual(n.type);
+              return (
+                <Pressable
+                  key={n.id}
+                  onPress={() => void onPressNotification(n)}
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: visual.backgroundColor,
+                      borderColor: visual.borderColor,
+                      opacity: n.read ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <View style={styles.iconCircle}>
+                    <Text style={styles.iconText}>{visual.icon}</Text>
+                  </View>
+                  <View style={styles.cardContent}>
+                    <Text style={styles.cardTitle}>{n.title}</Text>
+                    <Text style={styles.cardDesc}>{n.message}</Text>
+                    <Text style={styles.cardTime}>{formatRelativeTime(n.createdAt)}</Text>
+                  </View>
+                  {!n.read && <View style={styles.unreadDot} />}
+                </Pressable>
+              );
+            })}
+        </ScrollView>
       </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
-      >
-        <Text style={styles.subtitle}>Tus últimas actividades</Text>
-
-        {loading && (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#E67E22" />
-          </View>
-        )}
-
-        {!loading && error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-            {!getAuthToken() && (
-              <Pressable style={styles.loginBtn} onPress={() => router.replace('/login')}>
-                <Text style={styles.loginBtnText}>Iniciar sesión</Text>
-              </Pressable>
-            )}
-          </View>
-        )}
-
-        {!loading && !error && items.length === 0 && (
-          <Text style={styles.emptyText}>No tenés notificaciones por ahora.</Text>
-        )}
-
-        {!loading &&
-          !error &&
-          items.map((n) => {
-            const visual = getNotificationVisual(n.type);
-            return (
-              <Pressable
-                key={n.id}
-                onPress={() => void onPressNotification(n)}
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: visual.backgroundColor,
-                    borderColor: visual.borderColor,
-                    opacity: n.read ? 0.85 : 1,
-                  },
-                ]}
-              >
-                <View style={styles.iconCircle}>
-                  <Text style={styles.iconText}>{visual.icon}</Text>
-                </View>
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle}>{n.title}</Text>
-                  <Text style={styles.cardDesc}>{n.message}</Text>
-                  <Text style={styles.cardTime}>{formatRelativeTime(n.createdAt)}</Text>
-                </View>
-                {!n.read && <View style={styles.unreadDot} />}
-              </Pressable>
-            );
-          })}
-      </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#002855' },
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 52,
-    paddingBottom: 14,
+    paddingVertical: 14,
     backgroundColor: '#002855',
   },
   backBtn: {
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
   topBarTitle: { flex: 1, textAlign: 'center', color: '#FFF', fontSize: 17, fontWeight: '700' },
   markAllBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   markAllText: { color: '#FDE68A', fontSize: 13, fontWeight: '600' },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 35 },
   subtitle: { fontSize: 14, color: '#64748B', marginBottom: 20 },
   centered: { paddingVertical: 40, alignItems: 'center' },
   errorBox: {

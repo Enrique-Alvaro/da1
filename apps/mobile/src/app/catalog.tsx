@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type AuctionDetail = {
   id: number;
@@ -103,160 +104,163 @@ export default function CatalogScreen() {
   );
 
   return (
-    <ThemedView style={styles.container}>
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backButton}>
-          <ThemedText style={styles.topBarIcon}>←</ThemedText>
-        </Pressable>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <ThemedText style={styles.topBarTitle}>CrownBid</ThemedText>
-        </View>
-        <View style={styles.placeholder} />
-      </View>
-
-      {loading ? (
-        <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
-      ) : error ? (
-        <View style={styles.errorState}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Volver</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backButton}>
+            <ThemedText style={styles.topBarIcon}>←</ThemedText>
           </Pressable>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <ThemedText style={styles.topBarTitle}>CrownBid</ThemedText>
+          </View>
+          <View style={styles.placeholder} />
         </View>
-      ) : auction ? (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>
-              Subasta #{auction.id}
-            </Text>
-            <View style={[styles.statusBadge, { backgroundColor: STATUS_BG[displayStatus] }]}>
-              <Text style={[styles.statusBadgeText, { color: STATUS_COLOR[displayStatus] }]}>
-                {STATUS_LABEL[displayStatus] ?? displayStatus}
+
+        {loading ? (
+          <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
+        ) : error ? (
+          <View style={styles.errorState}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backBtn}>
+              <Text style={styles.backBtnText}>← Volver</Text>
+            </Pressable>
+          </View>
+        ) : auction ? (
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Header */}
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>
+                Subasta #{auction.id}
               </Text>
+              <View style={[styles.statusBadge, { backgroundColor: STATUS_BG[displayStatus] }]}>
+                <Text style={[styles.statusBadgeText, { color: STATUS_COLOR[displayStatus] }]}>
+                  {STATUS_LABEL[displayStatus] ?? displayStatus}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <View style={styles.countdownCard}>
-            <AuctionCountdown
-              date={auction.date}
-              time={auction.time}
-              endTime={auction.endTime}
-              status={displayStatus}
-              variant="detail"
-              onStatusChange={setDisplayStatus}
-              onExpired={() => setDisplayStatus('closed')}
-            />
-          </View>
-
-          {/* Info grid */}
-          <View style={styles.infoGrid}>
-            {auction.date && (
-              <View style={styles.infoCard}>
-                <Text style={styles.infoLabel}>Fecha</Text>
-                <Text style={styles.infoValue}>{auction.date}</Text>
-              </View>
-            )}
-            {auction.time && (
-              <View style={styles.infoCard}>
-                <Text style={styles.infoLabel}>Inicio</Text>
-                <Text style={styles.infoValue}>{auction.time.slice(0, 5)}</Text>
-              </View>
-            )}
-            {auction.endTime && (
-              <View style={styles.infoCard}>
-                <Text style={styles.infoLabel}>Cierre</Text>
-                <Text style={styles.infoValue}>{auction.endTime.slice(0, 5)}</Text>
-              </View>
-            )}
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Categoría</Text>
-              <Text style={styles.infoValue}>
-                {CATEGORY_LABELS[auction.category ?? ''] ?? auction.category ?? '—'}
-              </Text>
+            <View style={styles.countdownCard}>
+              <AuctionCountdown
+                date={auction.date}
+                time={auction.time}
+                endTime={auction.endTime}
+                status={displayStatus}
+                variant="detail"
+                onStatusChange={setDisplayStatus}
+                onExpired={() => setDisplayStatus('closed')}
+              />
             </View>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Moneda</Text>
-              <Text style={styles.infoValue}>{auction.currency}</Text>
-            </View>
-            {auction.location && (
-              <View style={[styles.infoCard, styles.infoCardFull]}>
-                <Text style={styles.infoLabel}>Ubicación</Text>
-                <Text style={styles.infoValue}>{auction.location}</Text>
-              </View>
-            )}
-            {auction.auctioneer?.fullName && (
-              <View style={[styles.infoCard, styles.infoCardFull]}>
-                <Text style={styles.infoLabel}>Subastador</Text>
-                <Text style={styles.infoValue}>{auction.auctioneer.fullName}</Text>
-              </View>
-            )}
-          </View>
 
-          {/* Items */}
-          <Text style={styles.sectionTitle}>
-            Artículos en Subasta ({items.length})
-          </Text>
-
-          {items.length === 0 ? (
-            <View style={styles.emptyItems}>
-              <Text style={styles.emptyItemsText}>Esta subasta aún no tiene artículos asignados.</Text>
-            </View>
-          ) : (
-            items.map((item) => (
-              <Pressable
-                key={item.id}
-                style={styles.itemCard}
-                onPress={() => router.push({
-                  pathname: '/item-detail',
-                  params: { auctionId: String(auction.id), itemId: String(item.id) },
-                })}
-              >
-                <View style={styles.itemIconBox}>
-                  <Text style={styles.itemIcon}>📦</Text>
+            {/* Info grid */}
+            <View style={styles.infoGrid}>
+              {auction.date && (
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoLabel}>Fecha</Text>
+                  <Text style={styles.infoValue}>{auction.date}</Text>
                 </View>
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
-                  {item.catalogDescription && (
-                    <Text style={styles.itemDesc} numberOfLines={2}>{item.catalogDescription}</Text>
-                  )}
-                  <View style={styles.itemMeta}>
-                    {item.currentHighestBid != null ? (
-                      <Text style={styles.itemBid}>
-                        Mejor oferta: {item.currency} {item.currentHighestBid.toLocaleString('es-AR')}
-                      </Text>
-                    ) : item.basePrice != null ? (
-                      <Text style={styles.itemBid}>
-                        Base: {item.currency} {item.basePrice.toLocaleString('es-AR')}
-                      </Text>
-                    ) : null}
-                    <View style={[styles.itemStatusBadge,
-                      item.status === 'sold' && { backgroundColor: '#F3E8FF' },
-                      item.status === 'live' && { backgroundColor: '#DCFCE7' },
-                    ]}>
-                      <Text style={[styles.itemStatusText,
-                        item.status === 'sold' && { color: '#7C3AED' },
-                        item.status === 'live' && { color: '#16A34A' },
+              )}
+              {auction.time && (
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoLabel}>Inicio</Text>
+                  <Text style={styles.infoValue}>{auction.time.slice(0, 5)}</Text>
+                </View>
+              )}
+              {auction.endTime && (
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoLabel}>Cierre</Text>
+                  <Text style={styles.infoValue}>{auction.endTime.slice(0, 5)}</Text>
+                </View>
+              )}
+              <View style={styles.infoCard}>
+                <Text style={styles.infoLabel}>Categoría</Text>
+                <Text style={styles.infoValue}>
+                  {CATEGORY_LABELS[auction.category ?? ''] ?? auction.category ?? '—'}
+                </Text>
+              </View>
+              <View style={styles.infoCard}>
+                <Text style={styles.infoLabel}>Moneda</Text>
+                <Text style={styles.infoValue}>{auction.currency}</Text>
+              </View>
+              {auction.location && (
+                <View style={[styles.infoCard, styles.infoCardFull]}>
+                  <Text style={styles.infoLabel}>Ubicación</Text>
+                  <Text style={styles.infoValue}>{auction.location}</Text>
+                </View>
+              )}
+              {auction.auctioneer?.fullName && (
+                <View style={[styles.infoCard, styles.infoCardFull]}>
+                  <Text style={styles.infoLabel}>Subastador</Text>
+                  <Text style={styles.infoValue}>{auction.auctioneer.fullName}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Items */}
+            <Text style={styles.sectionTitle}>
+              Artículos en Subasta ({items.length})
+            </Text>
+
+            {items.length === 0 ? (
+              <View style={styles.emptyItems}>
+                <Text style={styles.emptyItemsText}>Esta subasta aún no tiene artículos asignados.</Text>
+              </View>
+            ) : (
+              items.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={styles.itemCard}
+                  onPress={() => router.push({
+                    pathname: '/item-detail',
+                    params: { auctionId: String(auction.id), itemId: String(item.id) },
+                  })}
+                >
+                  <View style={styles.itemIconBox}>
+                    <Text style={styles.itemIcon}>📦</Text>
+                  </View>
+                  <View style={styles.itemContent}>
+                    <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+                    {item.catalogDescription && (
+                      <Text style={styles.itemDesc} numberOfLines={2}>{item.catalogDescription}</Text>
+                    )}
+                    <View style={styles.itemMeta}>
+                      {item.currentHighestBid != null ? (
+                        <Text style={styles.itemBid}>
+                          Mejor oferta: {item.currency} {item.currentHighestBid.toLocaleString('es-AR')}
+                        </Text>
+                      ) : item.basePrice != null ? (
+                        <Text style={styles.itemBid}>
+                          Base: {item.currency} {item.basePrice.toLocaleString('es-AR')}
+                        </Text>
+                      ) : null}
+                      <View style={[styles.itemStatusBadge,
+                        item.status === 'sold' && { backgroundColor: '#F3E8FF' },
+                        item.status === 'live' && { backgroundColor: '#DCFCE7' },
                       ]}>
-                        {ITEM_STATUS_LABEL[item.status] ?? item.status}
-                      </Text>
+                        <Text style={[styles.itemStatusText,
+                          item.status === 'sold' && { color: '#7C3AED' },
+                          item.status === 'live' && { color: '#16A34A' },
+                        ]}>
+                          {ITEM_STATUS_LABEL[item.status] ?? item.status}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-                <Text style={styles.arrowIcon}>→</Text>
-              </Pressable>
-            ))
-          )}
-        </ScrollView>
-      ) : null}
-    </ThemedView>
+                  <Text style={styles.arrowIcon}>→</Text>
+                </Pressable>
+              ))
+            )}
+          </ScrollView>
+        ) : null}
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, paddingTop: 40, backgroundColor: '#FFF', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 14, backgroundColor: '#FFF', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE' },
   backButton: { padding: 5, width: 40 },
   topBarTitle: { fontWeight: 'bold', fontSize: 16, color: '#002855' },
   topBarIcon: { fontSize: 22, color: '#002855' },
@@ -268,7 +272,7 @@ const styles = StyleSheet.create({
   backBtn: { backgroundColor: '#D35400', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8 },
   backBtnText: { color: '#FFF', fontWeight: 'bold' },
 
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: 20, paddingBottom: 35 },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   title: { fontSize: 22, fontWeight: 'bold', color: '#002855', flex: 1, marginRight: 10 },

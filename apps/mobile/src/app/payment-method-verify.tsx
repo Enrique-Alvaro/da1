@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { fetchPaymentMethods } from '@/services/api';
 import type { PaymentMethod } from '@/services/types';
@@ -11,8 +10,7 @@ const STATUS_COPY: Record<string, { title: string; message: string; icon: string
   pendiente: {
     icon: '🔍',
     title: 'Verificación en proceso',
-    message:
-      'Tu medio de pago fue registrado correctamente. El equipo de CrownBid lo verificará antes de que puedas participar en subastas.',
+    message: 'Tu medio de pago fue registrado correctamente. El equipo de CrownBid lo verificará antes de que puedas participar en subastas.',
   },
   verificado: {
     icon: '✓',
@@ -40,7 +38,6 @@ export default function PaymentMethodVerifyScreen() {
   const router = useRouter();
   const { methodId } = useLocalSearchParams<{ methodId?: string }>();
   const parsedId = methodId ? Number.parseInt(methodId, 10) : NaN;
-
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,18 +75,19 @@ export default function PaymentMethodVerifyScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScreenHeader title="Estado del método" fallbackRoute="/payment-methods" />
+      
       <View style={styles.content}>
         {loading && <ActivityIndicator size="large" color="#E67E22" />}
 
         {!loading && error && (
-          <>
+          <View style={styles.centeredState}>
             <Text style={styles.title}>Sin información</Text>
             <Text style={styles.message}>{error}</Text>
-          </>
+          </View>
         )}
 
         {!loading && method && copy && (
-          <>
+          <View style={styles.centeredState}>
             <View style={styles.iconCircle}>
               <Text style={styles.iconText}>{copy.icon}</Text>
             </View>
@@ -118,12 +116,15 @@ export default function PaymentMethodVerifyScreen() {
                 </Text>
               </View>
             )}
-          </>
+          </View>
         )}
+      </View>
 
+      <View style={styles.bottomBar}>
         <Pressable style={styles.primaryBtn} onPress={() => router.replace('/payment-methods')}>
           <Text style={styles.primaryBtnText}>Ver mis métodos de pago</Text>
         </Pressable>
+
         <Pressable style={styles.secondaryBtn} onPress={() => router.replace('/home')}>
           <Text style={styles.secondaryBtnText}>Volver al inicio</Text>
         </Pressable>
@@ -134,7 +135,8 @@ export default function PaymentMethodVerifyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
+  content: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
+  centeredState: { alignItems: 'center', gap: 16, width: '100%' },
   iconCircle: {
     width: 80,
     height: 80,
@@ -157,6 +159,14 @@ const styles = StyleSheet.create({
   },
   infoTitle: { fontSize: 14, fontWeight: '700', color: '#1E3A8A' },
   infoText: { fontSize: 13, color: '#374151', lineHeight: 20 },
+  bottomBar: {
+    width: '100%',
+    paddingHorizontal: 32,
+    paddingTop: 10,
+    paddingBottom: 20,
+    backgroundColor: '#F8FAFC',
+    gap: 12,
+  },
   primaryBtn: {
     backgroundColor: '#D35400',
     paddingVertical: 15,

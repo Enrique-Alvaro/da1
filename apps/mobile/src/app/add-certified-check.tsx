@@ -52,13 +52,14 @@ export default function AddCertifiedCheckScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        
+        {/* Formulario con Scroll */}
         <ScrollView 
-          style={{ width: '100%' }} 
+          style={{ width: '100%', flex: 1 }} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          
           <View style={styles.headerContainer}>
             <View style={styles.iconCircle}>
               <Ionicons name="document-text-outline" size={36} color="#059669" />
@@ -147,7 +148,10 @@ export default function AddCertifiedCheckScreen() {
               <Text style={styles.errorBannerText}>{error}</Text>
             </View>
           )}
+        </ScrollView>
 
+        {/* Botones Fijos */}
+        <View style={styles.bottomBar}>
           <Pressable
             style={[styles.primaryButton, submitting && { opacity: 0.6 }]}
             onPress={handleSubmit}
@@ -165,8 +169,8 @@ export default function AddCertifiedCheckScreen() {
           >
             <Text style={styles.secondaryButtonText}>Cancelar</Text>
           </Pressable>
+        </View>
 
-        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -181,7 +185,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 28,
     alignItems: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
@@ -189,7 +192,7 @@ const styles = StyleSheet.create({
   },
   content: {
     width: '100%',
-    paddingBottom: Spacing.six,
+    paddingBottom: 20,
   },
   headerContainer: {
     alignItems: 'center',
@@ -199,7 +202,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#ECFDF5', // Verde muy claro
+    backgroundColor: '#ECFDF5',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -207,13 +210,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#0A1E3F', // Azul marino oscuro
+    color: '#0A1E3F',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280', // Gris
+    color: '#6B7280',
     textAlign: 'center',
   },
   form: {
@@ -249,7 +252,7 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
     borderRadius: 8,
     overflow: 'hidden',
-    height: 52, // Alineado con la altura del input de texto
+    height: 52,
     backgroundColor: '#F9FAFB',
   },
   toggleOption: {
@@ -258,7 +261,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toggleOptionActive: {
-    backgroundColor: '#059669', // Verde principal
+    backgroundColor: '#059669',
   },
   toggleText: {
     color: '#4B5563',
@@ -285,6 +288,11 @@ const styles = StyleSheet.create({
   infoTextBold: {
     fontWeight: 'bold',
   },
+  bottomBar: {
+    width: '100%',
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+  },
   errorBanner: {
     backgroundColor: '#FFECEC',
     borderRadius: 8,
@@ -298,7 +306,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   primaryButton: {
-    backgroundColor: '#059669', // Verde principal
+    backgroundColor: '#059669',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -310,7 +318,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   secondaryButton: {
-    backgroundColor: '#F3F4F6', // Gris claro
+    backgroundColor: '#F3F4F6',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PasswordInput } from '@/components/PasswordInput';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth } from '@/constants/theme';
 import { login } from '@/services/api';
 import { isValidEmail, normalizeEmail } from '@/utils/email';
 
@@ -33,7 +33,6 @@ export default function LoginScreen() {
       ? 'Ingresá tu correo electrónico para continuar.'
       : 'Por favor ingresa un email válido (ej: tu@email.com)';
 
-  // robust navigation helper
   async function navigateTo(path: string) {
     try {
       const before = Platform.OS === 'web' ? (window as any).location.pathname : null;
@@ -78,16 +77,14 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         
-        {/* Avatar restaurado */}
         <View style={styles.avatarWrap}>
           <View style={styles.avatarCircle}>
             <Text style={styles.emoji}>👑</Text>
           </View>
         </View>
 
-        {/* Título actualizado */}
         <View style={styles.headerContainer}>
           <Text style={styles.title}>CrownBid</Text>
           <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
@@ -152,7 +149,9 @@ export default function LoginScreen() {
               navigateTo('/home');
             }}
           >
-            <Text style={styles.secondaryButtonText}>{clickedGuest ? '...' : 'Continuar como Invitado'}</Text>
+            <Text style={styles.secondaryButtonText}>
+              {clickedGuest ? '...' : 'Continuar como Invitado'}
+            </Text>
           </Pressable>
         </View>
 
@@ -184,12 +183,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 28,
     justifyContent: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
   },
-  // Estilos del avatar agregados nuevamente
   avatarWrap: {
     alignItems: 'center',
     marginBottom: 16,
@@ -198,7 +195,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#FFF1D9', // Fondo cremita/naranja claro
+    backgroundColor: '#FFF1D9', 
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -9,14 +9,13 @@ import {
   StyleSheet,
   TextInput,
   View,
-  Text, // Importamos Text nativo
+  Text,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { createSubmission, getAuthToken } from '@/services/api';
 import { alertLoginRequired, alertPendingAdmission, resolveClientSession } from '@/utils/clientPermissions';
@@ -113,20 +112,17 @@ export default function PostArticleScreen() {
   async function pickImage(fromCamera = false) {
     const granted = await requestPermissions();
     if (!granted) return;
-
     try {
       const pickerOptions = {
         quality: 0.7 as const,
         base64: true,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       };
-
       const result = fromCamera
         ? await ImagePicker.launchCameraAsync(pickerOptions)
         : await ImagePicker.launchImageLibraryAsync({ ...pickerOptions, allowsMultipleSelection: true });
 
       if (result.canceled) return;
-
       const newItems: ImageItem[] = result.assets
         .filter((a) => a.base64)
         .map((a, idx) => ({
@@ -135,7 +131,6 @@ export default function PostArticleScreen() {
           mimeType: normalizeSubmissionImageMime(a.mimeType),
           filename: a.fileName ?? `foto-${Date.now()}-${idx}.jpg`,
         }));
-
       if (newItems.length === 0) {
         setApiError('No se pudieron leer las imágenes seleccionadas. Probá con JPG o PNG.');
         return;
@@ -190,12 +185,6 @@ export default function PostArticleScreen() {
         base64: img.base64.replace(/^data:[^;]+;base64,/, ''),
       })),
     };
-
-    console.log('[post-article] submit', {
-      fotos: payload.fotos.length,
-      hasToken: Boolean(getAuthToken()),
-    });
-
     setIsSubmitting(true);
     try {
       await createSubmission(payload);
@@ -217,11 +206,12 @@ export default function PostArticleScreen() {
   }
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: '#FFFFFF' }]}>
-      <View style={styles.headerWrap}>
-        <ScreenHeader title="Postular Artículo" fallbackRoute="/home" />
-      </View>
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={styles.safeAreaContainer} edges={['top', 'bottom']}>
+      <ThemedView style={[styles.container, { backgroundColor: '#FFFFFF' }]}>
+        <View style={styles.headerWrap}>
+          <ScreenHeader title="Postular Artículo" fallbackRoute="/home" />
+        </View>
+
         <ScrollView
           style={styles.scroll}
           showsVerticalScrollIndicator={false}
@@ -231,7 +221,6 @@ export default function PostArticleScreen() {
             Tu artículo será evaluado por nuestro equipo antes de ser incluido en una subasta.
           </Text>
 
-          {/* Fotos */}
           <View style={styles.section}>
             <Text style={{ color: '#000000', fontWeight: 'bold' }}>Fotos del Artículo *</Text>
             <Text style={{ color: '#6B7280', fontSize: 12 }}>
@@ -268,7 +257,6 @@ export default function PostArticleScreen() {
             )}
           </View>
 
-          {/* Datos del artículo */}
           <View style={styles.section}>
             <Text style={{ color: '#000000', marginBottom: 6 }}>Nombre del Artículo *</Text>
             <TextInput
@@ -339,7 +327,6 @@ export default function PostArticleScreen() {
             />
           </View>
 
-          {/* Declaraciones */}
           <View style={styles.section}>
             <Text style={{ color: '#000000', fontSize: 18, fontWeight: 'bold' }}>Declaraciones Obligatorias</Text>
             {[
@@ -383,17 +370,17 @@ export default function PostArticleScreen() {
             )}
           </Pressable>
         </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeAreaContainer: { flex: 1, backgroundColor: '#FFFFFF' },
   container: { flex: 1, flexDirection: 'column', width: '100%', backgroundColor: '#FFFFFF' },
   headerWrap: { width: '100%', alignSelf: 'stretch' },
-  safeArea: { flex: 1, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
-  scroll: { width: '100%' },
-  content: { width: '100%', gap: 16, paddingHorizontal: 16, paddingBottom: 50 },
+  scroll: { width: '100%', flex: 1 },
+  content: { width: '100%', gap: 16, paddingHorizontal: 16, paddingBottom: 35 },
   section: { width: '100%', gap: 8 },
   imageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   uploadButton: { minWidth: 120, minHeight: 120, borderWidth: 1, borderRadius: 14, justifyContent: 'center', alignItems: 'center', padding: 12, backgroundColor: '#F3F4F6' },
@@ -405,7 +392,7 @@ const styles = StyleSheet.create({
   checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   checkbox: { width: 24, height: 24, borderWidth: 1, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   checkboxLabel: { flex: 1 },
-  primaryButton: { paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
+  primaryButton: { paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginBottom: 15 },
   primaryButtonDisabled: { opacity: 0.6 },
   errorText: { color: '#E74C3C', marginTop: 6 },
   apiErrorBox: {

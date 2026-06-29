@@ -6,16 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 
-// Actualizamos las opciones para incluir el nombre del ícono y su color de fondo
 const options = [
   {
     id: 'bank',
     title: 'Cuenta Bancaria',
     description: 'Reserva fondos desde tu cuenta',
     iconName: 'business-outline' as const,
-    iconBg: '#7C3AED', // Morado
+    iconBg: '#7C3AED', 
     route: '/add-bank-account',
   },
   {
@@ -23,7 +22,7 @@ const options = [
     title: 'Tarjeta de Crédito',
     description: 'Nacional o internacional',
     iconName: 'card-outline' as const,
-    iconBg: '#2563EB', // Azul
+    iconBg: '#2563EB', 
     route: '/add-payment-card',
   },
   {
@@ -31,7 +30,7 @@ const options = [
     title: 'Cheque Certificado',
     description: 'Entregado antes de la subasta',
     iconName: 'document-text-outline' as const,
-    iconBg: '#059669', // Verde
+    iconBg: '#059669', 
     route: '/add-certified-check',
   },
 ];
@@ -40,15 +39,15 @@ export default function SelectPaymentMethodScreen() {
   const router = useRouter();
 
   return (
-    <ThemedView style={styles.container}>
-      <ScreenHeader title="Seleccionar Método" fallbackRoute="/payment-methods" />
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={styles.safeAreaContainer} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        <ScreenHeader title="Seleccionar Método" fallbackRoute="/payment-methods" />
+        
         <ScrollView 
-          style={{ width: '100%' }} 
+          style={{ width: '100%', flex: 1 }} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          
           <View style={styles.headerContainer}>
             <Text style={styles.subtitle}>
               Elige cómo deseas garantizar tu participación
@@ -80,52 +79,42 @@ export default function SelectPaymentMethodScreen() {
               Todos los métodos de pago deben ser verificados antes de participar en subastas.
             </Text>
           </View>
-
         </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeAreaContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   container: { 
     flex: 1, 
     backgroundColor: '#FFFFFF',
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: 28,
-    alignItems: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-    width: '100%',
-    alignSelf: 'center',
-    paddingTop: 24,
-  },
   content: {
     width: '100%',
-    paddingBottom: Spacing.six,
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 16,
+    paddingBottom: 35,
   },
   headerContainer: {
     alignItems: 'center',
     marginBottom: 32,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#0A1E3F', // Azul marino oscuro
-    marginBottom: 8,
-    textAlign: 'center',
-  },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280', // Gris
+    color: '#6B7280', 
     textAlign: 'center',
   },
   optionCard: {
     width: '100%',
     borderWidth: 1,
-    borderColor: '#E5E7EB', // Borde gris sutil
+    borderColor: '#E5E7EB', 
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
@@ -154,24 +143,24 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0A1E3F', // Azul marino oscuro
+    color: '#0A1E3F', 
     marginBottom: 4,
   },
   optionDescription: {
     fontSize: 14,
-    color: '#6B7280', // Gris
+    color: '#6B7280', 
   },
   infoBox: {
     width: '100%',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#BFDBFE', // Borde azul claro
-    backgroundColor: '#EFF6FF', // Fondo azul muy claro
+    borderColor: '#BFDBFE', 
+    backgroundColor: '#EFF6FF', 
     padding: 16,
     marginTop: 16,
   },
   infoText: {
-    color: '#1E40AF', // Azul oscuro para lectura
+    color: '#1E40AF', 
     fontSize: 14,
     lineHeight: 20,
   },

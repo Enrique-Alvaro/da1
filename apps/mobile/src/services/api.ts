@@ -22,7 +22,7 @@ import {
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
-  'http://localhost:3000/api';
+  'http://192.168.200.10:3000/api';
 
 console.log('[CrownBid API_BASE_URL]', API_BASE_URL);
 

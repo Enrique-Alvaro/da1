@@ -25,7 +25,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PaymentMethod } from '@/services/types';
 
 type BidResult = {
@@ -131,7 +131,6 @@ export default function LiveAuctionScreen() {
 
   const [setupLoading, setSetupLoading] = useState(true);
   const [setupError, setSetupError] = useState<string | null>(null);
-
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
 
@@ -141,11 +140,9 @@ export default function LiveAuctionScreen() {
   const [bidAmount, setBidAmount] = useState(minNextBid || '');
   const [isHighestBidder, setIsHighestBidder] = useState(false);
   const [showOutbidBanner, setShowOutbidBanner] = useState(false);
-
   const [bidding, setBidding] = useState(false);
   const [bidError, setBidError] = useState<string | null>(null);
   const [bidSuccess, setBidSuccess] = useState<string | null>(null);
-
   const [itemFinalized, setItemFinalized] = useState(false);
   const [finalResult, setFinalResult] = useState<ItemFinalizationResult | null>(null);
   const [resultLoading, setResultLoading] = useState(false);
@@ -297,7 +294,6 @@ export default function LiveAuctionScreen() {
       }
     }
     void setup();
-
     return () => {
       if (sessionEntered.current) {
         leaveLiveSession(aucId).catch(() => {});
@@ -414,238 +410,241 @@ export default function LiveAuctionScreen() {
     (liveState?.canBid === false && bidContextIsCurrent);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.liveBanner}>
-        <View style={styles.liveHeaderRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <View style={styles.container}>
+        <View style={styles.liveBanner}>
+          <View style={styles.liveHeaderRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Pressable
+                onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
+                style={{ paddingRight: 15 }}
+              >
+                <Text style={styles.backText}>←</Text>
+              </Pressable>
+              <ThemedText style={styles.liveTitle}>
+                {auctionClosed ? 'SUBASTA FINALIZADA' : '🔴 SUBASTA EN VIVO'}
+              </ThemedText>
+            </View>
+          </View>
+          {auctionSchedule ? (
+            <AuctionCountdown
+              date={auctionSchedule.date}
+              time={auctionSchedule.time}
+              endTime={auctionSchedule.endTime}
+              status={displayAuctionStatus}
+              serverTime={liveState?.serverTime}
+              variant="live"
+              onStatusChange={setDisplayAuctionStatus}
+              onExpired={() => {
+                setAuctionEnded(true);
+                setDisplayAuctionStatus('closed');
+              }}
+              style={styles.liveCountdown}
+            />
+          ) : null}
+          <ThemedText style={styles.itemTitleBanner} numberOfLines={2}>
+            {title || liveState?.currentItem?.catalogDescription || `Ítem #${itmId}`}
+          </ThemedText>
+        </View>
+
+        {showOutbidBanner && !itemFinalized ? (
+          <View style={styles.outbidBanner}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.outbidTitle}>Te han superado</Text>
+              <Text style={styles.outbidBody}>
+                Otro usuario hizo una puja mayor en &apos;{title || `Ítem #${itmId}`}&apos;
+              </Text>
+            </View>
+            <Pressable onPress={() => setShowOutbidBanner(false)}>
+              <Text style={styles.outbidClose}>✕</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {setupLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#D35400" />
+            <Text style={styles.loadingText}>Uniéndose a la subasta...</Text>
+          </View>
+        ) : setupError ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>{setupError}</Text>
             <Pressable
               onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
-              style={{ paddingRight: 15 }}
+              style={styles.backBtn}
             >
-              <ThemedText style={styles.backText}>←</ThemedText>
+              <Text style={styles.backBtnText}>← Volver</Text>
             </Pressable>
-            <ThemedText style={styles.liveTitle}>
-              {auctionClosed ? 'SUBASTA FINALIZADA' : '🔴 SUBASTA EN VIVO'}
-            </ThemedText>
           </View>
-        </View>
-        {auctionSchedule ? (
-          <AuctionCountdown
-            date={auctionSchedule.date}
-            time={auctionSchedule.time}
-            endTime={auctionSchedule.endTime}
-            status={displayAuctionStatus}
-            serverTime={liveState?.serverTime}
-            variant="live"
-            onStatusChange={setDisplayAuctionStatus}
-            onExpired={() => {
-              setAuctionEnded(true);
-              setDisplayAuctionStatus('closed');
-            }}
-            style={styles.liveCountdown}
-          />
-        ) : null}
-        <ThemedText style={styles.itemTitleBanner} numberOfLines={2}>
-          {title || liveState?.currentItem?.catalogDescription || `Ítem #${itmId}`}
-        </ThemedText>
-      </View>
-
-      {showOutbidBanner && !itemFinalized ? (
-        <View style={styles.outbidBanner}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.outbidTitle}>Te han superado</Text>
-            <Text style={styles.outbidBody}>
-              Otro usuario hizo una puja mayor en &apos;{title || `Ítem #${itmId}`}&apos;
-            </Text>
-          </View>
-          <Pressable onPress={() => setShowOutbidBanner(false)}>
-            <Text style={styles.outbidClose}>✕</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {setupLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#D35400" />
-          <Text style={styles.loadingText}>Uniéndose a la subasta...</Text>
-        </View>
-      ) : setupError ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{setupError}</Text>
-          <Pressable
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
-            style={styles.backBtn}
-          >
-            <Text style={styles.backBtnText}>← Volver</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {pollError ? (
-            <View style={styles.warningBox}>
-              <Text style={styles.warningText}>{pollError}</Text>
-            </View>
-          ) : null}
-
-          {waitingNextItem && !itemFinalized ? (
-            <View style={styles.waitingBox}>
-              <Text style={styles.waitingTitle}>Esperando el próximo artículo</Text>
-              <Text style={styles.waitingText}>El próximo artículo comenzará pronto.</Text>
-            </View>
-          ) : null}
-
-          {itemFinalized ? (
-            resultLoading ? (
-              <View style={styles.centeredInline}>
-                <ActivityIndicator color="#D35400" />
-                <Text style={styles.loadingText}>Obteniendo resultado...</Text>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {pollError ? (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>{pollError}</Text>
               </View>
-            ) : finalResult ? (
-              <ResultPanel
-                result={finalResult}
-                currency={displayCurrency}
-                onViewPurchases={() => router.push('/my-purchases' as never)}
-                onContinue={goToNextItem}
-                showContinue={!auctionEnded && liveState?.currentItem != null && liveState.currentItem.id !== itmId}
-              />
-            ) : null
-          ) : (
-            <>
-              <View style={styles.highestBidBox}>
-                <Text style={styles.highestBidLabel}>Puja más alta actual</Text>
-                <View style={styles.highestBidRow}>
-                  <Text style={styles.trendIcon}>{isHighestBidder ? '↗' : '↘'}</Text>
-                  <Text style={styles.highestBidAmount}>
-                    {highestBid > 0
-                      ? `${displayCurrency} ${highestBid.toLocaleString('es-AR')}`
-                      : 'Sin ofertas aún'}
-                  </Text>
+            ) : null}
+
+            {waitingNextItem && !itemFinalized ? (
+              <View style={styles.waitingBox}>
+                <Text style={styles.waitingTitle}>Esperando el próximo artículo</Text>
+                <Text style={styles.waitingText}>El próximo artículo comenzará pronto.</Text>
+              </View>
+            ) : null}
+
+            {itemFinalized ? (
+              resultLoading ? (
+                <View style={styles.centeredInline}>
+                  <ActivityIndicator color="#D35400" />
+                  <Text style={styles.loadingText}>Obteniendo resultado...</Text>
                 </View>
-                {isHighestBidder ? (
-                  <Text style={styles.leadingText}>Sos el mejor postor actualmente</Text>
-                ) : null}
-              </View>
-
-              <View style={styles.bidSection}>
-                {nextMin !== null && (
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoBoxText}>
-                      Mínimo permitido: {displayCurrency} {nextMin.toLocaleString('es-AR')}
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={styles.inputLabel}>Realiza tu puja ({displayCurrency})</Text>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.currencySymbol}>{displayCurrency}</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={bidAmount}
-                    onChangeText={(t) => {
-                      setBidAmount(t.replace(/[^0-9.]/g, ''));
-                      setBidError(null);
-                      setBidSuccess(null);
-                    }}
-                    keyboardType="numeric"
-                    placeholder={nextMin ? String(nextMin) : '0'}
-                    placeholderTextColor="#9AA0A6"
-                    editable={!biddingDisabled}
-                  />
-                </View>
-                <Text style={styles.currentBidHint}>
-                  Puja actual: {displayCurrency} {highestBid.toLocaleString('es-AR')}
-                </Text>
-
-                {paymentMethods.length > 0 ? (
-                  <View style={styles.pmSection}>
-                    <Text style={styles.inputLabel}>Medio de pago</Text>
-                    {paymentMethods.map((pm) => (
-                      <Pressable
-                        key={pm.id}
-                        style={[styles.pmOption, selectedPaymentId === pm.id && styles.pmOptionSelected]}
-                        onPress={() => setSelectedPaymentId(pm.id)}
-                        disabled={biddingDisabled}
-                      >
-                        <Text
-                          style={[
-                            styles.pmOptionText,
-                            selectedPaymentId === pm.id && styles.pmOptionTextSelected,
-                          ]}
-                        >
-                          {pm.entity ?? pm.type}
-                          {pm.lastDigits ? ` •••• ${pm.lastDigits}` : ''}
-                          {pm.availableAmount != null
-                            ? ` · disp. ${displayCurrency} ${pm.availableAmount.toLocaleString('es-AR')}`
-                            : ''}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.warningBox}>
-                    <Text style={styles.warningText}>
-                      No tenés medios de pago verificados en {displayCurrency}. Registrá uno desde tu perfil.
-                    </Text>
-                  </View>
-                )}
-
-                {bidError ? (
-                  <View style={styles.errorBox}>
-                    <Text style={styles.errorBoxText}>{bidError}</Text>
-                  </View>
-                ) : null}
-
-                {bidSuccess ? (
-                  <View style={styles.successBox}>
-                    <Text style={styles.successBoxText}>{bidSuccess}</Text>
-                  </View>
-                ) : null}
-              </View>
-            </>
-          )}
-        </ScrollView>
-      )}
-
-      {!setupLoading && !setupError && !itemFinalized ? (
-        <View style={styles.bottomBar}>
-          <Pressable
-            style={[styles.bidButton, biddingDisabled && styles.bidButtonDisabled]}
-            onPress={() => void handleBid()}
-            disabled={biddingDisabled}
-          >
-            {bidding ? (
-              <ActivityIndicator color="#FFF" />
+              ) : finalResult ? (
+                <ResultPanel
+                  result={finalResult}
+                  currency={displayCurrency}
+                  onViewPurchases={() => router.push('/my-purchases' as never)}
+                  onContinue={goToNextItem}
+                  showContinue={!auctionEnded && liveState?.currentItem != null && liveState.currentItem.id !== itmId}
+                />
+              ) : null
             ) : (
-              <Text style={styles.bidButtonText}>
-                {auctionEnded ? 'Subasta finalizada' : 'Realizar Puja'}
-              </Text>
+              <>
+                <View style={styles.highestBidBox}>
+                  <Text style={styles.highestBidLabel}>Puja más alta actual</Text>
+                  <View style={styles.highestBidRow}>
+                    <Text style={styles.trendIcon}>{isHighestBidder ? '↗' : '↘'}</Text>
+                    <Text style={styles.highestBidAmount}>
+                      {highestBid > 0
+                        ? `${displayCurrency} ${highestBid.toLocaleString('es-AR')}`
+                        : 'Sin ofertas aún'}
+                    </Text>
+                  </View>
+                  {isHighestBidder ? (
+                    <Text style={styles.leadingText}>Sos el mejor postor actualmente</Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.bidSection}>
+                  {nextMin !== null && (
+                    <View style={styles.infoBox}>
+                      <Text style={styles.infoBoxText}>
+                        Mínimo permitido: {displayCurrency} {nextMin.toLocaleString('es-AR')}
+                      </Text>
+                    </View>
+                  )}
+
+                  <Text style={styles.inputLabel}>Realiza tu puja ({displayCurrency})</Text>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.currencySymbol}>{displayCurrency}</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={bidAmount}
+                      onChangeText={(t) => {
+                        setBidAmount(t.replace(/[^0-9.]/g, ''));
+                        setBidError(null);
+                        setBidSuccess(null);
+                      }}
+                      keyboardType="numeric"
+                      placeholder={nextMin ? String(nextMin) : '0'}
+                      placeholderTextColor="#9AA0A6"
+                      editable={!biddingDisabled}
+                    />
+                  </View>
+                  <Text style={styles.currentBidHint}>
+                    Puja actual: {displayCurrency} {highestBid.toLocaleString('es-AR')}
+                  </Text>
+
+                  {paymentMethods.length > 0 ? (
+                    <View style={styles.pmSection}>
+                      <Text style={styles.inputLabel}>Medio de pago</Text>
+                      {paymentMethods.map((pm) => (
+                        <Pressable
+                          key={pm.id}
+                          style={[styles.pmOption, selectedPaymentId === pm.id && styles.pmOptionSelected]}
+                          onPress={() => setSelectedPaymentId(pm.id)}
+                          disabled={biddingDisabled}
+                        >
+                          <Text
+                            style={[
+                              styles.pmOptionText,
+                              selectedPaymentId === pm.id && styles.pmOptionTextSelected,
+                            ]}
+                          >
+                            {pm.entity ?? pm.type}
+                            {pm.lastDigits ? ` •••• ${pm.lastDigits}` : ''}
+                            {pm.availableAmount != null
+                              ? ` · disp. ${displayCurrency} ${pm.availableAmount.toLocaleString('es-AR')}`
+                              : ''}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.warningBox}>
+                      <Text style={styles.warningText}>
+                        No tenés medios de pago verified en {displayCurrency}. Registrá uno desde tu perfil.
+                      </Text>
+                    </View>
+                  )}
+
+                  {bidError ? (
+                    <View style={styles.errorBox}>
+                      <Text style={styles.errorBoxText}>{bidError}</Text>
+                    </View>
+                  ) : null}
+
+                  {bidSuccess ? (
+                    <View style={styles.successBox}>
+                      <Text style={styles.successBoxText}>{bidSuccess}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </>
             )}
-          </Pressable>
-          <Pressable
-            style={styles.historyLink}
-            onPress={() =>
-              router.push({
-                pathname: '/bid-history',
-                params: {
-                  auctionId: String(aucId),
-                  itemId: String(itmId),
-                  currency: displayCurrency,
-                  title: title ?? '',
-                },
-              })
-            }
-          >
-            <Text style={styles.historyLinkText}>Ver historial de pujas →</Text>
-          </Pressable>
-        </View>
-      ) : null}
-    </View>
+          </ScrollView>
+        )}
+
+        {!setupLoading && !setupError && !itemFinalized ? (
+          <View style={styles.bottomBar}>
+            <Pressable
+              style={[styles.bidButton, biddingDisabled && styles.bidButtonDisabled]}
+              onPress={() => void handleBid()}
+              disabled={biddingDisabled}
+            >
+              {bidding ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.bidButtonText}>
+                  {auctionEnded ? 'Subasta finalizada' : 'Realizar Puja'}
+                </Text>
+              )}
+            </Pressable>
+            <Pressable
+              style={styles.historyLink}
+              onPress={() =>
+                router.push({
+                  pathname: '/bid-history',
+                  params: {
+                    auctionId: String(aucId),
+                    itemId: String(itmId),
+                    currency: displayCurrency,
+                    title: title ?? '',
+                  },
+                })
+              }
+            >
+              <Text style={styles.historyLinkText}>Ver historial de pujas →</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#C81010' },
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  liveBanner: { backgroundColor: '#C81010', padding: 20, paddingTop: 55 },
+  liveBanner: { backgroundColor: '#C81010', padding: 20, paddingVertical: 14 },
   liveCountdown: { marginTop: 8, marginBottom: 4 },
   liveHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   backText: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
@@ -672,7 +671,7 @@ const styles = StyleSheet.create({
   backBtn: { backgroundColor: '#D35400', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8 },
   backBtnText: { color: '#FFF', fontWeight: 'bold' },
 
-  scrollContent: { paddingBottom: 120 },
+  scrollContent: { paddingBottom: 20 },
 
   waitingBox: {
     margin: 16,
@@ -759,10 +758,10 @@ const styles = StyleSheet.create({
   resultBtnSecondaryText: { color: '#D35400', fontWeight: '700' },
 
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
     width: '100%',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
     backgroundColor: '#FFF',
     borderTopWidth: 1,
     borderTopColor: '#EEE',

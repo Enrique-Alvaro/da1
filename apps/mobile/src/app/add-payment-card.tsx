@@ -1,216 +1,163 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { createPaymentMethod } from '@/services/api';
 
-type CardType = 'tarjeta_credito' | 'tarjeta_credito_extranjera';
-type Currency = 'ARS' | 'USD';
-
-const ISSUERS = ['Visa', 'Mastercard', 'American Express', 'Naranja', 'Cabal', 'Otro'];
-
 export default function AddPaymentCardScreen() {
   const router = useRouter();
 
-  const [tipo, setTipo] = useState<CardType>('tarjeta_credito');
-  const [moneda, setMoneda] = useState<Currency>('ARS');
-  const [titular, setTitular] = useState('');
-  const [entidad, setEntidad] = useState('');
-  const [ultimosDigitos, setUltimosDigitos] = useState('');
-  const [showIssuers, setShowIssuers] = useState(false);
-  const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [issuerBank, setIssuerBank] = useState('');
+  const [holder, setHolder] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [currency, setCurrency] = useState<'ARS' | 'USD'>('USD');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const titularError = submitAttempted && titular.trim().length === 0;
-  const entidadError = submitAttempted && entidad.trim().length === 0;
-  const digitosError = submitAttempted && !/^\d{4}$/.test(ultimosDigitos.trim());
+  async function handleSubmit() {
+    setError(null);
 
-  const hasErrors = titularError || entidadError || digitosError;
-
-  async function onSubmit() {
-    setSubmitAttempted(true);
-    if (hasErrors || titular.trim().length === 0 || entidad.trim().length === 0 || !/^\d{4}$/.test(ultimosDigitos.trim())) {
+    if (!issuerBank.trim() || !holder.trim() || !cardNumber.trim()) {
+      setError('Completá los datos obligatorios de la tarjeta.');
       return;
     }
 
-    setIsSubmitting(true);
+    setSubmitting(true);
     try {
       await createPaymentMethod({
-        tipo,
-        moneda,
-        titular: titular.trim(),
-        entidad: entidad.trim(),
-        ultimosDigitos: ultimosDigitos.trim(),
+        tipo: 'tarjeta_credito',
+        moneda: currency,
+        titular: holder.trim(),
+        entidad: issuerBank.trim(),
+        aliasOCbu: cardNumber.trim(), 
       });
-      router.push('/payment-verify-success');
-    } catch (e: any) {
-      router.push('/payment-verify-error');
+      router.replace('/payment-methods');
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message ?? 'Ocurrió un error al registrar la tarjeta.');
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   }
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        
+        {/* Formulario con Scroll */}
         <ScrollView 
-          style={{ width: '100%' }} 
+          style={{ width: '100%', flex: 1 }} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
           
           <View style={styles.headerContainer}>
             <View style={styles.iconCircle}>
-              {/* Ícono y fondo en azul como solicitaste */}
-              <Ionicons name="card-outline" size={36} color="#2563EB" />
+              <Ionicons name="card-outline" size={36} color="#0284C7" />
             </View>
-            <Text style={styles.title}>Agregar Tarjeta de Pago</Text>
+            <Text style={styles.title}>Tarjeta de Pago</Text>
             <Text style={styles.subtitle}>
-              La empresa verificará tu tarjeta antes de que puedas pujar
+              Registra tu tarjeta de crédito o débito
             </Text>
           </View>
 
-          {/* Tipo de tarjeta */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Tipo de tarjeta</Text>
-            <View style={styles.toggleContainer}>
-              <Pressable
-                style={[styles.toggleBtn, tipo === 'tarjeta_credito' && styles.toggleBtnActive]}
-                onPress={() => { setTipo('tarjeta_credito'); setMoneda('ARS'); }}
-              >
-                <Text style={[styles.toggleText, tipo === 'tarjeta_credito' && styles.toggleTextActive]}>
-                  Nacional
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.toggleBtn, tipo === 'tarjeta_credito_extranjera' && styles.toggleBtnActive]}
-                onPress={() => { setTipo('tarjeta_credito_extranjera'); setMoneda('USD'); }}
-              >
-                <Text style={[styles.toggleText, tipo === 'tarjeta_credito_extranjera' && styles.toggleTextActive]}>
-                  Internacional
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Moneda */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Moneda</Text>
-            <View style={styles.toggleContainer}>
-              {(['ARS', 'USD'] as Currency[]).map((m) => (
-                <Pressable
-                  key={m}
-                  style={[styles.toggleBtn, moneda === m && styles.toggleBtnActive]}
-                  onPress={() => setMoneda(m)}
-                >
-                  <Text style={[styles.toggleText, moneda === m && styles.toggleTextActive]}>{m}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Titular */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Nombre del Titular</Text>
+          <View style={styles.form}>
+            <Text style={styles.label}>Banco Emisor</Text>
             <TextInput
-              style={[styles.input, titularError && { borderColor: '#E74C3C' }]}
-              value={titular}
-              onChangeText={setTitular}
-              placeholder="JUAN PEREZ"
+              style={styles.input}
+              value={issuerBank}
+              onChangeText={setIssuerBank}
+              placeholder="Ej: Banco Galicia"
               placeholderTextColor="#9AA0A6"
-              autoCapitalize="characters"
             />
-            {titularError && <Text style={styles.errorText}>Este campo es obligatorio.</Text>}
-          </View>
 
-          {/* Entidad emisora */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Entidad Emisora</Text>
-            <Pressable
-              style={[styles.input, entidadError && { borderColor: '#E74C3C' }, { justifyContent: 'center' }]}
-              onPress={() => setShowIssuers((p) => !p)}
-            >
-              <Text style={{ color: entidad ? '#1F2937' : '#9AA0A6', fontSize: 16 }}>
-                {entidad || 'Seleccionar emisor'}
-              </Text>
-            </Pressable>
-            
-            {showIssuers && (
-              <View style={styles.optionsBox}>
-                {ISSUERS.map((opt) => (
-                  <Pressable
-                    key={opt}
-                    style={styles.optionItem}
-                    onPress={() => { setEntidad(opt); setShowIssuers(false); }}
-                  >
-                    <Text style={{ color: '#1F2937', fontSize: 16 }}>{opt}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-            {entidadError && <Text style={styles.errorText}>Seleccioná la entidad emisora.</Text>}
-          </View>
-
-          {/* Últimos 4 dígitos */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Últimos 4 dígitos</Text>
+            <Text style={styles.label}>Titular de la Tarjeta</Text>
             <TextInput
-              style={[styles.input, digitosError && { borderColor: '#E74C3C' }]}
-              value={ultimosDigitos}
-              onChangeText={(t) => setUltimosDigitos(t.replace(/\D/g, '').slice(0, 4))}
-              placeholder="3456"
+              style={styles.input}
+              value={holder}
+              onChangeText={setHolder}
+              placeholder="Nombre como figura en la tarjeta"
+              placeholderTextColor="#9AA0A6"
+            />
+
+            <Text style={styles.label}>Número de Tarjeta</Text>
+            <TextInput
+              style={styles.input}
+              value={cardNumber}
+              onChangeText={setCardNumber}
+              placeholder="#### #### #### ####"
               placeholderTextColor="#9AA0A6"
               keyboardType="numeric"
-              maxLength={4}
             />
-            {digitosError && <Text style={styles.errorText}>Ingresá exactamente 4 dígitos numéricos.</Text>}
+
+            <View style={styles.row}>
+              <View style={styles.rowItem}>
+                <Text style={styles.label}>Vencimiento</Text>
+                <TextInput
+                  style={styles.input}
+                  value={expiry}
+                  onChangeText={setExpiry}
+                  placeholder="MM/AA"
+                  placeholderTextColor="#9AA0A6"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.rowItem}>
+                <Text style={styles.label}>Moneda Principal</Text>
+                <View style={styles.toggle}>
+                  <Pressable
+                    style={[styles.toggleOption, currency === 'ARS' && styles.toggleOptionActive]}
+                    onPress={() => setCurrency('ARS')}
+                  >
+                    <Text style={[styles.toggleText, currency === 'ARS' && styles.toggleTextActive]}>
+                      ARS
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.toggleOption, currency === 'USD' && styles.toggleOptionActive]}
+                    onPress={() => setCurrency('USD')}
+                  >
+                    <Text style={[styles.toggleText, currency === 'USD' && styles.toggleTextActive]}>
+                      USD
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
           </View>
 
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>
-              Por seguridad no almacenamos el número completo ni el CVV de tu tarjeta.
-            </Text>
-          </View>
-
-          {hasErrors && submitAttempted && (
-            <Text style={styles.formError}>Corregí los campos marcados antes de continuar.</Text>
+          {error && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{error}</Text>
+            </View>
           )}
+        </ScrollView>
 
+        {/* Botones Fijos */}
+        <View style={styles.bottomBar}>
           <Pressable
-            style={[styles.primaryButton, isSubmitting && { opacity: 0.6 }]}
-            onPress={onSubmit}
-            disabled={isSubmitting}
+            style={[styles.primaryButton, submitting && { opacity: 0.6 }]}
+            onPress={handleSubmit}
+            disabled={submitting}
           >
-            {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Continuar</Text>
-            )}
+            <Text style={styles.primaryButtonText}>
+              {submitting ? 'Guardando...' : 'Registrar Tarjeta'}
+            </Text>
           </Pressable>
 
-          {/* Botón secundario para Cancelar agregado */}
           <Pressable
             style={styles.secondaryButton}
             onPress={() => router.back()}
-            disabled={isSubmitting}
+            disabled={submitting}
           >
             <Text style={styles.secondaryButtonText}>Cancelar</Text>
           </Pressable>
+        </View>
 
-        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -225,7 +172,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 28,
     alignItems: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
@@ -233,7 +179,7 @@ const styles = StyleSheet.create({
   },
   content: {
     width: '100%',
-    paddingBottom: Spacing.six,
+    paddingBottom: 20,
   },
   headerContainer: {
     alignItems: 'center',
@@ -243,7 +189,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#EFF6FF', // Azul muy claro
+    backgroundColor: '#E0F2FE',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -251,47 +197,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#0A1E3F', // Azul marino oscuro
+    color: '#0A1E3F',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
-    color: '#6B7280', // Gris
+    fontSize: 16,
+    color: '#6B7280',
     textAlign: 'center',
   },
-  section: {
-    marginBottom: 20,
+  form: {
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
     fontWeight: '700',
     color: '#0A1E3F',
     marginBottom: 8,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#F9FAFB',
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  toggleBtnActive: {
-    backgroundColor: '#2563EB', // Azul
-  },
-  toggleText: {
-    color: '#4B5563',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  toggleTextActive: {
-    color: '#FFFFFF',
   },
   input: {
     borderWidth: 1,
@@ -302,37 +224,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     fontSize: 16,
     color: '#1F2937',
+    marginBottom: 20,
   },
-  optionsBox: {
+  row: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  rowItem: {
+    flex: 1,
+  },
+  toggle: {
+    flexDirection: 'row',
     borderWidth: 1,
     borderColor: '#D1D5DB',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    marginTop: 4,
     overflow: 'hidden',
-  },
-  optionItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  notice: {
-    padding: 16,
+    height: 52,
     backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
-  noticeText: {
-    color: '#6B7280',
+  toggleOption: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toggleOptionActive: {
+    backgroundColor: '#0284C7',
+  },
+  toggleText: {
+    color: '#4B5563',
+    fontWeight: '600',
     fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
+  },
+  toggleTextActive: {
+    color: '#FFFFFF',
+  },
+  bottomBar: {
+    width: '100%',
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
   },
   primaryButton: {
-    backgroundColor: '#2563EB', // Azul
+    backgroundColor: '#0284C7',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -344,7 +276,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   secondaryButton: {
-    backgroundColor: '#F3F4F6', // Gris claro
+    backgroundColor: '#F3F4F6',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -354,15 +286,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  errorText: {
-    color: '#E74C3C',
-    marginTop: 6,
-    fontSize: 13,
+  errorBanner: {
+    backgroundColor: '#FFECEC',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E74C3C',
+    marginBottom: 20,
   },
-  formError: {
-    color: '#E74C3C',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontWeight: '600',
+  errorBannerText: {
+    color: '#7B241C',
+    fontSize: 14,
   },
 });

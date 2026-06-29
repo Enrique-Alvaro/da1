@@ -16,6 +16,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type ItemDetail = {
   id: number;
@@ -98,7 +99,7 @@ export default function ItemDetailScreen() {
   }, [itemId, auctionId]);
 
   useFocusEffect(
-    useCallback(() => {
+    __useCallback_wrapper(() => {
       void loadItem();
     }, [loadItem])
   );
@@ -142,161 +143,163 @@ export default function ItemDetailScreen() {
   const primaryImage = resolveProductImageUrl(item.imageUrls?.[0]);
 
   return (
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.imageContainer}>
-          <Pressable style={styles.floatingBackButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/home')}>
-            <ThemedText style={styles.backIcon}>←</ThemedText>
-          </Pressable>
-          {primaryImage ? (
-            <Image source={{ uri: primaryImage }} style={styles.itemImage} resizeMode="cover" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['bottom']}>
+      <View style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.imageContainer}>
+            <Pressable style={styles.floatingBackButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/home')}>
+              <ThemedText style={styles.backIcon}>←</ThemedText>
+            </Pressable>
+            {primaryImage ? (
+              <Image source={{ uri: primaryImage }} style={styles.itemImage} resizeMode="cover" />
+            ) : (
+              <Text style={styles.bigIcon}>📦</Text>
+            )}
+            <View style={[styles.itemStatusBadge, { backgroundColor: ITEM_STATUS_BG[item.status] }]}>
+              <Text style={[styles.itemStatusText, { color: ITEM_STATUS_COLOR[item.status] }]}>
+                {ITEM_STATUS_LABEL[item.status] ?? item.status}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.contentContainer}>
+            <Text style={styles.title}>{item.title}</Text>
+            {item.pieceNumber != null ? (
+              <Text style={styles.metaLine}>Pieza Nº {item.pieceNumber}</Text>
+            ) : null}
+            {item.artistOrDesigner ? (
+              <Text style={styles.metaLine}>Artista / diseñador: {item.artistOrDesigner}</Text>
+            ) : null}
+            {item.originDate ? (
+              <Text style={styles.metaLine}>Fecha / origen: {item.originDate}</Text>
+            ) : null}
+            {item.components ? (
+              <Text style={styles.metaLine}>Componentes: {item.components}</Text>
+            ) : null}
+
+            {item.history ? (
+              <Text style={styles.description}>{item.history}</Text>
+            ) : null}
+
+            {item.catalogDescription ? (
+              <Text style={styles.description}>{item.catalogDescription}</Text>
+            ) : null}
+
+            {/* Precios */}
+            {auctionSchedule && isItemLive ? (
+              <View style={styles.countdownCard}>
+                <AuctionCountdown
+                  date={auctionSchedule.date}
+                  time={auctionSchedule.time}
+                  endTime={auctionSchedule.endTime}
+                  status={displayAuctionStatus}
+                  variant="detail"
+                  onStatusChange={setDisplayAuctionStatus}
+                  onExpired={() => setDisplayAuctionStatus('closed')}
+                />
+              </View>
+            ) : item.status === 'sold' ? (
+              <View style={styles.soldBanner}>
+                <Text style={styles.soldBannerTitle}>Artículo vendido</Text>
+                <Text style={styles.soldBannerText}>
+                  Este ítem ya fue adjudicado y no admite nuevas ofertas.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.priceBox}>
+              {item.basePrice != null && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Precio base</Text>
+                  <Text style={styles.priceBase}>
+                    {item.currency} {item.basePrice.toLocaleString('es-AR')}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Mejor oferta actual</Text>
+                <Text style={styles.priceCurrent}>
+                  {item.currentHighestBid != null
+                    ? `${item.currency} ${item.currentHighestBid.toLocaleString('es-AR')}`
+                    : 'Sin ofertas aún'}
+                </Text>
+              </View>
+              {item.minNextBid != null && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Próxima puja mínima</Text>
+                  <Text style={styles.priceMin}>
+                    {item.currency} {item.minNextBid.toLocaleString('es-AR')}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Mejor postor */}
+            {item.highestBidderDisplay && (
+              <View style={styles.bidderRow}>
+                <Text style={styles.bidderLabel}>Postor actual</Text>
+                <Text style={styles.bidderValue}>
+                  Postor #{item.highestBidderDisplay.bidderNumber}
+                </Text>
+              </View>
+            )}
+
+            {/* Mensaje si no puede pujar */}
+            {!item.canBid && item.cannotBidReason && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>
+                  {BID_DENIAL_MESSAGES[item.cannotBidReason] ?? 'No podés pujar en este momento.'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Botón inferior: ahora dentro del layout flexible respetando Android */}
+        <View style={styles.bottomBar}>
+          {canEnterLiveNow ? (
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => router.push({
+                pathname: '/live-auction',
+                params: {
+                  auctionId: String(effectiveAuctionId),
+                  itemId: String(item.id),
+                  title: item.title,
+                  currentBid: String(item.currentHighestBid ?? item.basePrice ?? 0),
+                  minNextBid: String(item.minNextBid ?? ''),
+                  currency: item.currency,
+                },
+              })}
+            >
+              <Text style={styles.actionButtonText}>Entrar a subasta en vivo</Text>
+            </Pressable>
           ) : (
-            <Text style={styles.bigIcon}>📦</Text>
-          )}
-          <View style={[styles.itemStatusBadge, { backgroundColor: ITEM_STATUS_BG[item.status] }]}>
-            <Text style={[styles.itemStatusText, { color: ITEM_STATUS_COLOR[item.status] }]}>
-              {ITEM_STATUS_LABEL[item.status] ?? item.status}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.contentContainer}>
-          <Text style={styles.title}>{item.title}</Text>
-          {item.pieceNumber != null ? (
-            <Text style={styles.metaLine}>Pieza Nº {item.pieceNumber}</Text>
-          ) : null}
-          {item.artistOrDesigner ? (
-            <Text style={styles.metaLine}>Artista / diseñador: {item.artistOrDesigner}</Text>
-          ) : null}
-          {item.originDate ? (
-            <Text style={styles.metaLine}>Fecha / origen: {item.originDate}</Text>
-          ) : null}
-          {item.components ? (
-            <Text style={styles.metaLine}>Componentes: {item.components}</Text>
-          ) : null}
-
-          {item.history ? (
-            <Text style={styles.description}>{item.history}</Text>
-          ) : null}
-
-          {item.catalogDescription ? (
-            <Text style={styles.description}>{item.catalogDescription}</Text>
-          ) : null}
-
-          {/* Precios */}
-          {auctionSchedule && isItemLive ? (
-            <View style={styles.countdownCard}>
-              <AuctionCountdown
-                date={auctionSchedule.date}
-                time={auctionSchedule.time}
-                endTime={auctionSchedule.endTime}
-                status={displayAuctionStatus}
-                variant="detail"
-                onStatusChange={setDisplayAuctionStatus}
-                onExpired={() => setDisplayAuctionStatus('closed')}
-              />
-            </View>
-          ) : item.status === 'sold' ? (
-            <View style={styles.soldBanner}>
-              <Text style={styles.soldBannerTitle}>Artículo vendido</Text>
-              <Text style={styles.soldBannerText}>
-                Este ítem ya fue adjudicado y no admite nuevas ofertas.
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.priceBox}>
-            {item.basePrice != null && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Precio base</Text>
-                <Text style={styles.priceBase}>
-                  {item.currency} {item.basePrice.toLocaleString('es-AR')}
-                </Text>
-              </View>
-            )}
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Mejor oferta actual</Text>
-              <Text style={styles.priceCurrent}>
-                {item.currentHighestBid != null
-                  ? `${item.currency} ${item.currentHighestBid.toLocaleString('es-AR')}`
-                  : 'Sin ofertas aún'}
-              </Text>
-            </View>
-            {item.minNextBid != null && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Próxima puja mínima</Text>
-                <Text style={styles.priceMin}>
-                  {item.currency} {item.minNextBid.toLocaleString('es-AR')}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Mejor postor */}
-          {item.highestBidderDisplay && (
-            <View style={styles.bidderRow}>
-              <Text style={styles.bidderLabel}>Postor actual</Text>
-              <Text style={styles.bidderValue}>
-                Postor #{item.highestBidderDisplay.bidderNumber}
-              </Text>
-            </View>
-          )}
-
-          {/* Mensaje si no puede pujar */}
-          {!item.canBid && item.cannotBidReason && (
-            <View style={styles.warningBox}>
-              <Text style={styles.warningText}>
-                {BID_DENIAL_MESSAGES[item.cannotBidReason] ?? 'No podés pujar en este momento.'}
+            <View style={[styles.actionButton, styles.actionButtonDisabled]}>
+              <Text style={styles.actionButtonText}>
+                {item.isOwner
+                  ? 'No podés pujar sobre un artículo propio.'
+                  : item.status === 'sold'
+                  ? 'Artículo vendido'
+                  : item.status === 'closed'
+                  ? 'Artículo cerrado'
+                  : displayAuctionStatus === 'closed'
+                  ? 'Subasta finalizada'
+                  : displayAuctionStatus === 'scheduled'
+                  ? 'Subasta aún no comenzó'
+                  : 'No disponible'}
               </Text>
             </View>
           )}
         </View>
-      </ScrollView>
-
-      {/* Botón inferior */}
-      <View style={styles.bottomBar}>
-        {canEnterLiveNow ? (
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => router.push({
-              pathname: '/live-auction',
-              params: {
-                auctionId: String(effectiveAuctionId),
-                itemId: String(item.id),
-                title: item.title,
-                currentBid: String(item.currentHighestBid ?? item.basePrice ?? 0),
-                minNextBid: String(item.minNextBid ?? ''),
-                currency: item.currency,
-              },
-            })}
-          >
-            <Text style={styles.actionButtonText}>Entrar a subasta en vivo</Text>
-          </Pressable>
-        ) : (
-          <View style={[styles.actionButton, styles.actionButtonDisabled]}>
-            <Text style={styles.actionButtonText}>
-              {item.isOwner
-                ? 'No podés pujar sobre un artículo propio.'
-                : item.status === 'sold'
-                ? 'Artículo vendido'
-                : item.status === 'closed'
-                ? 'Artículo cerrado'
-                : displayAuctionStatus === 'closed'
-                ? 'Subasta finalizada'
-                : displayAuctionStatus === 'scheduled'
-                ? 'Subasta aún no comenzó'
-                : 'No disponible'}
-            </Text>
-          </View>
-        )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  scrollContent: { paddingBottom: 100 },
+  scrollContent: { paddingBottom: 20 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, padding: 15, paddingTop: 50 },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.85)', justifyContent: 'center', alignItems: 'center' },
@@ -354,8 +357,21 @@ const styles = StyleSheet.create({
   warningBox: { backgroundColor: '#FEF9C3', borderWidth: 1, borderColor: '#FDE047', borderRadius: 10, padding: 14, marginTop: 16 },
   warningText: { color: '#854D0E', fontSize: 14 },
 
-  bottomBar: { position: 'absolute', bottom: 0, width: '100%', padding: 20, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#EEEEEE' },
+  bottomBar: { 
+    width: '100%', 
+    paddingHorizontal: 20, 
+    paddingTop: 10, 
+    paddingBottom: 20, 
+    backgroundColor: '#FFFFFF', 
+    borderTopWidth: 1, 
+    borderTopColor: '#EEEEEE' 
+  },
   actionButton: { backgroundColor: '#D35400', paddingVertical: 15, borderRadius: 12, alignItems: 'center' },
   actionButtonDisabled: { backgroundColor: '#9CA3AF' },
   actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 });
+
+// Helper interno para mantener la compatibilidad del FocusEffect de navegación nativa
+function __useCallback_wrapper(fn: () => void, deps: any[]) {
+  return useCallback(fn, deps);
+}

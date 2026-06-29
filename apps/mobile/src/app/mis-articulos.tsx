@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedView } from '@/components/themed-view';
 
 type Submission = {
   submissionId: number;
@@ -158,60 +159,69 @@ export default function MisArticulosScreen() {
             ) : null}
           </View>
         ) : null}
-        {/* ... (resto del renderItem igual que antes) */}
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <CustomNavBar />
-      {!isAuthError && (
-        <View style={styles.header}>
-            <Text style={styles.title}>Mis Artículos</Text>
-            <Pressable style={styles.newBtn} onPress={() => router.push('/post-article')}><Text style={styles.newBtnText}>+ Nuevo</Text></Pressable>
-        </View>
-      )}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        <CustomNavBar />
+        {!isAuthError && (
+          <View style={styles.header}>
+              <Text style={styles.title}>Mis Artículos</Text>
+              <Pressable style={styles.newBtn} onPress={() => router.push('/post-article')}><Text style={styles.newBtnText}>+ Nuevo</Text></Pressable>
+          </View>
+        )}
 
-      {loading ? (
-        <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
-      ) : isAuthError ? (
-        <View style={styles.authGate}>
-          <Text style={styles.authGateIcon}>🔒</Text>
-          <Text style={styles.authGateTitle}>Acceso restringido</Text>
-          <Text style={styles.authGateText}>Debés iniciar sesión para acceder a esta sección.</Text>
-          <Pressable style={styles.authGateButton} onPress={() => router.replace('/login')}>
-            <Text style={styles.authGateButtonText}>Iniciar sesión</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <FlatList data={submissions} renderItem={renderItem} keyExtractor={item => String(item.submissionId)} />
-      )}
+        {loading ? (
+          <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
+        ) : isAuthError ? (
+          <View style={styles.authGate}>
+            <Text style={styles.authGateIcon}>🔒</Text>
+            <Text style={styles.authGateTitle}>Acceso restringido</Text>
+            <Text style={styles.authGateText}>Debés iniciar sesión para acceder a esta sección.</Text>
+            <Pressable style={styles.authGateButton} onPress={() => router.replace('/login')}>
+              <Text style={styles.authGateButtonText}>Iniciar sesión</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList 
+            data={submissions} 
+            renderItem={renderItem} 
+            keyExtractor={item => String(item.submissionId)} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+          />
+        )}
+      </ThemedView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20 },
   title: { fontSize: 26, fontWeight: 'bold' },
-  newBtn: { backgroundColor: '#D35400', padding: 10, borderRadius: 20 },
-  newBtnText: { color: '#FFF' },
+  newBtn: { backgroundColor: '#D35400', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, justifyContent: 'center' },
+  newBtnText: { color: '#FFF', fontWeight: 'bold' },
   loader: { marginTop: 60 },
-  card: { backgroundColor: '#FFF', borderRadius: 16, margin: 16, padding: 16, borderLeftWidth: 4 },
+  listContainer: { paddingBottom: 35 },
+  card: { backgroundColor: '#FFF', borderRadius: 16, marginHorizontal: 16, marginBottom: 16, padding: 16, borderLeftWidth: 4, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
   cardTop: { flexDirection: 'row', alignItems: 'center' },
   iconCircle: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   iconText: { fontSize: 20 },
   cardTopInfo: { flex: 1, marginLeft: 10 },
-  cardTitle: { fontWeight: 'bold' },
+  cardTitle: { fontWeight: 'bold', fontSize: 15, color: '#0A1E3F' },
   consignmentBox: { marginTop: 10, padding: 10, backgroundColor: '#F3F4F6', borderRadius: 8, gap: 4 },
   consignmentText: { fontSize: 12, color: '#374151' },
   cardDate: { fontSize: 12, color: '#94A3B8' },
-  statusPill: { padding: 5, borderRadius: 10 },
-  statusPillText: { fontSize: 10 },
-  progressRow: { flexDirection: 'row', marginTop: 10 },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  statusPillText: { fontSize: 11, fontWeight: '700' },
+  progressRow: { flexDirection: 'row', marginTop: 14, paddingHorizontal: 4 },
   progressDot: { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  progressDotCheck: { color: '#FFF' },
+  progressDotCheck: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
   progressLine: { flex: 1, height: 2, alignSelf: 'center' },
   authGate: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   authGateIcon: { fontSize: 48, marginBottom: 16 },

@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { disablePaymentMethod, fetchPaymentMethods, getCurrentUser } from '@/services/api';
 import type { PaymentMethod, UserProfile } from '@/services/types';
 import { isUserAdmitted } from '@/utils/clientPermissions';
@@ -48,7 +47,6 @@ function formatAmount(amount: number | null, currency: string): string {
 export default function PaymentMethodsScreen() {
   const router = useRouter();
 
-  // La lista arranca vacía, como pediste, esperando los datos de la API
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,15 +93,15 @@ export default function PaymentMethodsScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ScreenHeader title="Métodos de Pago" fallbackRoute="/home" />
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        <ScreenHeader title="Métodos de Pago" fallbackRoute="/home" />
+        
         <ScrollView 
-          style={{ width: '100%' }} 
+          style={{ width: '100%', flex: 1 }} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          
           <View style={styles.headerContainer}>
             <Text style={styles.subtitle}>
               Administra tus garantías de pago
@@ -141,18 +139,12 @@ export default function PaymentMethodsScreen() {
             </Text>
           )}
 
-          {/* Si se agregan métodos desde la API, se renderizarán con el nuevo diseño */}
           {!loading && !error && methods.map((method) => {
             const statusLabel = STATUS_LABELS[method.status] ?? method.status;
             const isVerified = method.status === 'verificado';
-            
-            // Colores dinámicos para los estados (Verde para verificado, Naranja para pendiente)
             const statusColor = isVerified ? '#10B981' : '#E67E22';
             const statusBgColor = isVerified ? '#D1FAE5' : '#FEF3C7';
-            
-            // Color de la caja del ícono (Azul para tarjeta, Verde para cheque, etc.)
             const iconBgColor = method.type.includes('tarjeta') ? '#2563EB' : '#059669';
-            
             const reservedAmount = method.availableAmount ?? method.guaranteeAmount;
             const isConfirming = confirmingId === method.id;
 
@@ -167,7 +159,6 @@ export default function PaymentMethodsScreen() {
                     <Text style={styles.methodSubtitle}>{getSubtitle(method)}</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: statusBgColor }]}>
-                    {/* Un pequeño ícono dinámico junto al texto del estado */}
                     <Text style={[styles.statusText, { color: statusColor }]}>
                       {isVerified ? '⊙ ' : '◷ '}{statusLabel}
                     </Text>
@@ -229,54 +220,41 @@ export default function PaymentMethodsScreen() {
             );
           })}
 
-          {/* Botón de Agregar (Borde Punteado) */}
           <Pressable
             style={styles.dashedButton}
             onPress={() => router.push('/select-payment-method')}
           >
             <Text style={styles.dashedButtonText}>+  Agregar Método de Pago</Text>
           </Pressable>
-
         </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   container: { 
     flex: 1, 
     backgroundColor: '#FFFFFF',
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: 28,
-    alignItems: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-    width: '100%',
-    alignSelf: 'center',
-    paddingTop: 24,
-  },
   content: {
-    width: '100%',
-    paddingBottom: Spacing.six,
+    paddingHorizontal: 28,
+    paddingTop: 16,
+    paddingBottom: 35,
   },
   headerContainer: {
     marginBottom: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#0A1E3F', // Azul marino oscuro
-    marginBottom: 4,
-  },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280', // Gris
+    color: '#6B7280',
   },
   centered: {
-    paddingVertical: Spacing.six,
+    paddingVertical: 24,
     alignItems: 'center',
   },
   errorBanner: {
@@ -353,7 +331,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   reservedBox: {
-    backgroundColor: '#F9FAFB', // Gris muy claro
+    backgroundColor: '#F9FAFB',
     borderRadius: 8,
     padding: 12,
   },
@@ -375,12 +353,12 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontWeight: '600',
-    color: '#2563EB', // Azul para el enlace
+    color: '#2563EB',
     fontSize: 15,
   },
   deleteText: {
     fontWeight: '600',
-    color: '#DC2626', // Rojo para eliminar
+    color: '#DC2626',
     fontSize: 15,
   },
   confirmRow: {
@@ -409,7 +387,7 @@ const styles = StyleSheet.create({
   },
   dashedButton: {
     borderWidth: 1.5,
-    borderColor: '#D1D5DB', // Gris claro
+    borderColor: '#D1D5DB',
     borderStyle: 'dashed',
     borderRadius: 8,
     paddingVertical: 16,
@@ -418,19 +396,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   dashedButtonText: {
-    color: '#4B5563', // Gris oscuro
+    color: '#4B5563',
     fontSize: 16,
     fontWeight: '600',
-  },
-  primaryButton: {
-    backgroundColor: '#E67E22', // Naranja
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });

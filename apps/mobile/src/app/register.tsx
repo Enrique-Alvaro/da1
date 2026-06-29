@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth } from '@/constants/theme';
 import { fetchRegisterCountries, registerUser } from '@/services/api';
 
 type CountryOption = { id: number; name: string; shortName: string | null };
@@ -55,7 +55,6 @@ export default function RegisterScreen() {
         }
       })
       .catch(() => {
-        // fallback list remains
       });
   }, []);
 
@@ -84,8 +83,13 @@ export default function RegisterScreen() {
         const asset = (result as any).assets?.[0];
         const uri = asset?.uri ?? (result as any).uri;
         const base64 = asset?.base64 ?? null;
-        if (forWhat === 'front') { setFrontImage(uri); setFrontImageBase64(base64); }
-        else { setBackImage(uri); setBackImageBase64(base64); }
+        if (forWhat === 'front') {
+          setFrontImage(uri);
+          setFrontImageBase64(base64);
+        } else {
+          setBackImage(uri);
+          setBackImageBase64(base64);
+        }
       }
     } catch (e) {
       console.warn('Image pick error', e);
@@ -121,13 +125,12 @@ export default function RegisterScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <ScrollView 
           style={{ width: '100%' }} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          
           <View style={styles.headerContainer}>
             <Text style={styles.title}>Crear Cuenta</Text>
             <Text style={styles.subtitle}>Únete a CrownBid hoy</Text>
@@ -143,7 +146,6 @@ export default function RegisterScreen() {
             <Text style={styles.label}>Correo Electrónico</Text>
             <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="tu@email.com" placeholderTextColor="#9AA0A6" />
 
-            {/* El documento no está en las imágenes pero es requerido por tu backend */}
             <Text style={styles.label}>Documento</Text>
             <TextInput style={styles.input} value={documentNumber} onChangeText={setDocumentNumber} placeholder="DNI / Pasaporte" placeholderTextColor="#9AA0A6" />
 
@@ -225,18 +227,20 @@ export default function RegisterScreen() {
                 <Text style={styles.errorBannerText}>{serverError}</Text>
               </View>
             ) : null}
-
-            <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
-              <Text style={styles.primaryButtonText}>
-                {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
-              </Text>
-            </Pressable>
-
-            <Pressable style={styles.secondaryButton} onPress={() => router.push('/')}>
-              <ThemedText>Volver al inicio de sesión</ThemedText>
-            </Pressable>
           </View>
         </ScrollView>
+
+        <View style={styles.bottomBar}>
+          <Pressable style={styles.primaryButton} onPress={onSubmit} disabled={loading}>
+            <Text style={styles.primaryButtonText}>
+              {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
+            </Text>
+          </Pressable>
+
+          <Pressable style={styles.secondaryButton} onPress={() => router.push('/')}>
+            <ThemedText>Volver al inicio de sesión</ThemedText>
+          </Pressable>
+        </View>
       </SafeAreaView>
     </ThemedView>
   );
@@ -255,8 +259,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 28,
-    paddingBottom: BottomTabInset + Spacing.four,
-    paddingTop: Spacing.four,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   headerContainer: {
     alignItems: 'center',
@@ -385,13 +389,19 @@ const styles = StyleSheet.create({
     color: '#7B241C',
     fontSize: 14,
   },
+  bottomBar: {
+    width: '100%',
+    paddingHorizontal: 28,
+    paddingTop: 10,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+  },
   primaryButton: {
     backgroundColor: '#E67E22',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: Spacing.two,
+    marginBottom: 12,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -403,6 +413,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: Spacing.two,
   },
 });

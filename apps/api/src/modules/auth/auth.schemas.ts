@@ -101,7 +101,7 @@ export const forgotPasswordBodySchema = z.object({
 export type ForgotPasswordBodyInput = z.infer<typeof forgotPasswordBodySchema>;
 
 export const resetPasswordBodySchema = z.object({
-  token: z.string().min(10, "El token de restablecimiento es inválido"),
+  token: z.string().min(6, "El token de restablecimiento es inválido"), 
   password: z
     .string()
     .min(8, "La contraseña debe tener al menos 8 caracteres")

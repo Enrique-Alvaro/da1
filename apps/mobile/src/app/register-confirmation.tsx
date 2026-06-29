@@ -5,22 +5,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth } from '@/constants/theme';
+import { MaxContentWidth } from '@/constants/theme';
 
 export default function RegisterConfirmation() {
   const router = useRouter();
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.content}>
           
-          {/* Ícono circular */}
           <View style={styles.iconCircle}>
             <Ionicons name="mail-outline" size={44} color="#E67E22" />
           </View>
 
-          {/* Textos */}
           <Text style={styles.title}>
             Te hemos enviado un correo{'\n'}de confirmación
           </Text>
@@ -29,11 +27,12 @@ export default function RegisterConfirmation() {
             Por favor revisa tu correo electrónico para{'\n'}continuar el proceso de registro
           </Text>
 
-          {/* Botón */}
+        </View>
+
+        <View style={styles.bottomBar}>
           <Pressable style={styles.primaryButton} onPress={() => router.push('/')}>
             <Text style={styles.primaryButtonText}>Continuar</Text>
           </Pressable>
-          
         </View>
       </SafeAreaView>
     </ThemedView>
@@ -50,7 +49,6 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    paddingBottom: BottomTabInset,
   },
   content: {
     flex: 1,
@@ -62,7 +60,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#FFF1D9', // Naranja/cremita muy claro
+    backgroundColor: '#FFF1D9',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 32,
@@ -70,20 +68,26 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#0A1E3F', // Azul marino oscuro
+    color: '#0A1E3F',
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 34,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280', // Gris
+    color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 40,
     lineHeight: 24,
   },
+  bottomBar: {
+    width: '100%',
+    paddingHorizontal: 32,
+    paddingTop: 10,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+  },
   primaryButton: {
-    backgroundColor: '#E67E22', // Naranja
+    backgroundColor: '#E67E22',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',

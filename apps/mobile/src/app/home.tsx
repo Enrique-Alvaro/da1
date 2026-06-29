@@ -9,6 +9,7 @@ import { isUserAdmitted, PENDING_ADMISSION_BANNER } from '@/utils/clientPermissi
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, View, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Auction = {
   id: number;
@@ -24,8 +25,6 @@ type Auction = {
   canAccess: boolean;
   cannotAccessReason: string | null;
 };
-
-
 type ApiUser = Pick<UserProfile, 'fullName' | 'category' | 'admitted'>;
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -35,7 +34,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   oro: 'Oro',
   platino: 'Platino',
 };
-
 const STATUS_LABELS: Record<string, string> = {
   scheduled: 'Programada',
   live: 'En Vivo',
@@ -63,7 +61,6 @@ function CalendarGrid({ month, availableDates, selectedDate, onSelect }: {
 
   const rows: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
-
   return (
     <View>
       {rows.map((row, ri) => (
@@ -101,6 +98,7 @@ function CalendarGrid({ month, availableDates, selectedDate, onSelect }: {
   );
 }
 
+// Comentario eliminado de la declaración de AuctionListCard
 function AuctionListCard({
   item,
   onAuctionUpdate,
@@ -114,11 +112,9 @@ function AuctionListCard({
   useEffect(() => {
     setLocalStatus(item.status);
   }, [item.id, item.status]);
-
   const categoryLabel = CATEGORY_LABELS[item.category] ?? item.category;
   const statusLabel = STATUS_LABELS[localStatus] ?? localStatus;
   const isLive = localStatus === 'live';
-
   return (
     <Pressable
       style={styles.card}
@@ -197,7 +193,6 @@ export default function HomeScreen() {
           const userResult = await (getCurrentUser() as Promise<any>);
           setUser(userResult);
         } catch {
-          // continúa sin nombre si el fetch del usuario falla
         } finally {
           setUserLoading(false);
         }
@@ -243,17 +238,13 @@ export default function HomeScreen() {
   const noAuctionsMessage = hasActiveFilters
     ? 'No hay subastas para este filtro.'
     : 'No hay subastas disponibles en este momento.';
-
   const isNotAdmitted = !isGuest && user != null && !isUserAdmitted(user);
-
   const handleAuctionUpdate = useCallback((id: number, status: string) => {
     setAuctions((prev) => prev.map((auction) => (auction.id === id ? { ...auction, status } : auction)));
   }, []);
-
   const renderAuctionCard = ({ item }: { item: Auction }) => (
     <AuctionListCard item={item} onAuctionUpdate={handleAuctionUpdate} />
   );
-
   function formatDateChip(dateStr: string): string {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
@@ -265,214 +256,213 @@ export default function HomeScreen() {
         await logout();
       }
     } catch {
-      // clear local session even if API fails
     } finally {
       router.replace('/login');
     }
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.topBar}>
-        {!isGuest && <NotificationBell color="#FFFFFF" />}
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <ThemedText style={styles.topBarTitle}>CrownBid</ThemedText>
-        </View>
-        <Pressable style={styles.iconButton} onPress={() => void (isGuest ? router.replace('/login') : onLogout())}>
-          <ThemedText style={styles.topBarIcon}>{isGuest ? 'Entrar' : 'Salir'}</ThemedText>
-        </Pressable>
-      </View>
-
-      <CustomNavBar />
-
-      <View style={styles.userBanner}>
-        {isGuest ? (
-          <>
-            <View style={styles.guestBannerHeader}>
-              <View>
-                <Text style={styles.greeting}>Bienvenido</Text>
-                <Text style={styles.userRank}>Subastas Premium</Text>
-              </View>
-              <Pressable style={styles.entrarButton} onPress={() => router.replace('/login')}>
-                <ThemedText style={styles.entrarButtonText}>Entrar</ThemedText>
-              </Pressable>
-            </View>
-            <View style={styles.guestAlertBox}>
-              <Text style={styles.guestAlertText}>
-                Navegando como invitado. Iniciá sesión para ver precios y pujar.
-              </Text>
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={styles.greeting}>
-              Hola, {userLoading ? '...' : (user?.fullName ?? '')}
-            </Text>
-            <Text style={styles.userRank}>
-              Categoría: {userLoading ? '...' : (CATEGORY_LABELS[user?.category ?? ''] ?? user?.category ?? '—')}
-            </Text>
-          </>
-        )}
-      </View>
-
-      {isNotAdmitted && (
-        <View style={styles.pendingBanner}>
-          <Text style={styles.pendingBannerText}>{PENDING_ADMISSION_BANNER}</Text>
-        </View>
-      )}
-
-      <View style={styles.sectionHeader}>
-        <ThemedText style={styles.sectionTitle}>Subastas</ThemedText>
-        {hasActiveFilters && (
-          <Pressable
-            style={styles.clearButton}
-            onPress={() => { setShowLiveOnly(false); setSelectedCategory(null); setSelectedDate(null); }}
-          >
-            <Text style={styles.clearButtonText}>Limpiar filtros</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        <View style={styles.topBar}>
+          {!isGuest && <NotificationBell color="#002855" />}
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <ThemedText style={styles.topBarTitle}>CrownBid</ThemedText>
+          </View>
+          <Pressable style={styles.iconButton} onPress={() => void (isGuest ? router.replace('/login') : onLogout())}>
+            <ThemedText style={styles.topBarIcon}>{isGuest ? 'Entrar' : 'Salir'}</ThemedText>
           </Pressable>
-        )}
-      </View>
+        </View>
 
-      <View style={styles.filtersBlock}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
-          {(['all', 'live', 'scheduled', 'closed'] as const).map((status) => (
-            <Pressable
-              key={status}
-              style={[styles.chip, statusFilter === status && styles.chipActive]}
-              onPress={() => setStatusFilter(status)}
-            >
-              <Text style={[styles.chipText, statusFilter === status && styles.chipTextActive]}>
-                {status === 'all'
-                  ? 'Todas'
-                  : status === 'live'
-                  ? 'En vivo'
-                  : status === 'scheduled'
-                  ? 'Próximas'
-                  : 'Cerradas'}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable
-            style={[styles.chip, showLiveOnly && styles.chipActive]}
-            onPress={() => setShowLiveOnly((prev) => !prev)}
-          >
-            <Text style={[styles.chipText, showLiveOnly && styles.chipTextActive]}>
-              {showLiveOnly ? '● En vivo' : 'En vivo'}
-            </Text>
-          </Pressable>
-          {[null, 'comun', 'especial', 'plata', 'oro', 'platino'].map((cat) => (
-            <Pressable
-              key={cat ?? 'all'}
-              style={[styles.chip, selectedCategory === cat && styles.chipActive]}
-              onPress={() => setSelectedCategory(cat)}
-            >
-              <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
-                {cat ? (CATEGORY_LABELS[cat] ?? cat) : 'Todas'}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
+        <CustomNavBar />
 
-      {/* Filtro por fecha — botón que abre calendario */}
-      <View style={styles.dateFilterRow}>
-        <Pressable
-          style={[styles.chip, selectedDate !== null && styles.chipDateActive]}
-          onPress={() => {
-            if (selectedDate) {
-              setCalendarMonth(new Date(selectedDate + 'T00:00:00'));
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={visibleAuctions}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listContainer}
+            renderItem={renderAuctionCard}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <>
+                <View style={styles.userBanner}>
+                  {isGuest ? (
+                    <>
+                      <View style={styles.guestBannerHeader}>
+                        <View>
+                          <Text style={styles.greeting}>Bienvenido</Text>
+                          <Text style={styles.userRank}>Subastas Premium</Text>
+                        </View>
+                        <Pressable style={styles.entrarButton} onPress={() => router.replace('/login')}>
+                          <ThemedText style={styles.entrarButtonText}>Entrar</ThemedText>
+                        </Pressable>
+                      </View>
+                      <View style={styles.guestAlertBox}>
+                        <Text style={styles.guestAlertText}>
+                          Navegando como invitado. Iniciá sesión para ver precios y pujar.
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.greeting}>
+                        Hola, {userLoading ? '...' : (user?.fullName ?? '')}
+                      </Text>
+                      <Text style={styles.userRank}>
+                        Categoría: {userLoading ? '...' : (CATEGORY_LABELS[user?.category ?? ''] ?? user?.category ?? '—')}
+                      </Text>
+                    </>
+                  )}
+                </View>
+
+                {isNotAdmitted && (
+                  <View style={styles.pendingBanner}>
+                    <Text style={styles.pendingBannerText}>{PENDING_ADMISSION_BANNER}</Text>
+                  </View>
+                )}
+
+                <View style={styles.sectionHeader}>
+                  <ThemedText style={styles.sectionTitle}>Subastas</ThemedText>
+                  {hasActiveFilters && (
+                    <Pressable
+                      style={styles.clearButton}
+                      onPress={() => { setShowLiveOnly(false); setSelectedCategory(null); setSelectedDate(null); }}
+                    >
+                      <Text style={styles.clearButtonText}>Limpiar filtros</Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                <View style={styles.filtersBlock}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
+                    {(['all', 'live', 'scheduled', 'closed'] as const).map((status) => (
+                      <Pressable
+                        key={status}
+                        style={[styles.chip, statusFilter === status && styles.chipActive]}
+                        onPress={() => setStatusFilter(status)}
+                      >
+                        <Text style={[styles.chipText, statusFilter === status && styles.chipTextActive]}>
+                          {status === 'all' ? 'Todas' : status === 'live' ? 'En vivo' : status === 'scheduled' ? 'Próximas' : 'Cerradas'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    <Pressable
+                      style={[styles.chip, showLiveOnly && styles.chipActive]}
+                      onPress={() => setShowLiveOnly((prev) => !prev)}
+                    >
+                      <Text style={[styles.chipText, showLiveOnly && styles.chipTextActive]}>
+                        {showLiveOnly ? '● En vivo' : 'En vivo'}
+                      </Text>
+                    </Pressable>
+                    {[null, 'comun', 'especial', 'plata', 'oro', 'platino'].map((cat) => (
+                      <Pressable
+                        key={cat ?? 'all'}
+                        style={[styles.chip, selectedCategory === cat && styles.chipActive]}
+                        onPress={() => setSelectedCategory(cat)}
+                      >
+                        <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
+                          {cat ? (CATEGORY_LABELS[cat] ?? cat) : 'Todas'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <View style={styles.dateFilterRow}>
+                  <Pressable
+                    style={[styles.chip, selectedDate !== null && styles.chipDateActive]}
+                    onPress={() => {
+                      if (selectedDate) {
+                        setCalendarMonth(new Date(selectedDate + 'T00:00:00'));
+                      }
+                      setCalendarVisible(true);
+                    }}
+                  >
+                    <Text style={[styles.chipText, selectedDate !== null && styles.chipDateActive]}>
+                      {selectedDate ? `📅 ${formatDateChip(selectedDate)}` : '📅 Fecha'}
+                    </Text>
+                  </Pressable>
+                  {selectedDate && (
+                    <Pressable onPress={() => setSelectedDate(null)} style={styles.dateChipClear}>
+                      <Text style={styles.dateChipClearText}>✕</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </>
             }
-            setCalendarVisible(true);
-          }}
-        >
-          <Text style={[styles.chipText, selectedDate !== null && styles.chipTextActive]}>
-            {selectedDate ? `📅 ${formatDateChip(selectedDate)}` : '📅 Fecha'}
-          </Text>
-        </Pressable>
-        {selectedDate && (
-          <Pressable onPress={() => setSelectedDate(null)} style={styles.dateChipClear}>
-            <Text style={styles.dateChipClearText}>✕</Text>
-          </Pressable>
-        )}
-      </View>
+            ListEmptyComponent={
+              !loading ? (
+                <View style={styles.emptyState}>
+                  <ThemedText style={styles.emptyText}>{noAuctionsMessage}</ThemedText>
+                </View>
+              ) : null
+            }
+          />
+        </View>
 
-      {/* Calendario Modal */}
-      <Modal visible={calendarVisible} transparent animationType="fade" onRequestClose={() => setCalendarVisible(false)}>
-        <Pressable style={styles.calendarOverlay} onPress={() => setCalendarVisible(false)}>
-          <Pressable style={styles.calendarBox} onPress={(e) => e.stopPropagation()}>
-            {/* Navegación de mes */}
-            <View style={styles.calendarHeader}>
-              <Pressable onPress={() => setCalendarMonth(m => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return d; })}>
-                <Text style={styles.calendarNavBtn}>‹</Text>
+        <Modal visible={calendarVisible} transparent animationType="fade" onRequestClose={() => setCalendarVisible(false)}>
+          <Pressable style={styles.calendarOverlay} onPress={() => setCalendarVisible(false)}>
+            <Pressable style={styles.calendarBox} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.calendarHeader}>
+                <Pressable onPress={() => setCalendarMonth(m => { const d = new Date(m); d.setMonth(d.getMonth() - 1); return d; })}>
+                  <Text style={styles.calendarNavBtn}>‹</Text>
+                </Pressable>
+                <Text style={styles.calendarMonthTitle}>
+                  {calendarMonth.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+                </Text>
+                <Pressable onPress={() => setCalendarMonth(m => { const d = new Date(m); d.setMonth(d.getMonth() + 1); return d; })}>
+                  <Text style={styles.calendarNavBtn}>›</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.calendarWeekRow}>
+                {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'].map(d => (
+                  <Text key={d} style={styles.calendarWeekDay}>{d}</Text>
+                ))}
+              </View>
+
+              <CalendarGrid
+                month={calendarMonth}
+                availableDates={availableDates}
+                selectedDate={selectedDate}
+                onSelect={(d) => { setSelectedDate(d); setCalendarVisible(false); }}
+              />
+
+              <Pressable style={styles.calendarClearBtn} onPress={() => { setSelectedDate(null); setCalendarVisible(false); }}>
+                <Text style={styles.calendarClearBtnText}>Ver todas las fechas</Text>
               </Pressable>
-              <Text style={styles.calendarMonthTitle}>
-                {calendarMonth.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
-              </Text>
-              <Pressable onPress={() => setCalendarMonth(m => { const d = new Date(m); d.setMonth(d.getMonth() + 1); return d; })}>
-                <Text style={styles.calendarNavBtn}>›</Text>
-              </Pressable>
-            </View>
-
-            {/* Días de semana */}
-            <View style={styles.calendarWeekRow}>
-              {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'].map(d => (
-                <Text key={d} style={styles.calendarWeekDay}>{d}</Text>
-              ))}
-            </View>
-
-            {/* Grilla de días */}
-            <CalendarGrid
-              month={calendarMonth}
-              availableDates={availableDates}
-              selectedDate={selectedDate}
-              onSelect={(d) => { setSelectedDate(d); setCalendarVisible(false); }}
-            />
-
-            <Pressable style={styles.calendarClearBtn} onPress={() => { setSelectedDate(null); setCalendarVisible(false); }}>
-              <Text style={styles.calendarClearBtnText}>Ver todas las fechas</Text>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
 
-      {loading ? (
-        <ActivityIndicator style={styles.loader} color="#D35400" />
-      ) : error ? (
-        <View style={styles.emptyState}>
-          <ThemedText style={styles.emptyText}>{error}</ThemedText>
-        </View>
-      ) : visibleAuctions.length === 0 ? (
-        <View style={styles.emptyState}>
-          <ThemedText style={styles.emptyText}>{noAuctionsMessage}</ThemedText>
-        </View>
-      ) : (
-        <FlatList
-          data={visibleAuctions}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContainer}
-          renderItem={renderAuctionCard}
-        />
-      )}
-    </ThemedView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' }, 
   container: { flex: 1, backgroundColor: '#FFFFFF' },
 
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 15,
-    paddingTop: 40,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
     backgroundColor: '#FFF',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
   },
   topBarTitle: { fontWeight: 'bold', fontSize: 16, color: '#002855' },
   iconButton: { padding: 5 },
-  topBarIcon: { fontSize: 14, color: '#666' },
+  topBarIcon: { fontSize: 14, color: '#666', fontWeight: '600' },
 
-  userBanner: { backgroundColor: '#D35400', padding: 20, paddingBottom: 30 },
+  userBanner: { 
+    backgroundColor: '#D35400', 
+    paddingVertical: 20, 
+    paddingHorizontal: 15
+  },
   greeting: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
   userRank: { color: '#FFF', fontSize: 15, marginTop: 4, opacity: 0.9 },
 
@@ -480,9 +470,16 @@ const styles = StyleSheet.create({
   entrarButton: { backgroundColor: '#FFF', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20 },
   entrarButtonText: { color: '#D35400', fontWeight: 'bold', fontSize: 14 },
   guestAlertBox: { backgroundColor: '#A04000', padding: 12, borderRadius: 8, marginTop: 15 },
-  guestAlertText: { color: '#FFF', fontSize: 14 },
+  guestAlertText: { color: '#FFF', fontSize: 14, lineHeight: 18 },
 
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 16, paddingBottom: 8 },
+  sectionHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 15,
+    paddingTop: 16, 
+    paddingBottom: 8 
+  },
   sectionTitle: { fontSize: 18, color: '#002855', fontWeight: 'bold' },
   clearButton: { paddingVertical: 6, paddingHorizontal: 10 },
   clearButtonText: { fontSize: 13, color: '#D35400', fontWeight: '600' },
@@ -512,7 +509,13 @@ const styles = StyleSheet.create({
   },
   pendingBannerText: { color: '#9A3412', fontSize: 14, lineHeight: 20 },
 
-  dateFilterRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, marginBottom: 4, gap: 6 },
+  dateFilterRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 15, 
+    marginBottom: 12, 
+    gap: 6 
+  },
   dateChipClear: { paddingHorizontal: 8, paddingVertical: 4 },
   dateChipClearText: { color: '#002855', fontSize: 14, fontWeight: '700' },
 
@@ -533,10 +536,13 @@ const styles = StyleSheet.create({
   calendarCellTextSelected: { color: '#FFF', fontWeight: '700' },
   calendarClearBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
   calendarClearBtnText: { color: '#002855', fontSize: 14, fontWeight: '600' },
-  listContainer: { padding: 15, paddingBottom: 30 },
+  
+  listContainer: { 
+    paddingBottom: 35 
+  },
   loader: { marginTop: 40 },
 
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyState: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: '#888', fontSize: 15, textAlign: 'center' },
 
   card: {
@@ -545,6 +551,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E6E9EB',
     padding: 15,
+    marginHorizontal: 15,
     marginBottom: 15,
     gap: 8,
   },

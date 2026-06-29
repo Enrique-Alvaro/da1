@@ -2,17 +2,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { PasswordInput } from '@/components/PasswordInput';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth } from '@/constants/theme';
 import { changeInitialPassword, resetPassword } from '@/services/api';
 
 export default function NewPasswordScreen() {
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ mode?: string; token?: string }>();
   const mode = searchParams.mode === 'reset' ? 'reset' : 'initial';
-  
   const [currentPassword, setCurrentPassword] = useState('');
   const [token, setToken] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -26,16 +24,12 @@ export default function NewPasswordScreen() {
     }
   }, [searchParams.token]);
 
-  // Validaciones dinámicas para la UI
   const hasUpper = /[A-Z]/.test(newPass);
   const hasLower = /[a-z]/.test(newPass);
   const isMinLength = newPass.length >= 8;
   const isMatch = newPass === confirmPass && newPass.length > 0;
-  
-  // Validar si el campo requerido inicial está completo
   const hasInitialRequirement = mode === 'reset' ? token.length > 0 : currentPassword.length > 0;
 
-  // El botón se habilita solo si todo está correcto
   const isFormValid = hasUpper && hasLower && isMinLength && isMatch && hasInitialRequirement;
 
   async function onReset() {
@@ -53,7 +47,7 @@ export default function NewPasswordScreen() {
       } else {
         await changeInitialPassword(currentPassword, newPass);
       }
-      router.push(mode === 'initial' ? '/home' : '/home');
+      router.push('/home');
     } catch (error: any) {
       setServerError(error?.message || 'No se pudo actualizar la contraseña.');
     } finally {
@@ -63,7 +57,7 @@ export default function NewPasswordScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         
         <View style={styles.headerContainer}>
           <Text style={styles.title}>Crea tu Contraseña</Text>
@@ -74,7 +68,6 @@ export default function NewPasswordScreen() {
 
         <View style={styles.form}>
           
-          {/* Campos previos necesarios para la API (Token o Pass Actual) */}
           {mode === 'reset' ? (
             <>
               <Text style={styles.label}>Token de Restablecimiento</Text>
@@ -99,7 +92,6 @@ export default function NewPasswordScreen() {
             </>
           )}
 
-          {/* Nuevos campos de contraseña */}
           <Text style={styles.label}>Contraseña</Text>
           <PasswordInput
             value={newPass}
@@ -116,7 +108,6 @@ export default function NewPasswordScreen() {
             style={styles.input}
           />
 
-          {/* Caja de Requisitos */}
           <View style={styles.requirementsBox}>
             <Text style={styles.requirementsTitle}>Requisitos de Contraseña:</Text>
             
@@ -149,7 +140,6 @@ export default function NewPasswordScreen() {
             </View>
           ) : null}
 
-          {/* Botón dinámico */}
           <Pressable 
             style={[styles.primaryButton, !isFormValid && styles.primaryButtonDisabled]} 
             onPress={onReset} 
@@ -179,11 +169,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 28,
     alignItems: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    paddingTop: 40,
+    justifyContent: 'center',
   },
   headerContainer: {
     alignItems: 'center',
@@ -193,13 +182,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#0A1E3F', // Azul marino oscuro
+    color: '#0A1E3F', 
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 15,
-    color: '#6B7280', // Gris
+    color: '#6B7280', 
     textAlign: 'center',
   },
   form: {
@@ -223,7 +212,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   requirementsBox: {
-    backgroundColor: '#F9FAFB', // Gris muy claro
+    backgroundColor: '#F9FAFB', 
     padding: 16,
     borderRadius: 8,
     marginBottom: 24,
@@ -241,17 +230,17 @@ const styles = StyleSheet.create({
   },
   requirementIcon: {
     fontSize: 14,
-    color: '#9CA3AF', // Gris para la 'X'
+    color: '#9CA3AF', 
     marginRight: 8,
     fontWeight: 'bold',
     width: 16,
   },
   requirementMet: {
-    color: '#10B981', // Verde esmeralda para el tilde
+    color: '#10B981', 
   },
   requirementText: {
     fontSize: 14,
-    color: '#4B5563', // Gris oscuro
+    color: '#4B5563', 
   },
   errorBanner: {
     backgroundColor: '#FFECEC',
@@ -271,14 +260,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   primaryButton: {
-    backgroundColor: '#E67E22', // Naranja
+    backgroundColor: '#E67E22', 
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 12,
   },
   primaryButtonDisabled: {
-    backgroundColor: '#D1D5DB', // Gris para botón deshabilitado
+    backgroundColor: '#D1D5DB', 
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -286,7 +275,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   primaryButtonTextDisabled: {
-    color: '#6B7280', // Texto gris oscuro para botón deshabilitado
+    color: '#6B7280', 
   },
   secondaryButton: {
     paddingVertical: 14,

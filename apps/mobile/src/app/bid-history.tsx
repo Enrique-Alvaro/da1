@@ -2,6 +2,7 @@ import { fetchBidHistory } from '@/services/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Bid = {
   id: number;
@@ -70,72 +71,76 @@ export default function BidHistoryScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topBar}>
-        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backBtn}>
-          <Text style={styles.backText}>←</Text>
-        </Pressable>
-        <View style={styles.topBarCenter}>
-          <Text style={styles.topBarTitle}>Historial de Pujas</Text>
-          {title ? <Text style={styles.topBarSub} numberOfLines={1}>{title}</Text> : null}
-        </View>
-        <View style={{ width: 36 }} />
-      </View>
-
-      {loading ? (
-        <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
-      ) : error ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.retryBtn}>
-            <Text style={styles.retryBtnText}>← Volver</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <View style={styles.container}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.backBtn}>
+            <Text style={styles.backText}>←</Text>
           </Pressable>
-        </View>
-      ) : (
-        <>
-          {leader && (
-            <View style={styles.leaderBanner}>
-              <View>
-                <Text style={styles.leaderLabel}>Líder actual</Text>
-                <Text style={styles.leaderName}>Postor #{leader.bidderNumber}</Text>
-              </View>
-              <View style={styles.leaderRight}>
-                <Text style={styles.leaderLabel}>Mejor oferta</Text>
-                <Text style={styles.leaderAmount}>
-                  {displayCurrency} {leader.amount.toLocaleString('es-AR')}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.totalRow}>
-            <Text style={styles.totalText}>
-              {total} {total === 1 ? 'puja' : 'pujas'} registradas
-            </Text>
+          <View style={styles.topBarCenter}>
+            <Text style={styles.topBarTitle}>Historial de Pujas</Text>
+            {title ? <Text style={styles.topBarSub} numberOfLines={1}>{title}</Text> : null}
           </View>
+          <View style={{ width: 36 }} />
+        </View>
 
-          {bids.length === 0 ? (
-            <View style={styles.centered}>
-              <Text style={styles.emptyText}>Todavía no hay pujas para este ítem.</Text>
+        {loading ? (
+          <ActivityIndicator style={styles.loader} size="large" color="#D35400" />
+        ) : error ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={styles.retryBtn}>
+              <Text style={styles.retryBtnText}>← Volver</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            {leader && (
+              <View style={styles.leaderBanner}>
+                <View>
+                  <Text style={styles.leaderLabel}>Líder actual</Text>
+                  <Text style={styles.leaderName}>Postor #{leader.bidderNumber}</Text>
+                </View>
+                <View style={styles.leaderRight}>
+                  <Text style={styles.leaderLabel}>Mejor oferta</Text>
+                  <Text style={styles.leaderAmount}>
+                    {displayCurrency} {leader.amount.toLocaleString('es-AR')}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.totalRow}>
+              <Text style={styles.totalText}>
+                {total} {total === 1 ? 'puja' : 'pujas'} registradas
+              </Text>
             </View>
-          ) : (
-            <FlatList
-              data={bids}
-              keyExtractor={b => String(b.id)}
-              renderItem={renderBid}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-        </>
-      )}
-    </View>
+
+            {bids.length === 0 ? (
+              <View style={styles.centered}>
+                <Text style={styles.emptyText}>Todavía no hay pujas para este ítem.</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={bids}
+                keyExtractor={b => String(b.id)}
+                renderItem={renderBid}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContent}
+              />
+            )}
+          </>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#002855' },
   container: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 14, backgroundColor: '#002855' },
+  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#002855' },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
   backText: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
   topBarCenter: { flex: 1, alignItems: 'center' },
@@ -157,6 +162,8 @@ const styles = StyleSheet.create({
 
   totalRow: { paddingHorizontal: 20, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#FFF' },
   totalText: { fontSize: 13, color: '#64748B' },
+
+  listContent: { paddingBottom: 30 },
 
   bidRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#FFF' },
   bidRowTop: { backgroundColor: '#FFFBEB' },

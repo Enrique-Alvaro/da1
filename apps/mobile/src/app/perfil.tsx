@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedView } from '@/components/themed-view';
 
 const CATEGORY_LABELS: Record<string, string> = {
   comun: 'Común', especial: 'Especial', plata: 'Plata', oro: 'Oro', platino: 'Platino',
@@ -54,153 +55,163 @@ export default function PerfilScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <CustomNavBar />
-        <View style={styles.centered}><ActivityIndicator size="large" color="#D35400" /></View>
+      <SafeAreaView style={styles.safeAreaLoading} edges={['top', 'bottom']}>
+        <ThemedView style={styles.container}>
+          <CustomNavBar />
+          <View style={styles.centered}><ActivityIndicator size="large" color="#D35400" /></View>
+        </ThemedView>
       </SafeAreaView>
     );
   }
 
   if (error || !user) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <CustomNavBar />
-        <View style={styles.centered}>
-          {isAuthError ? (
-            <>
-              <Text style={styles.authGateIcon}>🔒</Text>
-              <Text style={styles.authGateTitle}>Acceso restringido</Text>
-              <Text style={styles.authGateText}>Debés iniciar sesión para acceder a esta sección.</Text>
-              <Pressable style={styles.authGateButton} onPress={() => router.replace('/login')}>
-                <Text style={styles.authGateButtonText}>Iniciar sesión</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Text style={styles.errorText}>{error ?? 'Error al cargar perfil.'}</Text>
-              <Pressable onPress={() => router.replace('/login')} style={styles.retryBtn}>
-                <Text style={styles.retryBtnText}>Reintentar</Text>
-              </Pressable>
-            </>
-          )}
-        </View>
+      <SafeAreaView style={styles.safeAreaError} edges={['top', 'bottom']}>
+        <ThemedView style={styles.container}>
+          <CustomNavBar />
+          <View style={styles.centered}>
+            {isAuthError ? (
+              <>
+                <Text style={styles.authGateIcon}>🔒</Text>
+                <Text style={styles.authGateTitle}>Acceso restringido</Text>
+                <Text style={styles.authGateText}>Debés iniciar sesión para acceder a esta sección.</Text>
+                <Pressable style={styles.authGateButton} onPress={() => router.replace('/login')}>
+                  <Text style={styles.authGateButtonText}>Iniciar sesión</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.errorText}>{error ?? 'Error al cargar perfil.'}</Text>
+                <Pressable onPress={() => router.replace('/login')} style={styles.retryBtn}>
+                  <Text style={styles.retryBtnText}>Reintentar</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </ThemedView>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <CustomNavBar />
-      <View style={styles.profileHeader}>
-        <View style={styles.userInfoRow}>
-          <View style={styles.avatar}><Text style={styles.avatarInitials}>{user.fullName.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')}</Text></View>
-          <View style={styles.userNameBlock}>
-            <Text style={styles.userName}>{user.fullName}</Text>
-            {user.admitted === 'si' && user.category ? (
-              <View style={styles.badge}><Text style={styles.badgeIcon}>🔖</Text><Text style={styles.badgeText}>{CATEGORY_LABELS[user.category] ?? user.category}</Text></View>
-            ) : (
-              <View style={styles.badge}><Text style={styles.badgeText}>Pendiente de validación</Text></View>
-            )}
-          </View>
-        </View>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}><Text style={styles.statValue}>{metrics?.totalWins ?? 0}</Text><Text style={styles.statLabel}>Pujas Ganadas</Text></View>
-          <View style={styles.statItem}><Text style={styles.statValue}>{metrics?.totalBidsPlaced ?? 0}</Text><Text style={styles.statLabel}>Total Pujas</Text></View>
-          <View style={styles.statItem}><Text style={styles.statValue}>{metrics?.totalAuctionsAttended ?? 0}</Text><Text style={styles.statLabel}>Subastas</Text></View>
-        </View>
-      </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.cardsContainer}>
-        {user.admitted !== 'si' && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>
-              Tu cuenta está pendiente de validación. No podés gestionar medios de pago hasta ser aprobado.
-            </Text>
-          </View>
-        )}
-        {saveSuccess && (
-          <View style={styles.successBanner}>
-            <Text style={styles.successBannerText}>Perfil actualizado correctamente.</Text>
-          </View>
-        )}
-        {saveError && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>{saveError}</Text>
-          </View>
-        )}
-        {isEditing ? (
-          <View style={styles.editFormCard}>
-            <Text style={styles.formLabel}>Correo electrónico</Text>
-            <TextInput style={styles.input} value={editEmail} onChangeText={setEditEmail} autoCapitalize="none" />
-            <Text style={styles.formLabel}>Dirección</Text>
-            <TextInput style={styles.input} value={editAddress} onChangeText={setEditAddress} />
-            <View style={styles.formButtons}>
-              <Pressable
-                style={styles.saveButton}
-                disabled={isSaving}
-                onPress={async () => {
-                  setIsSaving(true);
-                  setSaveError(null);
-                  try {
-                    await updateProfile({ email: editEmail, address: editAddress });
-                    setUser({ ...user, email: editEmail, address: editAddress });
-                    setSaveSuccess(true);
-                    setIsEditing(false);
-                  } catch (e: any) {
-                    setSaveError(e?.message || 'No se pudo guardar el perfil.');
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-              >
-                <Text style={styles.saveButtonText}>{isSaving ? 'Guardando…' : 'Guardar'}</Text>
-              </Pressable>
-              <Pressable style={styles.cancelButton} onPress={() => setIsEditing(false)}>
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </Pressable>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        <CustomNavBar />
+        <View style={styles.profileHeader}>
+          <View style={styles.userInfoRow}>
+            <View style={styles.avatar}><Text style={styles.avatarInitials}>{user.fullName.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')}</Text></View>
+            <View style={styles.userNameBlock}>
+              <Text style={styles.userName}>{user.fullName}</Text>
+              {user.admitted === 'si' && user.category ? (
+                <View style={styles.badge}><Text style={styles.badgeIcon}>🔖</Text><Text style={styles.badgeText}>{CATEGORY_LABELS[user.category] ?? user.category}</Text></View>
+              ) : (
+                <View style={styles.badge}><Text style={styles.badgeText}>Pendiente de validación</Text></View>
+              )}
             </View>
           </View>
-        ) : (
-          <>
-            <Pressable style={styles.card} onPress={() => setIsEditing(true)}>
-              <View style={[styles.cardIconBox, { backgroundColor: '#E8F4FD' }]}>
-                <Text style={styles.cardIcon}>✏️</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}><Text style={styles.statValue}>{metrics?.totalWins ?? 0}</Text><Text style={styles.statLabel}>Pujas Ganadas</Text></View>
+            <View style={styles.statItem}><Text style={styles.statValue}>{metrics?.totalBidsPlaced ?? 0}</Text><Text style={styles.statLabel}>Total Pujas</Text></View>
+            <View style={styles.statItem}><Text style={styles.statValue}>{metrics?.totalAuctionsAttended ?? 0}</Text><Text style={styles.statLabel}>Subastas</Text></View>
+          </View>
+        </View>
+        
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.cardsContainer} showsVerticalScrollIndicator={false}>
+          {user.admitted !== 'si' && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>
+                Tu cuenta está pendiente de validación. No podés gestionar medios de pago hasta ser aprobado.
+              </Text>
+            </View>
+          )}
+          {saveSuccess && (
+            <View style={styles.successBanner}>
+              <Text style={styles.successBannerText}>Perfil actualizado correctamente.</Text>
+            </View>
+          )}
+          {saveError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{saveError}</Text>
+            </View>
+          )}
+          {isEditing ? (
+            <View style={styles.editFormCard}>
+              <Text style={styles.formLabel}>Correo electrónico</Text>
+              <TextInput style={styles.input} value={editEmail} onChangeText={setEditEmail} autoCapitalize="none" />
+              <Text style={styles.formLabel}>Dirección</Text>
+              <TextInput style={styles.input} value={editAddress} onChangeText={setEditAddress} />
+              <View style={styles.formButtons}>
+                <Pressable
+                  style={styles.saveButton}
+                  disabled={isSaving}
+                  onPress={async () => {
+                    setIsSaving(true);
+                    setSaveError(null);
+                    try {
+                      await updateProfile({ email: editEmail, address: editAddress });
+                      setUser({ ...user, email: editEmail, address: editAddress });
+                      setSaveSuccess(true);
+                      setIsEditing(false);
+                    } catch (e: any) {
+                      setSaveError(e?.message || 'No se pudo guardar el perfil.');
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.saveButtonText}>{isSaving ? 'Guardando…' : 'Guardar'}</Text>
+                </Pressable>
+                <Pressable style={styles.cancelButton} onPress={() => setIsEditing(false)}>
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </Pressable>
               </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Datos personales</Text>
-                <Text style={styles.cardSubtitle}>{user.email}</Text>
-              </View>
-            </Pressable>
-            {user.admitted === 'si' ? (
-              <Pressable style={styles.card} onPress={() => router.push('/payment-methods')}>
-                <View style={[styles.cardIconBox, { backgroundColor: '#E8F8F0' }]}>
-                  <Text style={styles.cardIcon}>💳</Text>
+            </View>
+          ) : (
+            <>
+              <Pressable style={styles.card} onPress={() => setIsEditing(true)}>
+                <View style={[styles.cardIconBox, { backgroundColor: '#E8F4FD' }]}>
+                  <Text style={styles.cardIcon}>✏️</Text>
                 </View>
                 <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle}>Medios de pago</Text>
-                  <Text style={styles.cardSubtitle}>Gestionar tarjetas y garantías</Text>
+                  <Text style={styles.cardTitle}>Datos personales</Text>
+                  <Text style={styles.cardSubtitle}>{user.email}</Text>
                 </View>
               </Pressable>
-            ) : null}
-            <Pressable style={[styles.card, styles.logoutCard]} onPress={handleLogout}>
-              <View style={[styles.cardIconBox, { backgroundColor: '#FDE8E8' }]}>
-                <Text style={styles.cardIcon}>🚪</Text>
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardTitle, { color: '#C0392B' }]}>Cerrar sesión</Text>
-              </View>
-            </Pressable>
-          </>
-        )}
-      </ScrollView>
+              {user.admitted === 'si' ? (
+                <Pressable style={styles.card} onPress={() => router.push('/payment-methods')}>
+                  <View style={[styles.cardIconBox, { backgroundColor: '#E8F8F0' }]}>
+                    <Text style={styles.cardIcon}>💳</Text>
+                  </View>
+                  <View style={styles.cardContent}>
+                    <Text style={styles.cardTitle}>Medios de pago</Text>
+                    <Text style={styles.cardSubtitle}>Gestionar tarjetas y garantías</Text>
+                  </View>
+                </Pressable>
+              ) : null}
+              <Pressable style={[styles.card, styles.logoutCard]} onPress={handleLogout}>
+                <View style={[styles.cardIconBox, { backgroundColor: '#FDE8E8' }]}>
+                  <Text style={styles.cardIcon}>🚪</Text>
+                </View>
+                <View style={styles.cardContent}>
+                  <Text style={[styles.cardTitle, { color: '#C0392B' }]}>Cerrar sesión</Text>
+                </View>
+              </Pressable>
+            </>
+          )}
+        </ScrollView>
+      </ThemedView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#D35400' },
+  safeAreaLoading: { flex: 1, backgroundColor: '#FFFFFF' },
+  safeAreaError: { flex: 1, backgroundColor: '#FFFFFF' },
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: '#E74C3C', fontSize: 16, textAlign: 'center', padding: 20 },
-  profileHeader: { backgroundColor: '#D35400', padding: 20, paddingTop: 30, paddingBottom: 25 },
+  profileHeader: { backgroundColor: '#D35400', padding: 20, paddingVertical: 14, paddingBottom: 25 },
   userInfoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 25 },
   avatar: { width: 75, height: 75, borderRadius: 37.5, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   avatarInitials: { fontSize: 28, fontWeight: 'bold', color: '#888' },
@@ -213,7 +224,7 @@ const styles = StyleSheet.create({
   statItem: { alignItems: 'center' },
   statValue: { fontSize: 24, fontWeight: 'bold', color: '#FFF' },
   statLabel: { fontSize: 13, color: '#FFF', opacity: 0.9, marginTop: 2 },
-  cardsContainer: { padding: 20, paddingBottom: 40 },
+  cardsContainer: { padding: 20, paddingBottom: 35 },
   card: { flexDirection: 'row', backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E6E9EB', borderRadius: 12, padding: 15, marginBottom: 15, alignItems: 'center' },
   logoutCard: { borderColor: '#FADBD8', backgroundColor: '#FFFAFA' },
   cardIconBox: { width: 50, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
