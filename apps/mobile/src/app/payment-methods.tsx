@@ -204,13 +204,13 @@ export default function PaymentMethodsScreen() {
                     <Pressable onPress={() => router.push(`/payment-method-verify?methodId=${method.id}`)}>
                       <Text style={styles.linkText}>Ver Detalles</Text>
                     </Pressable>
-                    {method.type !== 'cheque_certificado' && (
+                    {/* {method.type !== 'cheque_certificado' && (
                       <Pressable onPress={() => router.push(`/reserve-funds?methodId=${method.id}`)}>
                         <Text style={styles.linkText}>
                           {method.guaranteeAmount ? 'Modificar reserva' : 'Reservar fondos'}
                         </Text>
                       </Pressable>
-                    )}
+                    )} */}
                     <Pressable onPress={() => { setDisableError(null); setConfirmingId(method.id); }}>
                       <Text style={styles.deleteText}>Eliminar</Text>
                     </Pressable>

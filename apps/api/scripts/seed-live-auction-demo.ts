@@ -360,7 +360,7 @@ async function createLiveAuction(
       VALUES (
         CAST(GETDATE() AS date),
         CAST(DATEADD(minute, -1, GETDATE()) AS time),
-        CAST(DATEADD(minute, 10, GETDATE()) AS time),
+        CAST(DATEADD(hour, 2, GETDATE()) AS time),
         'abierta',
         @subastador,
         @ubicacion,
