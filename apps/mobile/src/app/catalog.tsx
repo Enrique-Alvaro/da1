@@ -5,8 +5,9 @@ import { fetchAuctionDetail, fetchAuctionItems } from '@/services/api';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 type AuctionDetail = {
   id: number;
@@ -62,6 +63,36 @@ const ITEM_STATUS_LABEL: Record<string, string> = {
 const CATEGORY_LABELS: Record<string, string> = {
   comun: 'Común', especial: 'Especial', plata: 'Plata', oro: 'Oro', platino: 'Platino',
 };
+
+const imagenesProductos: Record<number, any> = {
+  // Relojes del catálogo 1
+  1: require('../../assets/images/productos/rolex-submariner/rolex-submariner1.jpg'),
+  2: require('../../assets/images/productos/omega-speedmaster/omega-speedmaster1.jpg'),
+
+  // Catálogos base (del 2 al 16)
+  3: require('../../assets/images/productos/arte-moderno/arte-moderno1.jpg'),
+  4: require('../../assets/images/productos/pintura-clasica/pintura-clasica1.jpg'),
+  5: require('../../assets/images/productos/joyeria-fina/joyeria-fina1.jpg'),
+  6: require('../../assets/images/productos/autoc-clasico/auto-clasico1.jpg'),
+  7: require('../../assets/images/productos/antiguedad/antiguedad1.jpg'),
+  8: require('../../assets/images/productos/mueble-vintage/mueble-vintage1.jpg'),
+  9: require('../../assets/images/productos/ropa-diseñador/ropa-diseñador1.jpg'),
+  10: require('../../assets/images/productos/fotografia-autor/fotografia-autor1.jpg'),
+  11: require('../../assets/images/productos/instrumentos-musicales/instrumento-musical1.jpg'),
+  12: require('../../assets/images/productos/coleccionables/coleccionable1.jpg'),
+  13: require('../../assets/images/productos/arte-contemporaneo/arte-contemporaneo1.jpg'),
+  14: require('../../assets/images/productos/fotos-historicas/foto-historica1.jpg'),
+  15: require('../../assets/images/productos/muebles-clasicos/muebles-clasicos1.jpg'),
+  16: require('../../assets/images/productos/diseño-industrial/diseño-industrial1.jpg'),
+  17: require('../../assets/images/productos/reloj-vintage/reloj-vintage1.jpg'),
+
+  // --- ARTÍCULOS DE TU CATÁLOGO DE PRUEBA (#21) ---
+  21: require('../../assets/images/productos/arte-moderno/arte-moderno1.jpg'),
+  22: require('../../assets/images/productos/joyeria-fina/joyeria-fina1.jpg'),
+  23: require('../../assets/images/productos/instrumentos-musicales/instrumento-musical1.jpg'),
+};
+
+const imagenDefault = require('../../assets/images/icon.png');
 
 export default function CatalogScreen() {
   const router = useRouter();
@@ -216,8 +247,12 @@ export default function CatalogScreen() {
                   })}
                 >
                   <View style={styles.itemIconBox}>
-                    <Text style={styles.itemIcon}>📦</Text>
-                  </View>
+  <Image 
+  source={imagenesProductos[item.id] || imagenDefault} 
+  style={{ width: '100%', height: '100%', borderRadius: 10 }} 
+  resizeMode="cover"
+/>
+</View>
                   <View style={styles.itemContent}>
                     <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
                     {item.catalogDescription && (
